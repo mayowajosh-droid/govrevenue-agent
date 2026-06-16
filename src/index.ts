@@ -7,6 +7,7 @@ generateGovRevenueReport,
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import * as Sentry from "@sentry/node";
 import { Pool } from "pg";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -14,6 +15,8 @@ import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
+import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed } from "./lib/emailNotifications.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
 type ScanRecord = {
   id: string;
@@ -25,6 +28,10 @@ type ScanRecord = {
   procurement_json: any | null;
   report_markdown: string | null;
   error_message: string | null;
+  pdf_storage_key?: string | null;
+  pdf_storage_url?: string | null;
+  pdf_storage_etag?: string | null;
+  pdf_storage_updated_at?: string | null;
 };
 
 type ProcurementNotice = {
@@ -72,6 +79,18 @@ const PORT = Number(process.env.PORT || 3000);
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
 const REDIS_URL = process.env.REDIS_URL || null;
+const RUN_WEB = process.env.RUN_WEB !== "false";
+const RUN_WORKER = process.env.RUN_WORKER !== "false";
+const SENTRY_DSN = process.env.SENTRY_DSN || "";
+const SENTRY_ENABLED = Boolean(SENTRY_DSN);
+
+if (SENTRY_ENABLED) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development",
+    tracesSampleRate: 0
+  });
+}
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -91,9 +110,34 @@ const scanQueue = redisConnection
   ? new Queue("govrevenue-scans", { connection: redisConnection as any })
   : null;
 
+type AsyncRouteHandler = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => Promise<void>;
+
+function asyncRoute(handler: AsyncRouteHandler) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    handler(req, res, next).catch(next);
+  };
+}
+
+function captureError(error: unknown, context?: Record<string, unknown>) {
+  if (!SENTRY_ENABLED) return;
+
+  Sentry.withScope(scope => {
+    for (const [key, value] of Object.entries(context || {})) {
+      scope.setContext(key, typeof value === "object" && value !== null ? value as Record<string, unknown> : { value });
+    }
+    Sentry.captureException(error);
+  });
+}
+
 
 const intakeSchema = z.object({
   companyName: z.string().min(2),
+  clientEmail: z.string().email().optional().or(z.literal("")).default(""),
+  email: z.string().email().optional().or(z.literal("")).default(""),
   website: z.string().optional().default(""),
   location: z.string().optional().default(""),
   areasServed: z.string().optional().default(""),
@@ -437,11 +481,19 @@ async function initDb() {
       input_json JSONB NOT NULL,
       procurement_json JSONB,
       report_markdown TEXT,
-      error_message TEXT
+      error_message TEXT,
+      pdf_storage_key TEXT,
+      pdf_storage_url TEXT,
+      pdf_storage_etag TEXT,
+      pdf_storage_updated_at TIMESTAMPTZ
     );
   `);
 
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS procurement_json JSONB;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_key TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_url TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_etag TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_updated_at TIMESTAMPTZ;`);
   console.log("[db] ready");
 }
 
@@ -455,7 +507,11 @@ async function createScan(input: z.infer<typeof intakeSchema>): Promise<ScanReco
     input_json: input,
     procurement_json: null,
     report_markdown: null,
-    error_message: null
+    error_message: null,
+    pdf_storage_key: null,
+    pdf_storage_url: null,
+    pdf_storage_etag: null,
+    pdf_storage_updated_at: null
   };
 
   if (pool) {
@@ -508,6 +564,32 @@ async function updateScan(id: string, patch: Partial<ScanRecord>) {
   }
 }
 
+async function updateScanPdfStorage(
+  id: string,
+  storage: Pick<ScanRecord, "pdf_storage_key" | "pdf_storage_url" | "pdf_storage_etag">
+) {
+  const updatedAt = nowIso();
+
+  if (pool) {
+    await pool.query(
+      `UPDATE scans
+       SET pdf_storage_key=$2, pdf_storage_url=$3, pdf_storage_etag=$4, pdf_storage_updated_at=$5
+       WHERE id=$1`,
+      [id, storage.pdf_storage_key, storage.pdf_storage_url, storage.pdf_storage_etag, updatedAt]
+    );
+    return;
+  }
+
+  const current = await getScan(id);
+  if (!current) return;
+
+  memoryStore.set(id, {
+    ...current,
+    ...storage,
+    pdf_storage_updated_at: updatedAt
+  });
+}
+
 async function listScans(): Promise<ScanRecord[]> {
   if (pool) {
     const result = await pool.query(`SELECT * FROM scans ORDER BY created_at DESC LIMIT 100`);
@@ -535,6 +617,10 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
     return;
   }
   next();
+}
+
+function clientEmailFromInput(input: z.infer<typeof intakeSchema>) {
+  return input.clientEmail || input.email || null;
 }
 
 
@@ -695,6 +781,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
         ))
       );
     } catch (error: any) {
+      captureError(error, { dataPull: { source: "contracts_finder", status: "open", keyword } });
       errors.push(`Open search failed for "${keyword}": ${error?.message || error}`);
     }
 
@@ -706,6 +793,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
         ))
       );
     } catch (error: any) {
+      captureError(error, { dataPull: { source: "contracts_finder", status: "awarded", keyword } });
       errors.push(`Awarded search failed for "${keyword}": ${error?.message || error}`);
     }
   }
@@ -1423,13 +1511,24 @@ async function createReport(input: z.infer<typeof intakeSchema>) {
 
     return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
   } catch (firstError: any) {
-    const response = await openai.responses.create({
-      model: OPENAI_MODEL,
-      tools: [{ type: "web_search_preview" } as any],
-      input: prompt
-    });
+    try {
+      const response = await openai.responses.create({
+        model: OPENAI_MODEL,
+        tools: [{ type: "web_search_preview" } as any],
+        input: prompt
+      });
 
-    return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
+      return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
+    } catch (secondError: any) {
+      captureError(secondError, {
+        openai: {
+          model: OPENAI_MODEL,
+          fallbackAfterPrimaryFailure: true,
+          primaryError: firstError?.message || String(firstError)
+        }
+      });
+      throw secondError;
+    }
   }
 }
 
@@ -1446,13 +1545,31 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
       error_message: null
     });
 
+    const links = buildScanLinks(id);
+    await notifyScanCompleted({
+      scanId: id,
+      companyName: input.companyName,
+      status: "completed",
+      reportUrl: links.reportUrl,
+      pdfUrl: links.pdfUrl,
+      clientEmail: clientEmailFromInput(input)
+    });
+
     console.log(`[scan] completed ${id}`);
   } catch (err: any) {
     console.error(`[scan] failed ${id}`, err);
+    captureError(err, { scan: { id, companyName: input.companyName, status: "failed" } });
 
     await updateScan(id, {
       status: "failed",
       error_message: err?.message || String(err)
+    });
+
+    await notifyScanFailed({
+      scanId: id,
+      companyName: input.companyName,
+      status: "failed",
+      errorSummary: err?.message || String(err)
     });
   }
 }
@@ -1460,7 +1577,10 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
 async function enqueueScan(id: string, input: z.infer<typeof intakeSchema>) {
   if (!scanQueue) {
     console.log("[queue] REDIS_URL not set. Running scan in-process.");
-    runScan(id, input).catch(console.error);
+    runScan(id, input).catch(error => {
+      console.error(error);
+      captureError(error, { scan: { id, companyName: input.companyName, queue: "in-process" } });
+    });
     return;
   }
 
@@ -1513,6 +1633,7 @@ function startScanWorker() {
 
   worker.on("failed", (job, error) => {
     console.error(`[worker] failed job ${job?.id}`, error);
+    captureError(error, { worker: { jobId: job?.id, scanId: job?.data?.id } });
   });
 
   console.log("[queue] worker started");
@@ -3276,6 +3397,11 @@ app.get("/health", (_req, res) => {
     app: "govrevenue-agent",
     database: pool ? "postgres" : "memory",
     queue: scanQueue ? "redis" : "in-process",
+    storage: isPdfStorageConfigured() ? "s3" : "not-configured",
+    runWeb: RUN_WEB,
+    runWorker: RUN_WORKER,
+    sentry: SENTRY_ENABLED ? "enabled" : "disabled",
+    email: isEmailConfigured() ? "enabled" : "disabled",
     model: OPENAI_MODEL
   });
 });
@@ -3367,7 +3493,7 @@ app.get("/", (_req, res) => {
 </html>`);
 });
 
-app.post("/form-submit", async (req, res) => {
+app.post("/form-submit", asyncRoute(async (req, res) => {
   const parsed = intakeSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -3388,9 +3514,9 @@ app.post("/form-submit", async (req, res) => {
       </div>
     </body>
   `);
-});
+}));
 
-app.post("/api/scans", async (req, res) => {
+app.post("/api/scans", asyncRoute(async (req, res) => {
   const parsed = intakeSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -3406,30 +3532,30 @@ app.post("/api/scans", async (req, res) => {
     status: scan.status,
     message: "Scan queued. Poll GET /api/scans/:id"
   });
-});
+}));
 
-app.get("/api/scans/:id", async (req, res) => {
+app.get("/api/scans/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan) {
     res.status(404).json({ error: "Scan not found" });
     return;
   }
   res.json(scan);
-});
+}));
 
-app.delete("/api/scans/:id", requireAdmin, async (req, res) => {
+app.delete("/api/scans/:id", requireAdmin, asyncRoute(async (req, res) => {
   await deleteScan(req.params.id);
   res.json({ ok: true, deleted: req.params.id });
-});
+}));
 
-app.post("/admin/scans/:id/delete", requireAdmin, async (req, res) => {
+app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
   await deleteScan(req.params.id);
   const token = String(req.query.token || "");
   res.redirect(`/admin/scans?token=${encodeURIComponent(token)}`);
-});
+}));
 
 
-app.get("/api/scans/:id/relevance.json", async (req, res) => {
+app.get("/api/scans/:id/relevance.json", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan || !scan.procurement_json) {
@@ -3438,18 +3564,18 @@ app.get("/api/scans/:id/relevance.json", async (req, res) => {
   }
 
   res.json(buildTrustLayer(scan.input_json, scan.procurement_json));
-});
+}));
 
-app.get("/api/scans/:id/data.json", async (req, res) => {
+app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || !scan.procurement_json) {
     res.status(404).json({ error: "Procurement data not found or not ready yet." });
     return;
   }
   res.json(scan.procurement_json);
-});
+}));
 
-app.get("/scan/:id", async (req, res) => {
+app.get("/scan/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan) {
@@ -3458,10 +3584,10 @@ app.get("/scan/:id", async (req, res) => {
   }
 
   res.type("html").send(reportPage(scan));
-});
+}));
 
 
-app.get("/api/scans/:id/report.pdf", async (req, res) => {
+app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan || !scan.report_markdown) {
@@ -3614,21 +3740,41 @@ try {
     });
 
     const filename = `${scan.company_name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_govrevenue_scan.pdf`;
+    const pdfBuffer = Buffer.from(pdf);
+
+    if (isPdfStorageConfigured()) {
+      const key = buildPdfStorageKey(scan.id, filename);
+      const storedPdf = await storePdfObject({
+        key,
+        filename,
+        body: pdfBuffer
+      });
+
+      if (storedPdf) {
+        await updateScanPdfStorage(scan.id, {
+          pdf_storage_key: storedPdf.key,
+          pdf_storage_url: storedPdf.publicUrl,
+          pdf_storage_etag: storedPdf.etag
+        });
+        res.setHeader("X-PDF-Storage-Key", storedPdf.key);
+      }
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(Buffer.from(pdf));
+    res.send(pdfBuffer);
   } catch (error: any) {
     console.error("[pdf] failed", error);
+    captureError(error, { pdf: { scanId: req.params.id, storageConfigured: isPdfStorageConfigured() } });
     res.status(500).send(error?.message || "PDF generation failed.");
   } finally {
     if (browser) {
       await browser.close();
     }
   }
-});
+}));
 
-app.get("/api/scans/:id/report.md", async (req, res) => {
+app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan || !scan.report_markdown) {
@@ -3640,9 +3786,9 @@ app.get("/api/scans/:id/report.md", async (req, res) => {
   res.setHeader("Content-Type", "text/markdown; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(scan.report_markdown);
-});
+}));
 
-app.get("/admin/scans", requireAdmin, async (req, res) => {
+app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const scans = await listScans();
   const token = String(req.query.token || "");
 
@@ -3672,15 +3818,36 @@ ${scans
 </table>
 </body>
 </html>`);
+}));
+
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[route] failed", err);
+  captureError(err, { route: { method: req.method, path: req.path } });
+
+  if (res.headersSent) return;
+
+  res.status(500).json({ error: "Internal server error" });
 });
 
 initDb()
   .then(() => {
-    startScanWorker();
+    // Railway split-runtime setup later:
+    // web service: RUN_WEB=true, RUN_WORKER=false
+    // worker service: RUN_WEB=false, RUN_WORKER=true
+    // Missing flags keep the current beta single-service behavior and run both.
+    if (RUN_WORKER) {
+      startScanWorker();
+    } else {
+      console.log("[queue] worker disabled by RUN_WORKER=false");
+    }
 
-    app.listen(PORT, () => {
-      console.log(`[server] GovRevenue Agent running on port ${PORT}`);
-    });
+    if (RUN_WEB) {
+      app.listen(PORT, () => {
+        console.log(`[server] GovRevenue Agent running on port ${PORT}`);
+      });
+    } else {
+      console.log("[server] web disabled by RUN_WEB=false");
+    }
   })
   .catch(err => {
     console.error("[startup] failed", err);
