@@ -3980,127 +3980,31 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
     res.status(404).send("Report not found or not complete yet.");
     return;
   }
-let html: string;
+  const html = reportPage(scan).replace(
+    "</head>",
+    `<style>
+      .actions,
+      .toolbar,
+      .admin-actions,
+      .download-actions,
+      .no-print,
+      a[href*="/report.pdf"],
+      a[href*="/markdown"],
+      a[href*="/relevance.json"],
+      button {
+        display: none !important;
+      }
 
-const scanData = scan as Record<string, any>;
-try {
-  const result = generateGovRevenueReport({
-  intake: {
-    companyName:
-      scanData.company_name ??
-      scanData.companyName ??
-      scanData.name ??
-      "Unnamed company",
+      body {
+        background: #f3eadc !important;
+      }
 
-    website:
-      scanData.website ??
-      scanData.company_website ??
-      undefined,
+      main {
+        margin-top: 0 !important;
+      }
+    </style></head>`
+  );
 
-    sector:
-      scanData.sector ??
-      scanData.industry ??
-      inferGovRevenueSector(scan),
-
-    sectorLens:
-      scanData.sector_lens ??
-      scanData.sectorLens ??
-      undefined,
-
-    baseLocation:
-      scanData.location ??
-      scanData.base_location ??
-      undefined,
-
-    regions:
-      toStringArray(scanData.regions ?? scanData.region) ??
-      ["West Midlands"],
-
-    services:
-      toStringArray(scanData.services ?? scanData.main_services) ??
-      [inferGovRevenueSector(scan)],
-
-    secondaryServices:
-      toStringArray(scanData.secondary_services) ??
-      [],
-
-    excludedServices:
-      toStringArray(scanData.excluded_services) ??
-      [],
-
-    idealBuyerTypes:
-      toStringArray(scanData.ideal_buyer_types) ??
-      [],
-
-    idealContractMin:
-      toMoney(scanData.ideal_contract_min),
-
-    idealContractMax:
-      toMoney(scanData.ideal_contract_max),
-
-    maxDeliverableContractValue:
-      toMoney(scanData.max_deliverable_contract_value),
-
-    currentTeamSize:
-      toNumber(scanData.current_team_size),
-
-    publicSectorExperience:
-      scanData.public_sector_experience ?? undefined,
-
-    accreditations:
-      toStringArray(scanData.accreditations) ??
-      [],
-
-    insuranceConfirmed:
-      Boolean(scanData.insurance_confirmed),
-
-    tupeReady:
-      Boolean(scanData.tupe_ready),
-
-    mobilisationReady:
-      Boolean(scanData.mobilisation_ready ?? scanData.mobilization_ready),
-
-    caseStudiesConfirmed:
-      Boolean(scanData.case_studies_confirmed),
-
-    mainGoal:
-      scanData.main_goal ?? undefined,
-
-    biggestConcern:
-      scanData.biggest_concern ?? undefined,
-  },
-  rawRecords: extractRecordsFromScan(scan),
-  strict: false,
-});
-
-  html = result.html;
-
-  console.log("[GovRevenue QA]", {
-    passed: result.qa.passed,
-    errors: result.qa.errors,
-    warnings: result.qa.warnings,
-    dataQuality: result.model.dataQuality.level,
-    pulledRecords: result.model.dataQuality.pulledRecords,
-    relevantRecords: result.model.dataQuality.relevantRecords,
-    noiseRecords: result.model.dataQuality.quarantinedNoiseRecords,
-    addressableOpportunityValue: result.model.valueSummary.addressableOpportunityValue,
-  });
-} catch (error) {
-  if (error instanceof GovRevenueQualityGateError) {
-    console.error("[GovRevenue blocked PDF export]", error.qa);
-
-    res.status(422).json({
-      ok: false,
-      blocked: true,
-      message: "GovRevenue report blocked by quality gate.",
-      qa: error.qa,
-    });
-
-    return;
-  }
-
-  throw error;
-}
   let browser: any = null;
 
   try {
