@@ -35,7 +35,7 @@ type ScanRecord = {
 };
 
 type ProcurementNotice = {
-  source: "Contracts Finder";
+  source: "Contracts Finder" | "Find a Tender";
   id: string;
   title: string;
   buyer: string;
@@ -58,11 +58,30 @@ type ProcurementNotice = {
   relevanceReason?: string;
 };
 
+type CompanyHouseRecord = {
+  companyName: string;
+  companyNumber: string;
+  companyStatus: string;
+  companyType: string;
+  dateOfCreation: string | null;
+  address: string;
+  sicCodes: string[];
+  url: string;
+};
+
 type ProcurementData = {
   generatedAt: string;
   quality?: any;
   keywords: string[];
   regions: string;
+  companiesHouse?: {
+    matches: CompanyHouseRecord[];
+    errors: string[];
+  };
+  findTender?: {
+    notices: ProcurementNotice[];
+    errors: string[];
+  };
   contractsFinder: {
     open: ProcurementNotice[];
     awarded: ProcurementNotice[];
@@ -408,6 +427,146 @@ function normaliseNotice(raw: any, keyword: string): ProcurementNotice | null {
     keyword
   };
 }
+
+
+function companyHouseAddress(address: any) {
+  if (!address) return "";
+  return [
+    address.premises,
+    address.address_line_1,
+    address.address_line_2,
+    address.locality,
+    address.region,
+    address.postal_code,
+    address.country
+  ].filter(Boolean).join(", ");
+}
+
+async function companiesHouseSearch(companyName: string): Promise<{ matches: CompanyHouseRecord[]; errors: string[] }> {
+  const apiKey = process.env.COMPANIES_HOUSE_API_KEY || "";
+  const errors: string[] = [];
+
+  if (!apiKey || !companyName.trim()) {
+    return { matches: [], errors: apiKey ? [] : ["Companies House API key not configured."] };
+  }
+
+  try {
+    const url = new URL("https://api.company-information.service.gov.uk/search/companies");
+    url.searchParams.set("q", companyName.trim());
+    url.searchParams.set("items_per_page", "5");
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`,
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      return { matches: [], errors: [`Companies House search failed: ${response.status} ${response.statusText}`] };
+    }
+
+    const data = await response.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+
+    const matches = items.map((item: any): CompanyHouseRecord => ({
+      companyName: String(item.title || item.company_name || "").trim(),
+      companyNumber: String(item.company_number || ""),
+      companyStatus: String(item.company_status || ""),
+      companyType: String(item.company_type || ""),
+      dateOfCreation: item.date_of_creation || null,
+      address: companyHouseAddress(item.address),
+      sicCodes: Array.isArray(item.sic_codes) ? item.sic_codes.map(String) : [],
+      url: item.links?.self
+        ? `https://find-and-update.company-information.service.gov.uk${item.links.self}`
+        : "https://find-and-update.company-information.service.gov.uk/"
+    })).filter((item: CompanyHouseRecord) => item.companyName && item.companyNumber);
+
+    return { matches, errors };
+  } catch (error: any) {
+    return { matches: [], errors: [error?.message || String(error)] };
+  }
+}
+
+function normaliseFindTenderRelease(release: any, keyword: string): ProcurementNotice | null {
+  const tender = release?.tender || {};
+  const title = String(tender.title || release.title || "").trim();
+  if (!title) return null;
+
+  const buyerName = String(release?.buyer?.name || release?.parties?.find?.((party: any) => Array.isArray(party.roles) && party.roles.includes("buyer"))?.name || "Not stated");
+  const amount = typeof tender?.value?.amount === "number" ? tender.value.amount : null;
+  const region = String(
+    tender?.items?.[0]?.deliveryAddresses?.[0]?.region ||
+    release?.parties?.[0]?.address?.region ||
+    ""
+  );
+
+  return {
+    source: "Find a Tender",
+    id: String(release.id || release.ocid || ""),
+    title,
+    buyer: buyerName,
+    description: String(tender.description || release.description || "").slice(0, 900),
+    status: String(tender.status || ""),
+    type: Array.isArray(release.tag) ? release.tag.join(", ") : "",
+    region,
+    publishedDate: release.date || null,
+    deadlineDate: tender?.tenderPeriod?.endDate || null,
+    awardedDate: release.date || null,
+    valueLow: amount,
+    valueHigh: amount,
+    awardedValue: amount,
+    awardedSupplier: "",
+    suitableForSme: null,
+    url: release.id ? `https://www.find-tender.service.gov.uk/Notice/${encodeURIComponent(String(release.id))}` : "https://www.find-tender.service.gov.uk/",
+    keyword
+  };
+}
+
+async function findTenderSearch(keywords: string[]): Promise<{ notices: ProcurementNotice[]; errors: string[] }> {
+  const errors: string[] = [];
+  const notices: ProcurementNotice[] = [];
+  const keywordSet = keywords.map(k => k.toLowerCase()).filter(Boolean);
+
+  try {
+    const to = new Date();
+    const from = new Date(to.getTime() - 1000 * 60 * 60 * 24 * 90);
+    const url = new URL("https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages");
+    url.searchParams.set("limit", "100");
+    url.searchParams.set("stages", "tender,award");
+    url.searchParams.set("updatedFrom", from.toISOString().slice(0, 19));
+    url.searchParams.set("updatedTo", to.toISOString().slice(0, 19));
+
+    const response = await fetch(url, { headers: { Accept: "application/json" } });
+
+    if (!response.ok) {
+      return { notices: [], errors: [`Find a Tender OCDS search failed: ${response.status} ${response.statusText}`] };
+    }
+
+    const data = await response.json();
+    const releases = Array.isArray(data.releases) ? data.releases : [];
+
+    for (const release of releases) {
+      const haystack = [
+        release?.tender?.title,
+        release?.tender?.description,
+        release?.buyer?.name,
+        release?.parties?.map?.((party: any) => party?.name).join(" ")
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      const matchedKeyword = keywordSet.find(keyword => haystack.includes(keyword));
+      if (!matchedKeyword) continue;
+
+      const notice = normaliseFindTenderRelease(release, matchedKeyword);
+      if (notice) notices.push(notice);
+    }
+
+    return { notices: dedupeNotices(notices).map(notice => enrichNoticeQuality(notice, keywords)), errors };
+  } catch (error: any) {
+    return { notices: [], errors: [error?.message || String(error)] };
+  }
+}
+
 
 async function contractsFinderSearch(params: any, keyword: string) {
   const endpoints = [
@@ -798,15 +957,37 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     }
   }
 
+  const companiesHouse = await companiesHouseSearch(input.companyName);
+  if (companiesHouse.errors.length) {
+    for (const error of companiesHouse.errors) {
+      errors.push(`Companies House: ${error}`);
+    }
+  }
+
+  const findTender = await findTenderSearch(keywords);
+  if (findTender.errors.length) {
+    for (const error of findTender.errors) {
+      errors.push(`Find a Tender: ${error}`);
+    }
+  }
+
   const finalOpen = dedupeNotices(open).map(notice => enrichNoticeQuality(notice, keywords));
   const finalAwarded = dedupeNotices(awarded).map(notice => enrichNoticeQuality(notice, keywords));
-  const quality = dataQualitySummary(finalOpen, finalAwarded, errors, keywords, regions);
+  const quality = dataQualitySummary(
+    finalOpen,
+    [...finalAwarded, ...findTender.notices],
+    errors,
+    keywords,
+    regions
+  );
 
   return {
     generatedAt: nowIso(),
     quality,
     keywords,
     regions,
+    companiesHouse,
+    findTender,
     contractsFinder: {
       open: finalOpen,
       awarded: finalAwarded,
@@ -818,14 +999,28 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
 function procurementDataMarkdown(data: ProcurementData) {
   const open = data.contractsFinder.open.slice(0, 14);
   const awarded = data.contractsFinder.awarded.slice(0, 14);
-  const quality = data.quality || dataQualitySummary(open, awarded, data.contractsFinder.errors || [], data.keywords, data.regions);
+  const findTender = (data.findTender?.notices || []).slice(0, 14);
+  const companiesHouse = data.companiesHouse?.matches || [];
+  const allErrors = [
+    ...(data.contractsFinder.errors || []).map(error => `Contracts Finder: ${error}`),
+    ...(data.findTender?.errors || []).map(error => `Find a Tender: ${error}`),
+    ...(data.companiesHouse?.errors || []).map(error => `Companies House: ${error}`)
+  ];
 
-  const renderRows = (items: ProcurementNotice[]) =>
+  const quality = data.quality || dataQualitySummary(
+    open,
+    [...awarded, ...findTender],
+    allErrors,
+    data.keywords,
+    data.regions
+  );
+
+  const renderRows = (items: ProcurementNotice[], emptyLabel: string) =>
     items.length
       ? items
           .map(
             item =>
-              `- [Pulled record] ${item.title} | Buyer: ${item.buyer} | Status: ${item.status || "-"} | Relevance: ${item.relevanceScore ?? "-"} /100 | Reason: ${item.relevanceReason || "-"} | Value: ${formatMoney(
+              `- [Pulled record: ${item.source}] ${item.title} | Buyer: ${item.buyer} | Status: ${item.status || "-"} | Relevance: ${item.relevanceScore ?? "-"} /100 | Reason: ${item.relevanceReason || "-"} | Value: ${formatMoney(
                 item.valueLow || item.awardedValue
               )}-${formatMoney(item.valueHigh || item.awardedValue)} | Deadline: ${formatDate(
                 item.deadlineDate
@@ -834,13 +1029,22 @@ function procurementDataMarkdown(data: ProcurementData) {
               } | Source URL: ${item.url}`
           )
           .join("\n")
-      : "- No matching structured records returned from Contracts Finder for this scan.";
+      : `- No matching structured records returned from ${emptyLabel} for this scan.`;
+
+  const companyRows = companiesHouse.length
+    ? companiesHouse
+        .map(
+          company =>
+            `- [Pulled record: Companies House] ${company.companyName} | Company number: ${company.companyNumber} | Status: ${company.companyStatus || "-"} | Type: ${company.companyType || "-"} | Created: ${company.dateOfCreation || "-"} | SIC: ${company.sicCodes.length ? company.sicCodes.join(", ") : "-"} | Address: ${company.address || "-"} | Source URL: ${company.url}`
+        )
+        .join("\n")
+    : "- No matching Companies House company profile returned for this intake company name.";
 
   return `
-STRUCTURED PROCUREMENT DATA PULLED BEFORE ANALYSIS
+STRUCTURED PROCUREMENT AND COMPANY DATA PULLED BEFORE ANALYSIS
 
 Source confidence labels allowed in this report:
-- Pulled record = record returned directly from Contracts Finder data below and includes Source URL.
+- Pulled record = record returned directly from Contracts Finder, Find a Tender or Companies House and includes Source URL.
 - Verified web fact = fact verified by web search and listed with a URL in Source Appendix.
 - Strategy target = commercially relevant buyer/supplier/opportunity suggested by analyst logic, but not confirmed as a pulled record.
 - Unconfirmed = mentioned in intake or plausible from context but not verified from sources checked.
@@ -854,20 +1058,28 @@ Moderate matches: ${quality.moderateMatches}
 Total structured records: ${quality.totalRecords}
 
 Data generated at: ${data.generatedAt}
-Source: Contracts Finder API v2 search_notices
+Sources: Contracts Finder API v2 search_notices; Find a Tender public OCDS release packages; Companies House search/companies
 Regions searched: ${data.regions}
 Keywords searched: ${data.keywords.join(", ")}
 
-Open opportunities:
-${renderRows(open)}
+Companies House company profile matches:
+${companyRows}
 
-Awarded / historical signals:
-${renderRows(awarded)}
+Contracts Finder open opportunities:
+${renderRows(open, "Contracts Finder open opportunities")}
+
+Contracts Finder awarded / historical signals:
+${renderRows(awarded, "Contracts Finder awarded records")}
+
+Find a Tender public OCDS notices:
+${renderRows(findTender, "Find a Tender")}
 
 Data pull errors:
-${data.contractsFinder.errors.length ? data.contractsFinder.errors.map(error => `- ${error}`).join("\n") : "- None"}
+${allErrors.length ? allErrors.map(error => `- ${error}`).join("\n") : "- None"}
 `;
 }
+
+
 
 function enforceDataQualityLanguage(report: string) {
   return String(report || "")
