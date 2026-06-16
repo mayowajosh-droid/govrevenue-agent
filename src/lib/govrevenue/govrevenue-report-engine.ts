@@ -1275,7 +1275,7 @@ function runQualityGate(
     errors.push("Report must show addressable opportunity value.");
   }
 
-  if (!html.includes("Low-relevance noise quarantine")) {
+  if (!html.toLowerCase().includes("low-relevance noise quarantine")) {
     errors.push("Report must include a low-relevance noise quarantine section.");
   }
 
