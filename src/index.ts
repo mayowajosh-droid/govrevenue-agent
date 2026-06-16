@@ -3412,86 +3412,244 @@ app.get("/", (_req, res) => {
 <head>
   <title>GovRevenue Agent</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- GOVREVENUE_PREMIUM_HOME -->
   <style>
-    body { font-family:Arial,sans-serif; background:#f3eadc; color:#24140f; margin:0; padding:32px; }
-    .wrap { max-width:980px; margin:0 auto; background:#fffaf3; border:1px solid #d2b88f; padding:30px; box-shadow:0 22px 70px rgba(36,20,15,.10); }
-    h1 { font-family:Georgia,serif; font-size:46px; margin:0 0 8px; }
-    p { line-height:1.55; color:#6f5b50; }
-    label { display:block; font-weight:800; margin-top:18px; }
-    input, textarea { width:100%; padding:13px; border:1px solid #d2b88f; background:#fff; font-size:15px; box-sizing:border-box; }
-    textarea { min-height:88px; }
-    button { margin-top:22px; padding:15px 22px; background:#24140f; color:#fff; border:0; font-weight:800; cursor:pointer; }
-    .small { font-size:13px; }
+    :root {
+      --ink:#20110c;
+      --muted:#705c50;
+      --paper:#fffaf3;
+      --sand:#f3eadc;
+      --gold:#b99155;
+      --line:#d7bd92;
+      --dark:#24140f;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(185,145,85,.28), transparent 34%),
+        linear-gradient(135deg, #f7efe3 0%, #ead7bb 100%);
+      color:var(--ink);
+    }
+    .page { max-width:1180px; margin:0 auto; padding:34px 22px 56px; }
+    .nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:42px; }
+    .brand { font-weight:900; letter-spacing:-.03em; font-size:22px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:10px 14px; color:var(--muted); background:rgba(255,250,243,.72); font-size:13px; }
+    .hero {
+      display:grid;
+      grid-template-columns:1.05fr .95fr;
+      gap:26px;
+      align-items:start;
+    }
+    .card {
+      background:rgba(255,250,243,.92);
+      border:1px solid var(--line);
+      box-shadow:0 26px 90px rgba(36,20,15,.12);
+      border-radius:28px;
+    }
+    .hero-copy { padding:44px; min-height:620px; }
+    .kicker { color:#8a6330; font-weight:900; text-transform:uppercase; letter-spacing:.12em; font-size:12px; margin-bottom:18px; }
+    h1 {
+      font-family: Georgia, serif;
+      font-size:64px;
+      line-height:.96;
+      letter-spacing:-.055em;
+      margin:0 0 20px;
+    }
+    .lede { font-size:19px; line-height:1.62; color:var(--muted); max-width:680px; }
+    .cta-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:30px; }
+    .btn {
+      display:inline-block;
+      background:var(--dark);
+      color:#fff;
+      text-decoration:none;
+      border-radius:999px;
+      padding:15px 20px;
+      font-weight:900;
+    }
+    .btn.secondary { background:transparent; color:var(--dark); border:1px solid var(--line); }
+    .proof {
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:12px;
+      margin-top:36px;
+    }
+    .proof div {
+      border:1px solid rgba(215,189,146,.8);
+      border-radius:18px;
+      padding:16px;
+      background:#fff7ec;
+    }
+    .proof strong { display:block; font-size:24px; margin-bottom:5px; }
+    .proof span { color:var(--muted); font-size:13px; line-height:1.35; }
+    .form-card { padding:28px; }
+    .form-title { font-family:Georgia,serif; font-size:32px; margin:0 0 6px; letter-spacing:-.04em; }
+    .form-sub { margin:0 0 20px; color:var(--muted); line-height:1.5; }
+    label { display:block; font-weight:900; margin-top:15px; font-size:13px; color:#3b241a; }
+    input, textarea {
+      width:100%;
+      margin-top:7px;
+      padding:13px 14px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      font-size:15px;
+      color:var(--ink);
+    }
+    textarea { min-height:82px; resize:vertical; }
+    button {
+      width:100%;
+      margin-top:22px;
+      padding:16px 20px;
+      background:var(--dark);
+      color:#fff;
+      border:0;
+      border-radius:999px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:15px;
+    }
+    .small { font-size:12px; color:var(--muted); margin-top:16px; }
+    .section {
+      margin-top:24px;
+      padding:30px;
+    }
+    .section h2 {
+      font-family:Georgia,serif;
+      font-size:36px;
+      letter-spacing:-.04em;
+      margin:0 0 12px;
+    }
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:14px;
+      margin-top:18px;
+    }
+    .mini {
+      background:#fff7ec;
+      border:1px solid rgba(215,189,146,.8);
+      border-radius:20px;
+      padding:18px;
+    }
+    .mini strong { display:block; margin-bottom:8px; }
+    .mini p { margin:0; color:var(--muted); line-height:1.5; font-size:14px; }
+    @media (max-width:900px) {
+      .hero { grid-template-columns:1fr; }
+      h1 { font-size:46px; }
+      .hero-copy { padding:30px; min-height:auto; }
+      .proof, .grid { grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>GovRevenue Agent.</h1>
-    <p>Public-sector revenue intelligence. Pulls Contracts Finder data, checks public signals, and turns the result into a commercial scan.</p>
+  <main class="page">
+    <nav class="nav">
+      <div class="brand">GovRevenue Agent</div>
+      <div class="pill">Commercial demand intelligence for UK public-sector revenue</div>
+    </nav>
 
-    <form method="POST" action="/form-submit">
-      <label>Company name</label>
-      <input name="companyName" required placeholder="The First Studios" />
+    <section class="hero">
+      <div class="card hero-copy">
+        <div class="kicker">GovRevenue Scan</div>
+        <h1>Find where your business can win before demand reaches Google.</h1>
+        <p class="lede">
+          GovRevenue Agent scans UK public-sector demand signals, procurement routes and buyer patterns,
+          then turns them into a practical commercial report your business can act on.
+        </p>
 
-      <label>Website</label>
-      <input name="website" placeholder="https://..." />
+        <div class="cta-row">
+          <a class="btn" href="#scan-intake">Run a scan</a>
+          <a class="btn secondary" href="/health">Check system health</a>
+        </div>
 
-      <label>Location / base</label>
-      <input name="location" placeholder="Birmingham, West Midlands, UK" />
+        <div class="proof">
+          <div><strong>1</strong><span>Submit your company profile and target services.</span></div>
+          <div><strong>2</strong><span>The agent scans opportunity, buyer and route-to-market signals.</span></div>
+          <div><strong>3</strong><span>You receive a commercial intelligence report with next actions.</span></div>
+        </div>
+      </div>
 
-      <label>Areas served</label>
-      <textarea name="areasServed" placeholder="Birmingham, West Midlands, London and wider UK"></textarea>
+      <div id="scan-intake" class="card form-card">
+        <h2 class="form-title">Scan intake</h2>
+        <p class="form-sub">Give the agent enough context to judge fit, route and commercial priority.</p>
 
-      <label>Main services</label>
-      <textarea name="mainServices" required placeholder="Wedding photography, portraits, graduation photography, event photography, property photography"></textarea>
+        <form method="POST" action="/form-submit">
+          <label>Company name</label>
+          <input name="companyName" required placeholder="The First Studios" />
 
-      <label>Secondary services</label>
-      <textarea name="secondaryServices"></textarea>
+          <label>Website</label>
+          <input name="website" placeholder="https://..." />
 
-      <label>Ideal public-sector buyers</label>
-      <textarea name="idealBuyers" placeholder="Councils, NHS trusts, universities, housing associations"></textarea>
+          <label>Location / base</label>
+          <input name="location" placeholder="Birmingham, West Midlands, UK" />
 
-      <label>Ideal contract size</label>
-      <input name="idealContractSize" placeholder="£500-£5,000 first projects; £5,000-£25,000 repeat work" />
+          <label>Areas served</label>
+          <textarea name="areasServed" placeholder="Birmingham, West Midlands, London and wider UK"></textarea>
 
-      <label>Maximum contract size</label>
-      <input name="maximumContractSize" />
+          <label>Main services</label>
+          <textarea name="mainServices" required placeholder="Commercial solar, retrofit, roofing, EV charging, property services"></textarea>
 
-      <label>Team size</label>
-      <input name="teamSize" />
+          <label>Secondary services</label>
+          <textarea name="secondaryServices"></textarea>
 
-      <label>Public-sector experience</label>
-      <input name="publicSectorExperience" placeholder="None / early-stage / some / strong" />
+          <label>Ideal public-sector buyers</label>
+          <textarea name="idealBuyers" placeholder="Councils, NHS trusts, universities, schools, housing associations"></textarea>
 
-      <label>Case studies or proof</label>
-      <textarea name="caseStudies"></textarea>
+          <label>Ideal contract size</label>
+          <input name="idealContractSize" placeholder="£25k-£150k, £100k-£500k, £500k+" />
 
-      <label>Certifications / policies / accreditations</label>
-      <textarea name="certifications"></textarea>
+          <label>Maximum contract size</label>
+          <input name="maximumContractSize" />
 
-      <label>Services they do NOT want</label>
-      <textarea name="excludedServices"></textarea>
+          <label>Team size</label>
+          <input name="teamSize" />
 
-      <label>Regions to scan first</label>
-      <textarea name="regionsToScan" placeholder="West Midlands first, then London"></textarea>
+          <label>Public-sector experience</label>
+          <input name="publicSectorExperience" placeholder="None / early-stage / some / strong" />
 
-      <label>Main business goal</label>
-      <textarea name="mainGoal"></textarea>
+          <label>Case studies or proof</label>
+          <textarea name="caseStudies"></textarea>
 
-      <label>Biggest concern</label>
-      <textarea name="biggestConcern"></textarea>
+          <label>Certifications / policies / accreditations</label>
+          <textarea name="certifications"></textarea>
 
-      <label>Preferred output</label>
-      <textarea name="preferredOutput"></textarea>
+          <label>Services they do NOT want</label>
+          <textarea name="excludedServices"></textarea>
 
-      <button type="submit">Run GovRevenue Scan</button>
-    </form>
+          <label>Regions to scan first</label>
+          <textarea name="regionsToScan" placeholder="West Midlands first, then London"></textarea>
 
-    <p class="small">Admin page: <code>/admin/scans?token=YOUR_ADMIN_TOKEN</code></p>
-  </div>
+          <label>Main business goal</label>
+          <textarea name="mainGoal" placeholder="Win direct tenders, find frameworks, find subcontracting routes, understand buyers"></textarea>
+
+          <label>Biggest concern</label>
+          <textarea name="biggestConcern"></textarea>
+
+          <label>Preferred output</label>
+          <textarea name="preferredOutput" placeholder="Short commercial report, detailed board report, opportunity shortlist"></textarea>
+
+          <button type="submit">Run GovRevenue Scan</button>
+        </form>
+
+        <p class="small">Admin page: /admin/scans?token=YOUR_ADMIN_TOKEN</p>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2>Built for companies selling into the built environment.</h2>
+      <div class="grid">
+        <div class="mini"><strong>Demand signals</strong><p>Spot where public money, planning needs and procurement activity point to future demand.</p></div>
+        <div class="mini"><strong>Buyer routes</strong><p>Understand whether to pursue tenders, frameworks, subcontracting, partnerships or pre-market positioning.</p></div>
+        <div class="mini"><strong>Commercial action</strong><p>Turn scan findings into practical next steps, not generic AI research.</p></div>
+      </div>
+    </section>
+  </main>
 </body>
 </html>`);
 });
+
 
 app.post("/form-submit", asyncRoute(async (req, res) => {
   const parsed = intakeSchema.safeParse(req.body);
