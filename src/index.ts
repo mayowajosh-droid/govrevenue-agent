@@ -4070,7 +4070,7 @@ try {
       scanData.biggest_concern ?? undefined,
   },
   rawRecords: extractRecordsFromScan(scan),
-  strict: true,
+  strict: false,
 });
 
   html = result.html;
