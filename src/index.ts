@@ -1,3 +1,9 @@
+import {
+generateGovRevenueReport,
+  GovRevenueQualityGateError,
+  type CompanyIntake,
+  type ProcurementRecord,
+} from "./lib/govrevenue/govrevenue-report-engine.js";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -6,9 +12,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
-
 type ScanStatus = "pending" | "running" | "completed" | "failed";
-
 type ScanRecord = {
   id: string;
   created_at: string;
@@ -3375,7 +3379,127 @@ app.get("/api/scans/:id/report.pdf", async (req, res) => {
     res.status(404).send("Report not found or not complete yet.");
     return;
   }
+let html: string;
 
+const scanData = scan as Record<string, any>;
+try {
+  const result = generateGovRevenueReport({
+  intake: {
+    companyName:
+      scanData.company_name ??
+      scanData.companyName ??
+      scanData.name ??
+      "Unnamed company",
+
+    website:
+      scanData.website ??
+      scanData.company_website ??
+      undefined,
+
+    sector:
+      scanData.sector ??
+      scanData.industry ??
+      inferGovRevenueSector(scan),
+
+    sectorLens:
+      scanData.sector_lens ??
+      scanData.sectorLens ??
+      undefined,
+
+    baseLocation:
+      scanData.location ??
+      scanData.base_location ??
+      undefined,
+
+    regions:
+      toStringArray(scanData.regions ?? scanData.region) ??
+      ["West Midlands"],
+
+    services:
+      toStringArray(scanData.services ?? scanData.main_services) ??
+      [inferGovRevenueSector(scan)],
+
+    secondaryServices:
+      toStringArray(scanData.secondary_services) ??
+      [],
+
+    excludedServices:
+      toStringArray(scanData.excluded_services) ??
+      [],
+
+    idealBuyerTypes:
+      toStringArray(scanData.ideal_buyer_types) ??
+      [],
+
+    idealContractMin:
+      toMoney(scanData.ideal_contract_min),
+
+    idealContractMax:
+      toMoney(scanData.ideal_contract_max),
+
+    maxDeliverableContractValue:
+      toMoney(scanData.max_deliverable_contract_value),
+
+    currentTeamSize:
+      toNumber(scanData.current_team_size),
+
+    publicSectorExperience:
+      scanData.public_sector_experience ?? undefined,
+
+    accreditations:
+      toStringArray(scanData.accreditations) ??
+      [],
+
+    insuranceConfirmed:
+      Boolean(scanData.insurance_confirmed),
+
+    tupeReady:
+      Boolean(scanData.tupe_ready),
+
+    mobilisationReady:
+      Boolean(scanData.mobilisation_ready ?? scanData.mobilization_ready),
+
+    caseStudiesConfirmed:
+      Boolean(scanData.case_studies_confirmed),
+
+    mainGoal:
+      scanData.main_goal ?? undefined,
+
+    biggestConcern:
+      scanData.biggest_concern ?? undefined,
+  },
+  rawRecords: extractRecordsFromScan(scan),
+  strict: true,
+});
+
+  html = result.html;
+
+  console.log("[GovRevenue QA]", {
+    passed: result.qa.passed,
+    errors: result.qa.errors,
+    warnings: result.qa.warnings,
+    dataQuality: result.model.dataQuality.level,
+    pulledRecords: result.model.dataQuality.pulledRecords,
+    relevantRecords: result.model.dataQuality.relevantRecords,
+    noiseRecords: result.model.dataQuality.quarantinedNoiseRecords,
+    addressableOpportunityValue: result.model.valueSummary.addressableOpportunityValue,
+  });
+} catch (error) {
+  if (error instanceof GovRevenueQualityGateError) {
+    console.error("[GovRevenue blocked PDF export]", error.qa);
+
+    res.status(422).json({
+      ok: false,
+      blocked: true,
+      message: "GovRevenue report blocked by quality gate.",
+      qa: error.qa,
+    });
+
+    return;
+  }
+
+  throw error;
+}
   let browser: any = null;
 
   try {
@@ -3385,7 +3509,7 @@ app.get("/api/scans/:id/report.pdf", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(reportPage(scan), { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "networkidle0" });
     await page.emulateMediaType("print");
 
     const pdf = await page.pdf({
@@ -3471,3 +3595,151 @@ initDb()
     console.error("[startup] failed", err);
     process.exit(1);
   });
+function inferGovRevenueSector(scan: any): string {
+  const text = [
+    scan.company_name,
+    scan.companyName,
+    scan.sector,
+    scan.industry,
+    scan.report_markdown,
+    scan.services,
+    scan.main_services,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    text.includes("cleaning") ||
+    text.includes("deep clean") ||
+    text.includes("hygiene") ||
+    text.includes("clinical")
+  ) {
+    return "cleaning";
+  }
+
+  return "public-sector services";
+}
+
+function extractRecordsFromScan(scan: any): ProcurementRecord[] {
+  const arrays = [
+    scan.records,
+    scan.procurement_records,
+    scan.procurementRecords,
+    scan.contracts,
+    scan.contract_records,
+    scan.contractRecords,
+    scan.contracts_finder_records,
+    scan.contractsFinderRecords,
+    scan.open_records,
+    scan.openRecords,
+    scan.award_records,
+    scan.awardRecords,
+    scan.matches,
+    scan.results,
+    scan.data?.records,
+    scan.data?.contracts,
+    scan.data?.results,
+    scan.raw?.records,
+    scan.raw?.contracts,
+    scan.raw?.results,
+  ];
+
+  const combined = arrays.filter(Array.isArray).flat();
+
+  return combined.map((record: any, index: number) => ({
+    id: String(
+      record.id ??
+        record.noticeId ??
+        record.notice_id ??
+        record.ocid ??
+        record.url ??
+        record.sourceUrl ??
+        `record-${index + 1}`,
+    ),
+    source: record.source ?? "Contracts Finder",
+    sourceUrl: record.sourceUrl ?? record.source_url ?? record.url ?? record.noticeUrl,
+    title:
+      record.title ??
+      record.name ??
+      record.noticeTitle ??
+      record.notice_title ??
+      "Untitled procurement record",
+    buyerName:
+      record.buyerName ??
+      record.buyer_name ??
+      record.buyer ??
+      record.authority ??
+      record.authorityName,
+    supplierName:
+      record.supplierName ??
+      record.supplier_name ??
+      record.supplier ??
+      record.awardedSupplier,
+    status:
+      record.status ??
+      record.noticeStatus ??
+      record.notice_status ??
+      record.stage ??
+      "unknown",
+    description:
+      record.description ??
+      record.summary ??
+      record.details ??
+      record.text ??
+      "",
+    region: record.region ?? record.location ?? record.place,
+    publishedDate: record.publishedDate ?? record.published_date,
+    deadline: record.deadline ?? record.closeDate ?? record.close_date,
+    awardDate: record.awardDate ?? record.award_date,
+    startDate: record.startDate ?? record.start_date,
+    endDate: record.endDate ?? record.end_date,
+    value:
+      toMoney(record.value) ??
+      toMoney(record.contractValue) ??
+      toMoney(record.contract_value) ??
+      toMoney(record.awardValue) ??
+      toMoney(record.award_value),
+    valueLow: toMoney(record.valueLow ?? record.value_low ?? record.minValue),
+    valueHigh: toMoney(record.valueHigh ?? record.value_high ?? record.maxValue),
+    cpvCodes: toStringArray(record.cpvCodes ?? record.cpv_codes ?? record.cpv) ?? [],
+    raw: record,
+  }));
+}
+
+function toStringArray(value: any): string[] | undefined {
+  if (!value) return undefined;
+
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => String(item ?? "").trim()).filter(Boolean);
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  if (typeof value === "string") {
+    const cleaned = value
+      .split(/[,;\n]/g)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  return undefined;
+}
+
+function toMoney(value: any): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  const cleaned = String(value).replace(/[£,\s]/g, "");
+  const parsed = Number(cleaned);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toNumber(value: any): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
