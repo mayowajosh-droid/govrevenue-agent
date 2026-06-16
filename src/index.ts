@@ -3853,7 +3853,7 @@ app.get("/", (_req, res) => {
           <button type="submit">Run GovRevenue Scan</button>
         </form>
 
-        <p class="small">Admin page: /admin/scans?token=YOUR_ADMIN_TOKEN</p>
+        
       </div>
     </section>
 
