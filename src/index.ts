@@ -3657,22 +3657,24 @@ function reportPage(scan: ScanRecord) {
     </div>
 
     <section class="cover">
-      <h1>GovRevenue Scan</h1>
-      <p class="subtitle">Commercial public-sector opportunity scan for <strong>${escapeHtml(scan.company_name)}</strong>. Built from intake data, Contracts Finder records, verified web research and analyst scoring.</p>
+      <h1>Executive Decision Panel</h1>
+      <p class="subtitle">Commercial public-sector revenue intelligence for <strong>${escapeHtml(scan.company_name)}</strong>. Built from intake data, Contracts Finder records, verified web research and analyst scoring.</p>
 
       <div class="meta">
-        <div class="metric"><b>Status</b><span>${escapeHtml(scan.status)}</span><small>Latest scan state</small></div>
-        <div class="metric"><b>Open records</b><span>${openCount}</span><small>Contracts Finder matches</small></div>
-        <div class="metric"><b>Award signals</b><span>${awardedCount}</span><small>Historical award matches</small></div>
-        <div class="metric"><b>Route</b><span style="font-size:20px">${escapeHtml(scores.route)}</span><small>Recommended route</small></div>
+        <div class="metric"><b>Verdict</b><span style="font-size:20px">${escapeHtml(data?.quality?.level === "Strong" ? "Bid selectively" : data?.quality?.level === "Medium" ? "Proceed cautiously" : "Prepare first")}</span><small>Commercial recommendation</small></div>
+        <div class="metric"><b>Evidence Grade</b><span>${escapeHtml(data?.quality?.level === "Strong" ? "B" : data?.quality?.level === "Medium" ? "C" : data?.quality?.level === "Weak" ? "D" : "Pending")}</span><small>${escapeHtml(data?.quality?.level || "Pending")} evidence base</small></div>
+        <div class="metric"><b>Can they win now?</b><span style="font-size:20px">${Number(data?.quality?.verifiedRecords || 0) > 0 ? "Yes, selectively" : "Prepare first"}</span><small>Based on verified evidence</small></div>
+        <div class="metric"><b>Recommended route</b><span style="font-size:20px">${escapeHtml(scores.route)}</span><small>Best first money route</small></div>
       </div>
 
       <div class="data-strip">
+        <p><strong>Best first money route:</strong> ${escapeHtml(scores.route)}</p>
+        <p><strong>Fastest action this week:</strong> validate evidence, capacity, compliance documents and route access before chasing live tenders.</p>
+        <p><strong>Main blocker:</strong> ${Number(data?.quality?.verifiedRecords || 0) > 0 ? "Convert evidence into a bid-ready pack and buyer-specific proof." : "Low verified evidence. Treat this as a route map until source-backed proof is strengthened."}</p>
         <p><strong>Sector lens:</strong> ${escapeHtml(scores.sector)}</p>
         <p><strong>Regions searched:</strong> ${escapeHtml(regions)}</p>
-        <p><strong>Keywords searched:</strong> ${escapeHtml(keywords)}</p>
         <p><strong>Generated:</strong> ${escapeHtml(formatDate(scan.updated_at))}</p>
-        <p><strong>Data quality:</strong> ${escapeHtml(data?.quality?.level || "Pending")} — ${escapeHtml(data?.quality?.warning || "Data quality summary pending.")}</p>
+        <p><strong>Evidence note:</strong> ${escapeHtml(data?.quality?.warning || "Human verification required before bid decisions.")}</p>
       </div>
     </section>
 
