@@ -101,6 +101,19 @@ type ProcurementData = {
   };
 };
 
+type HomepageSignal = {
+  id: string;          // = source_url (unique per notice)
+  category: string;
+  title: string;
+  buyer: string | null;
+  source: string;      // 'CF' | 'FTS'
+  source_url: string;
+  notice_date: string | null;
+  value_amount: number | null;
+  status: string;
+  fetched_at: string;
+};
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -129,6 +142,7 @@ const pool = process.env.DATABASE_URL
 
 const memoryStore = new Map<string, ScanRecord>();
 const subMemStore = new Map<string, SubscriptionRecord>();
+const sigMemStore = new Map<string, HomepageSignal>();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const redisConnection = REDIS_URL
@@ -144,6 +158,10 @@ const scanQueue = redisConnection
 
 const alertQueue = redisConnection
   ? new Queue("govrevenue-alerts", { connection: redisConnection as any })
+  : null;
+
+const signalQueue = redisConnection
+  ? new Queue("govrevenue-signals", { connection: redisConnection as any })
   : null;
 
 type AsyncRouteHandler = (
@@ -918,7 +936,79 @@ async function initDb() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS homepage_signals (
+      id           TEXT PRIMARY KEY,
+      category     TEXT NOT NULL,
+      title        TEXT NOT NULL,
+      buyer        TEXT,
+      source       TEXT NOT NULL,
+      source_url   TEXT NOT NULL,
+      notice_date  TIMESTAMPTZ,
+      value_amount BIGINT,
+      status       TEXT NOT NULL,
+      fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_homepage_signals_cat_fetched
+      ON homepage_signals (category, fetched_at DESC);
+  `);
+
   console.log("[db] ready");
+}
+
+async function upsertSignals(signals: HomepageSignal[]): Promise<void> {
+  if (signals.length === 0) return;
+  if (pool) {
+    for (const s of signals) {
+      await pool.query(
+        `INSERT INTO homepage_signals (id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (id) DO UPDATE SET fetched_at = EXCLUDED.fetched_at`,
+        [s.id, s.category, s.title, s.buyer, s.source, s.source_url,
+         s.notice_date, s.value_amount, s.status, s.fetched_at]
+      );
+    }
+  } else {
+    for (const s of signals) sigMemStore.set(s.id, s);
+  }
+}
+
+async function queryLatestSignals(limit: number): Promise<HomepageSignal[]> {
+  if (pool) {
+    const r = await pool.query<HomepageSignal>(
+      `SELECT * FROM homepage_signals ORDER BY fetched_at DESC LIMIT $1`, [limit]
+    );
+    return r.rows;
+  }
+  return [...sigMemStore.values()]
+    .sort((a, b) => b.fetched_at.localeCompare(a.fetched_at))
+    .slice(0, limit);
+}
+
+async function count24hSignals(): Promise<number> {
+  if (pool) {
+    const r = await pool.query<{ n: string }>(
+      `SELECT COUNT(*) AS n FROM homepage_signals WHERE fetched_at > NOW() - INTERVAL '24 hours'`
+    );
+    return parseInt(r.rows[0]?.n || "0", 10);
+  }
+  const cutoff = new Date(Date.now() - 86_400_000).toISOString();
+  return [...sigMemStore.values()].filter(s => s.fetched_at > cutoff).length;
+}
+
+async function findSamplePdf(): Promise<string | null> {
+  if (pool) {
+    const r = await pool.query<{ pdf_storage_url: string }>(
+      `SELECT pdf_storage_url FROM scans WHERE pdf_storage_url IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+    );
+    return r.rows[0]?.pdf_storage_url || null;
+  }
+  for (const s of memoryStore.values()) {
+    if (s.pdf_storage_url) return s.pdf_storage_url;
+  }
+  return null;
 }
 
 async function createScan(input: z.infer<typeof intakeSchema>): Promise<ScanRecord> {
@@ -2421,6 +2511,141 @@ function startAlertWorker() {
 }
 
 
+const SIGNAL_CATEGORIES: Array<{
+  key: string;
+  label: string;
+  input: z.infer<typeof intakeSchema>;
+  cap: number;
+}> = [
+  {
+    key: "housing-maintenance",
+    label: "Housing maintenance",
+    cap: 25,
+    input: intakeSchema.parse({
+      companyName: "GovRevenue Signal Fetch",
+      mainServices: "housing maintenance void works repairs responsive maintenance",
+      idealBuyers: "local councils housing associations",
+      mainGoal: "find housing maintenance contracts"
+    })
+  },
+  {
+    key: "cleaning-facilities",
+    label: "Cleaning & facilities",
+    cap: 25,
+    input: intakeSchema.parse({
+      companyName: "GovRevenue Signal Fetch",
+      mainServices: "cleaning facilities management janitorial services",
+      idealBuyers: "councils NHS trusts schools",
+      mainGoal: "find cleaning contracts"
+    })
+  },
+  {
+    key: "construction-pm",
+    label: "Construction PM",
+    cap: 25,
+    input: intakeSchema.parse({
+      companyName: "GovRevenue Signal Fetch",
+      mainServices: "construction project management site management capital works",
+      idealBuyers: "local authorities housing associations",
+      mainGoal: "find construction management contracts"
+    })
+  },
+  {
+    key: "passenger-transport",
+    label: "Passenger transport",
+    cap: 25,
+    input: intakeSchema.parse({
+      companyName: "GovRevenue Signal Fetch",
+      mainServices: "passenger transport bus services community transport",
+      idealBuyers: "councils transport authorities",
+      mainGoal: "find transport contracts"
+    })
+  },
+  {
+    key: "recruitment-staffing",
+    label: "Recruitment & staffing",
+    cap: 10,
+    input: intakeSchema.parse({
+      companyName: "GovRevenue Signal Fetch",
+      mainServices: "recruitment temporary staffing agency workers",
+      idealBuyers: "public sector NHS councils",
+      mainGoal: "find recruitment contracts"
+    })
+  }
+];
+
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  SIGNAL_CATEGORIES.map(c => [c.key, c.label])
+);
+
+async function refreshHomepageSignals(): Promise<void> {
+  console.log("[signals] refresh started");
+  for (const cat of SIGNAL_CATEGORIES) {
+    try {
+      const data = await pullProcurementData(cat.input);
+      const allNotices: ProcurementNotice[] = [
+        ...data.contractsFinder.open,
+        ...data.contractsFinder.awarded,
+        ...(data.findTender?.notices || [])
+      ];
+      const deduped = dedupeNotices(allNotices).slice(0, cat.cap);
+      const now = nowIso();
+      const signals: HomepageSignal[] = deduped.map(n => ({
+        id: n.url || `${n.source}-${n.id}`,
+        category: cat.key,
+        title: n.title.slice(0, 200),
+        buyer: n.buyer && n.buyer !== "Not stated" ? n.buyer.slice(0, 120) : null,
+        source: n.source === "Find a Tender" ? "FTS" : "CF",
+        source_url: n.url,
+        notice_date: n.publishedDate || n.awardedDate || null,
+        value_amount: n.valueHigh ?? n.valueLow ?? n.awardedValue ?? null,
+        status: n.status || "unknown",
+        fetched_at: now
+      })).filter(s => s.id && s.title);
+      await upsertSignals(signals);
+      console.log(`[signals] ${cat.key}: upserted ${signals.length}`);
+    } catch (err: any) {
+      console.error(`[signals] ${cat.key} refresh failed: ${err?.message}`);
+      captureError(err, { signalRefresh: { category: cat.key } });
+    }
+  }
+  console.log("[signals] refresh complete");
+}
+
+function startSignalsWorker(): void {
+  if (redisConnection && signalQueue) {
+    signalQueue.add(
+      "refresh",
+      {},
+      {
+        repeat: { every: 60 * 60 * 1000 },
+        jobId: "homepage-signals-hourly",
+        removeOnComplete: { age: 60 * 60 * 24 },
+        removeOnFail: { age: 60 * 60 * 24 * 3 }
+      }
+    ).catch(err => console.error("[signals] failed to schedule job", err));
+
+    const worker = new Worker(
+      "govrevenue-signals",
+      async () => { await refreshHomepageSignals(); },
+      { connection: redisConnection as any, concurrency: 1 }
+    );
+    worker.on("completed", () => console.log("[signals] refresh job completed"));
+    worker.on("failed", (job, err) => {
+      console.error("[signals] refresh job failed", err);
+      captureError(err, { signalWorker: { jobId: job?.id } });
+    });
+    console.log("[signals] worker started");
+  } else {
+    // In-process fallback: run once on startup then every hour
+    console.log("[signals] Redis not configured — running in-process on startup");
+    refreshHomepageSignals().catch(err => console.error("[signals] initial refresh failed", err));
+    setInterval(() => {
+      refreshHomepageSignals().catch(err => console.error("[signals] scheduled refresh failed", err));
+    }, 60 * 60 * 1000);
+  }
+}
+
 function clampScore(value: number) {
   const safe = Number.isFinite(value) ? value : 0;
   return Math.max(0, Math.min(100, Math.round(safe)));
@@ -3500,7 +3725,48 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.get("/", (_req, res) => {
+app.get("/", asyncRoute(async (_req, res) => {
+  const [signals, count24h, samplePdfUrl] = await Promise.all([
+    queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
+    count24hSignals().catch(() => 0),
+    findSamplePdf().catch(() => null as string | null)
+  ]);
+
+  const heroSignal = signals[0] || null;
+  const isLive = heroSignal !== null;
+
+  // Ticker HTML — doubled for seamless CSS scroll, server-rendered
+  const tickerSrc = signals.length >= 3 ? signals : null;
+  const buildTickerItems = (arr: HomepageSignal[]) =>
+    arr.map(s =>
+      `<span><b>${escapeHtml(s.source)}</b> ${escapeHtml(s.title.slice(0, 70))}${s.buyer ? ` &middot; ${escapeHtml(s.buyer.slice(0, 40))}` : ""}</span>`
+    ).join("");
+  const tickerHtml = tickerSrc
+    ? buildTickerItems(tickerSrc) + buildTickerItems(tickerSrc)
+    : "<span><b>FTS</b> Illustrative signal &middot; data loads on first refresh</span>".repeat(6);
+
+  // Hero card values
+  const heroCategory = isLive ? (CATEGORY_LABELS[heroSignal!.category] || heroSignal!.category) : "Housing maintenance";
+  const heroTitle = isLive ? heroSignal!.title.slice(0, 80) : "Responsive maintenance framework — West Midlands";
+  const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Birmingham City Council";
+  const heroSource = isLive ? heroSignal!.source : "CF";
+  const heroDateRaw = isLive ? (heroSignal!.notice_date || null) : null;
+  const heroDate = heroDateRaw
+    ? new Date(heroDateRaw).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "date not stated";
+  const heroStatus = isLive ? (heroSignal!.status || "unknown") : "illustrative";
+  const heroVal = isLive && heroSignal!.value_amount && heroSignal!.value_amount > 0
+    ? (heroSignal!.value_amount >= 1_000_000
+        ? `&pound;${(heroSignal!.value_amount / 1_000_000).toFixed(1)}m`
+        : `&pound;${Math.round(heroSignal!.value_amount / 1000)}k`)
+    : "Value not stated";
+
+  const noticesDisplay = count24h > 0 ? String(count24h) : "—";
+
+  const sampleLink = samplePdfUrl
+    ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
+    : `<span class="btn-ghost" style="opacity:.4;cursor:default" title="Sample report available after first scan">Sample report (soon)</span>`;
+
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3679,28 +3945,28 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
       <p class="lede">Public bodies already spend on what you sell. We map who buys it, who supplies it now, and the one route where your firm can realistically win &mdash; before the tender goes live.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="/scan">Run a revenue scan</a>
-        <a class="btn-ghost" href="#chart">See live signals</a>
+        ${sampleLink}
       </div>
       <div class="chips">
         <div class="chip"><b>&pound;400bn</b> annual public spend</div>
-        <div class="chip"><b id="liveNotices">128</b> notices today <span class="up">&#9650;</span></div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> notices today <span class="up">&#9650;</span></div>
         <div class="chip"><b>2</b> sources live &middot; CF &middot; FTS</div>
       </div>
     </div>
     <div class="record">
-      <div class="rhead"><span class="t">Extracted signal</span><span class="src">CF &middot; FTS &middot; LA spend &gt;&pound;500</span></div>
+      <div class="rhead"><span class="t">${isLive ? "Live signal" : "Illustrative signal"}</span><span class="src">${escapeHtml(heroSource)} &middot; public record</span></div>
       <div class="rbody">
         <svg class="spark" id="spark" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
-        <div class="rrow"><span class="k">Category</span><span class="v">Housing maintenance<small>West Midlands &middot; 18mo window</small></span></div>
-        <div class="rrow"><span class="k">Recurring spend</span><span class="v"><span class="figure" data-count="4.2">&pound;0.0m</span><small>6 buyers &middot; 24mo</small></span></div>
-        <div class="rrow"><span class="k">Incumbent</span><span class="v">Mears Group<small>won 8 of 12 awards &middot; 3yr term</small></span></div>
-        <div class="rrow"><span class="k">Verdict</span><span class="v"><span class="verdict">Partner, not bid</span></span></div>
+        <div class="rrow"><span class="k">Category</span><span class="v">${escapeHtml(heroCategory)}<small>${escapeHtml(heroDate)}</small></span></div>
+        <div class="rrow"><span class="k">Notice</span><span class="v" style="font-size:14px;line-height:1.3">${escapeHtml(heroTitle)}</span></div>
+        <div class="rrow"><span class="k">Buyer</span><span class="v" style="font-size:16px">${escapeHtml(heroBuyer)}</span></div>
+        <div class="rrow"><span class="k">Value</span><span class="v">${heroVal}<small>${escapeHtml(heroStatus)}</small></span></div>
       </div>
-      <div class="caveat"><b>Caveat.</b> Spend data shows payments, not wrongdoing. Confidence: medium. Two buyer names unresolved &mdash; flagged, not merged.</div>
+      <div class="caveat"><b>Caveat.</b> ${isLive ? "Source: public procurement record. Confidence varies by notice quality — buyer names taken verbatim, not verified." : "Illustrative sample &mdash; live data loads on first refresh (hourly)."}</div>
     </div>
   </div>
 </section>
-<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"></div></div>
+<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow">${tickerHtml}</div></div>
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
@@ -3897,21 +4163,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   d.forEach((v,i)=>{pts+=(i?' ':'')+( i/(d.length-1)*W).toFixed(1)+','+(H-(v/max)*H).toFixed(1);});
   s.innerHTML='<polyline points="'+pts+'" fill="none" stroke="#C2553F" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round"/>';
 })();
-(function(){
-  const el=document.querySelector('.figure[data-count]'); if(!el) return;
-  const target=parseFloat(el.dataset.count); let v=0;
-  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
-    const t=setInterval(()=>{v+=target/30;if(v>=target){v=target;clearInterval(t);}el.textContent=v.toFixed(1)+'m';},20);
-    io.disconnect();
-  }}),{threshold:.5}); io.observe(el);
-})();
-(function(){
-  const items=['<b>FTS</b> 14 new construction-PM notices &middot; West Midlands','<b>CF</b> Cleaning framework re-let signalled &middot; NHS trust','<b>SPEND</b> Council passenger transport up 9% QoQ','<b>AWARD</b> 3yr facilities contract &middot; renewal Q1','<b>FRAMEWORK</b> CCS lot expressions of interest closing'];
-  const row=document.getElementById('tickerRow');
-  if(row){const html=items.map(i=>'<span>'+i+'</span>').join('');row.innerHTML=html+html;}
-  const ln=document.getElementById('liveNotices'); let n=128;
-  setInterval(()=>{if(Math.random()>.6){n+=1;ln.textContent=n;}},3400);
-})();
+/* hero card value is server-rendered; no count-up needed */
+/* ticker + count are server-rendered; no client fill needed */
 (function(){
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.15});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
@@ -3919,7 +4172,7 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 </script>
 </body>
 </html>`);
-});
+}));
 
 
 app.post("/form-submit", asyncRoute(async (req, res) => {
@@ -4431,6 +4684,7 @@ initDb()
     if (RUN_WORKER) {
       startScanWorker();
       startAlertWorker();
+      startSignalsWorker();
     } else {
       console.log("[queue] worker disabled by RUN_WORKER=false");
     }
