@@ -664,20 +664,30 @@ function noticeUrl(id: string) {
   return id ? `https://www.contractsfinder.service.gov.uk/Notice/${encodeURIComponent(id)}` : "https://www.contractsfinder.service.gov.uk/";
 }
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
 function normaliseNotice(raw: any, keyword: string): ProcurementNotice | null {
   const item = raw?.item || raw;
   if (!item) return null;
 
   const id = String(item.id || item.noticeIdentifier || "");
-  const title = String(item.title || "").trim();
+  const title = decodeHtmlEntities(String(item.title || "").trim());
   if (!title) return null;
 
   return {
     source: "Contracts Finder",
     id,
     title,
-    buyer: String(item.organisationName || "Not stated"),
-    description: String(item.description || "").slice(0, 900),
+    buyer: decodeHtmlEntities(String(item.organisationName || "Not stated")),
+    description: decodeHtmlEntities(String(item.description || "").slice(0, 900)),
     status: String(item.noticeStatus || ""),
     type: String(item.noticeType || ""),
     region: String(item.regionText || item.region || ""),
@@ -687,7 +697,7 @@ function normaliseNotice(raw: any, keyword: string): ProcurementNotice | null {
     valueLow: typeof item.valueLow === "number" ? item.valueLow : null,
     valueHigh: typeof item.valueHigh === "number" ? item.valueHigh : null,
     awardedValue: typeof item.awardedValue === "number" ? item.awardedValue : null,
-    awardedSupplier: String(item.awardedSupplier || ""),
+    awardedSupplier: decodeHtmlEntities(String(item.awardedSupplier || "")),
     suitableForSme: typeof item.isSuitableForSme === "boolean" ? item.isSuitableForSme : null,
     url: noticeUrl(id),
     keyword
@@ -759,7 +769,7 @@ function normaliseFindTenderRelease(release: any, keyword: string): ProcurementN
   const title = String(tender.title || release.title || "").trim();
   if (!title) return null;
 
-  const buyerName = String(release?.buyer?.name || release?.parties?.find?.((party: any) => Array.isArray(party.roles) && party.roles.includes("buyer"))?.name || "Not stated");
+  const buyerName = decodeHtmlEntities(String(release?.buyer?.name || release?.parties?.find?.((party: any) => Array.isArray(party.roles) && party.roles.includes("buyer"))?.name || "Not stated"));
   const amount = typeof tender?.value?.amount === "number" ? tender.value.amount : null;
   const region = String(
     tender?.items?.[0]?.deliveryAddresses?.[0]?.region ||
