@@ -308,9 +308,8 @@ function formatDate(value: string | null | undefined) {
 
 
 
-function buildKeywords(input: z.infer<typeof intakeSchema>) {
+function buildKeywords(input: z.infer<typeof intakeSchema>): string[] {
   const text = [
-    input.companyName,
     input.mainServices,
     input.secondaryServices,
     input.idealBuyers,
@@ -320,14 +319,25 @@ function buildKeywords(input: z.infer<typeof intakeSchema>) {
     .join(" ")
     .toLowerCase();
 
-  const catalog = [
+  interface SectorDef {
+    key: string;
+    // All triggers are multi-word phrases — score = number of these that match
+    primary: string[];
+    // If ANY exclusion phrase is present the sector is disqualified even if primary matched
+    excludeIf?: string[];
+    keywords: string[];
+  }
+
+  const SECTORS: SectorDef[] = [
     {
-      triggers: [
+      key: "social-housing-maintenance",
+      primary: [
         "social housing", "housing repairs", "void maintenance", "void property",
         "responsive repairs", "planned maintenance", "housing maintenance",
-        "repairs and maintenance", "voids and planned", "housing refurbishment",
-        "registered social landlord", "almo", "housing association",
-        "housing management", "resident-facing", "resident facing"
+        "repairs and maintenance", "housing refurbishment", "almo",
+        "registered social landlord", "housing association repairs",
+        "housing management", "voids and planned", "resident-facing",
+        "housing with care", "housing compliance", "housing contract"
       ],
       keywords: [
         "housing repairs and maintenance",
@@ -336,72 +346,266 @@ function buildKeywords(input: z.infer<typeof intakeSchema>) {
         "planned maintenance",
         "social housing maintenance",
         "housing refurbishment",
-        "housing retrofit",
-        "social housing retrofit"
+        "property maintenance housing",
+        "housing compliance works"
       ]
     },
     {
-      triggers: ["quantity surveying", "quantity surveyor", "cost management", "cost consultancy", "cost consultant", "qs"],
-      keywords: ["quantity surveying", "cost management", "cost consultancy", "construction consultancy"]
+      key: "housing-retrofit",
+      primary: [
+        "social housing retrofit", "shdf", "social housing decarbonisation",
+        "housing decarbonisation", "whole house retrofit",
+        "housing energy efficiency", "housing insulation", "external wall insulation",
+        "loft insulation housing", "ventilation upgrade", "housing net zero"
+      ],
+      keywords: [
+        "social housing retrofit",
+        "housing decarbonisation",
+        "SHDF retrofit",
+        "energy efficiency housing",
+        "whole house retrofit"
+      ]
     },
     {
-      triggers: ["construction project management", "project management", "employer's agent", "employer agent", "contract administration", "project controls", "programme management"],
-      keywords: ["construction project management", "project management", "programme management", "employer's agent", "contract administration", "project controls"]
+      key: "construction-qs",
+      primary: [
+        "quantity surveying", "quantity surveyor", "cost consultancy",
+        "cost consultant", "cost management", "qs services",
+        "bills of quantities", "pre-contract cost", "post-contract cost"
+      ],
+      excludeIf: ["social housing", "housing repairs", "void maintenance", "responsive repairs"],
+      keywords: [
+        "quantity surveying",
+        "cost management",
+        "cost consultancy",
+        "construction consultancy",
+        "employer's agent"
+      ]
     },
     {
-      triggers: ["building surveying", "building survey", "condition survey", "six facet", "estate consultancy", "estate management", "strategic estate", "asset management consultancy", "property consultancy", "built asset consultancy"],
-      keywords: ["building surveying", "condition survey", "estate consultancy", "asset management", "property consultancy", "built asset consultancy"]
+      key: "construction-pm",
+      primary: [
+        "construction project management", "employer's agent", "employer agent",
+        "contract administration", "project controls", "programme management",
+        "project management construction", "site management", "clerk of works"
+      ],
+      excludeIf: ["social housing", "housing repairs", "void maintenance", "responsive repairs"],
+      keywords: [
+        "construction project management",
+        "project management",
+        "programme management",
+        "employer's agent",
+        "contract administration"
+      ]
     },
     {
-      triggers: ["retrofit consultancy", "decarbonisation consultancy", "net zero consultancy", "energy efficiency consultancy", "sustainability consultancy", "retrofit assessment", "whole house retrofit"],
-      keywords: ["retrofit consultancy", "decarbonisation", "net zero consultancy", "energy efficiency", "sustainability consultancy"]
+      key: "building-surveying",
+      primary: [
+        "building surveying", "building survey", "condition survey",
+        "six facet survey", "estate consultancy", "estate management services",
+        "strategic estate", "built asset consultancy",
+        "asset management consultancy", "property consultancy",
+        "dilapidations", "measured survey", "planned preventive maintenance survey"
+      ],
+      excludeIf: ["social housing", "housing repairs", "void maintenance", "responsive repairs"],
+      keywords: [
+        "building surveying",
+        "condition survey",
+        "estate consultancy",
+        "asset management",
+        "property consultancy",
+        "built asset consultancy"
+      ]
     },
     {
-      triggers: ["retrofit", "decarbonisation", "decarbonization", "net zero", "energy efficiency", "sustainability", "shdf", "social housing decarbonisation"],
-      keywords: ["housing retrofit", "social housing decarbonisation", "SHDF retrofit", "energy efficiency works", "net zero housing"]
+      key: "cleaning",
+      primary: [
+        "cleaning services", "specialist cleaning", "deep cleaning",
+        "clinical cleaning", "healthcare cleaning", "infection control cleaning",
+        "office cleaning", "communal cleaning", "janitorial services",
+        "washroom services", "bio fogging", "sanitisation services",
+        "environmental cleaning", "school cleaning", "academy cleaning"
+      ],
+      excludeIf: ["social housing", "housing repairs", "building surveying"],
+      keywords: [
+        "cleaning services",
+        "specialist cleaning",
+        "healthcare cleaning",
+        "deep cleaning",
+        "infection control cleaning",
+        "communal area cleaning",
+        "estate cleaning",
+        "school cleaning"
+      ]
     },
     {
-      triggers: ["facilities management", "hard fm", "soft fm", "fm services"],
-      keywords: ["facilities management", "estate maintenance", "hard FM"]
+      key: "facilities-management",
+      primary: [
+        "facilities management", "hard fm", "soft fm",
+        "total fm", "integrated fm", "fm services", "tupe fm",
+        "building services maintenance", "mechanical and electrical maintenance",
+        "m&e maintenance", "helpdesk services"
+      ],
+      excludeIf: ["social housing", "housing repairs", "void maintenance"],
+      keywords: [
+        "facilities management",
+        "hard FM",
+        "soft FM",
+        "integrated facilities management",
+        "building services maintenance"
+      ]
     },
     {
-      triggers: ["roofing", "roof", "cladding", "building envelope"],
-      keywords: ["roofing", "cladding", "building envelope"]
+      key: "energy-retrofit",
+      primary: [
+        "solar pv", "photovoltaic", "heat pump installation",
+        "ev charging", "energy efficiency consultancy",
+        "retrofit consultancy", "net zero consultancy",
+        "decarbonisation consultancy", "energy assessment",
+        "epc assessment", "insulation contractor",
+        "air source heat pump", "ground source heat pump"
+      ],
+      excludeIf: ["social housing", "housing repairs", "housing maintenance"],
+      keywords: [
+        "energy efficiency",
+        "retrofit",
+        "solar PV",
+        "heat pumps",
+        "net zero services",
+        "decarbonisation",
+        "energy consultancy"
+      ]
     },
     {
-      triggers: ["solar", "photovoltaic", "pv", "ev charging", "heat pump"],
-      keywords: ["solar PV", "EV charging", "renewable energy", "heat pumps"]
+      key: "software-ict",
+      primary: [
+        "software development", "software services", "digital transformation",
+        "saas", "cloud services", "it services", "cyber security",
+        "data analytics", "app development", "technology services",
+        "software platform", "managed it", "it support services"
+      ],
+      keywords: [
+        "software development",
+        "digital transformation",
+        "IT services",
+        "technology solutions",
+        "cloud services",
+        "cyber security"
+      ]
     },
     {
-      triggers: ["photography", "photographer", "event photography", "portrait", "graduation", "wedding", "property photography"],
-      keywords: ["photography", "event photography", "corporate photography", "property photography", "creative services", "media services"]
+      key: "training-skills",
+      primary: [
+        "training services", "learning and development", "skills training",
+        "apprenticeship", "coaching services", "professional development",
+        "training provider", "workforce development", "skills programme",
+        "e-learning", "classroom training", "cpd training"
+      ],
+      keywords: [
+        "training services",
+        "professional development",
+        "skills training",
+        "apprenticeship programmes",
+        "workforce development"
+      ]
     },
     {
-      triggers: ["marketing", "communications", "content", "campaign", "creative", "video production", "film"],
-      keywords: ["marketing services", "communications", "creative services", "content production", "video production"]
+      key: "photography",
+      primary: [
+        "photography services", "event photography",
+        "portrait photography", "graduation photography",
+        "property photography", "commercial photography",
+        "wedding photography", "corporate photography"
+      ],
+      keywords: [
+        "photography",
+        "event photography",
+        "corporate photography",
+        "property photography",
+        "visual content services"
+      ]
+    },
+    {
+      key: "marketing-creative",
+      primary: [
+        "marketing agency", "creative agency", "communications agency",
+        "content production", "video production", "campaign management",
+        "brand strategy", "public relations", "media production",
+        "graphic design services", "social media management"
+      ],
+      keywords: [
+        "marketing services",
+        "communications",
+        "creative services",
+        "content production",
+        "video production"
+      ]
+    },
+    {
+      key: "healthcare",
+      primary: [
+        "healthcare consultancy", "nhs consultancy", "clinical services",
+        "health services management", "patient pathway", "primary care services",
+        "community health", "mental health services", "care home management"
+      ],
+      keywords: [
+        "healthcare services",
+        "NHS services",
+        "clinical services",
+        "health management",
+        "patient services"
+      ]
     }
   ];
 
-  const selected: string[] = [];
+  // Score each sector: count primary phrase matches, skip if excluded
+  const scored = SECTORS
+    .filter(def => !def.excludeIf?.some(exc => text.includes(exc)))
+    .map(def => ({
+      def,
+      score: def.primary.filter(t => text.includes(t)).length
+    }))
+    .filter(m => m.score > 0)
+    .sort((a, b) => b.score - a.score);
 
-  for (const group of catalog) {
-    if (group.triggers.some(trigger => text.includes(trigger))) {
-      selected.push(...group.keywords);
+  if (!scored.length) {
+    // Fallback: extract service phrases directly from intake
+    const phrases = [input.mainServices, input.secondaryServices]
+      .join(",")
+      .split(/[,./;|]+/)
+      .map(v => v.trim().toLowerCase())
+      .filter(v => v.length >= 4 && v.length <= 60)
+      .slice(0, 8);
+    return Array.from(new Set(phrases));
+  }
+
+  // Primary sector keywords
+  const selected = new Set<string>(scored[0].def.keywords);
+
+  // Allow one compatible secondary sector to supplement keywords up to the cap
+  const COMPATIBLE_SECONDARY: Record<string, string[]> = {
+    "social-housing-maintenance": ["housing-retrofit"],
+    "housing-retrofit":           ["social-housing-maintenance"],
+    "construction-qs":            ["construction-pm", "building-surveying"],
+    "construction-pm":            ["construction-qs", "building-surveying"],
+    "building-surveying":         ["construction-qs", "construction-pm"],
+    "energy-retrofit":            ["housing-retrofit"],
+    "cleaning":                   ["facilities-management"],
+    "facilities-management":      ["cleaning"]
+  };
+
+  if (scored.length > 1 && selected.size < 8) {
+    const allowed = COMPATIBLE_SECONDARY[scored[0].def.key] ?? [];
+    const secondary = scored.slice(1).find(m => allowed.includes(m.def.key));
+    if (secondary) {
+      for (const kw of secondary.def.keywords) {
+        if (selected.size >= 8) break;
+        selected.add(kw);
+      }
     }
   }
 
-  if (!selected.length) {
-    const servicePhrases = [input.mainServices, input.secondaryServices]
-      .join(",")
-      .split(/[,./;|]+/)
-      .map(value => value.trim().toLowerCase())
-      .filter(value => value.length >= 4 && value.length <= 60)
-      .slice(0, 6);
-
-    selected.push(...servicePhrases);
-  }
-
-  return Array.from(new Set(selected)).slice(0, 8);
+  return [...selected].slice(0, 8);
 }
 
 function buildRegion(input: z.infer<typeof intakeSchema>) {
