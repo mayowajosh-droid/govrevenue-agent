@@ -3494,253 +3494,375 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/", (_req, res) => {
-  res.type("html").send(`<!doctype html>
-<html>
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>GovRevenue Agent</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- GOVREVENUE_PREMIUM_HOME -->
-  <style>
-    :root {
-      --ink:#20110c;
-      --muted:#705c50;
-      --paper:#fffaf3;
-      --sand:#f3eadc;
-      --gold:#b99155;
-      --line:#d7bd92;
-      --dark:#24140f;
-    }
-    * { box-sizing:border-box; }
-    body {
-      margin:0;
-      font-family: Arial, sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(185,145,85,.28), transparent 34%),
-        linear-gradient(135deg, #f7efe3 0%, #ead7bb 100%);
-      color:var(--ink);
-    }
-    .page { max-width:1180px; margin:0 auto; padding:34px 22px 56px; }
-    .nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:42px; }
-    .brand { font-weight:900; letter-spacing:-.03em; font-size:22px; }
-    .pill { border:1px solid var(--line); border-radius:999px; padding:10px 14px; color:var(--muted); background:rgba(255,250,243,.72); font-size:13px; }
-    .hero {
-      display:grid;
-      grid-template-columns:1.05fr .95fr;
-      gap:26px;
-      align-items:start;
-    }
-    .card {
-      background:rgba(255,250,243,.92);
-      border:1px solid var(--line);
-      box-shadow:0 26px 90px rgba(36,20,15,.12);
-      border-radius:28px;
-    }
-    .hero-copy { padding:44px; min-height:620px; }
-    .kicker { color:#8a6330; font-weight:900; text-transform:uppercase; letter-spacing:.12em; font-size:12px; margin-bottom:18px; }
-    h1 {
-      font-family: Georgia, serif;
-      font-size:64px;
-      line-height:.96;
-      letter-spacing:-.055em;
-      margin:0 0 20px;
-    }
-    .lede { font-size:19px; line-height:1.62; color:var(--muted); max-width:680px; }
-    .cta-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:30px; }
-    .btn {
-      display:inline-block;
-      background:var(--dark);
-      color:#fff;
-      text-decoration:none;
-      border-radius:999px;
-      padding:15px 20px;
-      font-weight:900;
-    }
-    .btn.secondary { background:transparent; color:var(--dark); border:1px solid var(--line); }
-    .proof {
-      display:grid;
-      grid-template-columns:repeat(3, 1fr);
-      gap:12px;
-      margin-top:36px;
-    }
-    .proof div {
-      border:1px solid rgba(215,189,146,.8);
-      border-radius:18px;
-      padding:16px;
-      background:#fff7ec;
-    }
-    .proof strong { display:block; font-size:24px; margin-bottom:5px; }
-    .proof span { color:var(--muted); font-size:13px; line-height:1.35; }
-    .form-card { padding:28px; }
-    .form-title { font-family:Georgia,serif; font-size:32px; margin:0 0 6px; letter-spacing:-.04em; }
-    .form-sub { margin:0 0 20px; color:var(--muted); line-height:1.5; }
-    label { display:block; font-weight:900; margin-top:15px; font-size:13px; color:#3b241a; }
-    input, textarea {
-      width:100%;
-      margin-top:7px;
-      padding:13px 14px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:#fff;
-      font-size:15px;
-      color:var(--ink);
-    }
-    textarea { min-height:82px; resize:vertical; }
-    button {
-      width:100%;
-      margin-top:22px;
-      padding:16px 20px;
-      background:var(--dark);
-      color:#fff;
-      border:0;
-      border-radius:999px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:15px;
-    }
-    .small { font-size:12px; color:var(--muted); margin-top:16px; }
-    .section {
-      margin-top:24px;
-      padding:30px;
-    }
-    .section h2 {
-      font-family:Georgia,serif;
-      font-size:36px;
-      letter-spacing:-.04em;
-      margin:0 0 12px;
-    }
-    .grid {
-      display:grid;
-      grid-template-columns:repeat(3, 1fr);
-      gap:14px;
-      margin-top:18px;
-    }
-    .mini {
-      background:#fff7ec;
-      border:1px solid rgba(215,189,146,.8);
-      border-radius:20px;
-      padding:18px;
-    }
-    .mini strong { display:block; margin-bottom:8px; }
-    .mini p { margin:0; color:var(--muted); line-height:1.5; font-size:14px; }
-    @media (max-width:900px) {
-      .hero { grid-template-columns:1fr; }
-      h1 { font-size:46px; }
-      .hero-copy { padding:30px; min-height:auto; }
-      .proof, .grid { grid-template-columns:1fr; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GovRevenue — Public-Sector Revenue Intelligence</title>
+<style>
+:root{
+  --ink:#0B0F14; --paper:#FAF8F3; --paper-2:#F3EFE6;
+  --accent:#9B2C2C; --accent-2:#C2553F; --slate:#5A6B7B;
+  --line:#1f262e1a; --line-strong:#0F141926;
+  --serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
+.topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
+.topstrip .wrap{display:flex;justify-content:space-between;align-items:center;height:34px}
+.topstrip .live{display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #9B2C2C66}70%{box-shadow:0 0 0 7px #9B2C2C00}100%{box-shadow:0 0 0 0 #9B2C2C00}}
+header.mast{border-bottom:1px solid var(--line-strong)}
+.mast .wrap{display:flex;align-items:baseline;justify-content:space-between;padding-top:26px;padding-bottom:18px}
+.logo{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+nav.primary{display:flex;gap:30px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
+nav.primary a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
+nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
+.mast-cta{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--ink);padding:9px 16px;transition:.18s}
+.mast-cta:hover{background:var(--ink);color:var(--paper)}
+.verticals{border-bottom:1px solid var(--line-strong);background:var(--paper-2)}
+.verticals .wrap{display:flex;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;overflow-x:auto}
+.verticals a{padding:13px 22px 13px 0;color:var(--slate);white-space:nowrap;position:relative;transition:.18s}
+.verticals a:not(:last-child){margin-right:22px}
+.verticals a:not(:last-child):after{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:1px;height:13px;background:var(--line-strong)}
+.verticals a:hover{color:var(--accent)}
+.hero{position:relative;background:var(--ink);color:var(--paper);overflow:hidden;border-bottom:1px solid #000}
+#globe-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.92}
+.hero-grad{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 80% at 78% 42%, transparent 30%, #0B0F14 78%),linear-gradient(90deg,#0B0F14 18%, transparent 60%)}
+.hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center;min-height:560px;padding:64px 32px}
+.hero h1{font-family:var(--serif);font-weight:600;font-size:60px;line-height:1.03;letter-spacing:-.02em;margin:18px 0 22px}
+.hero h1 em{font-style:italic;color:var(--accent-2)}
+.hero .lede{font-size:18.5px;line-height:1.5;color:#c3ccd2;max-width:30em;margin-bottom:30px}
+.hero-actions{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.btn-primary{background:var(--accent);color:#fff;font-family:var(--mono);font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:14px 24px;transition:.18s}
+.btn-primary:hover{background:#7a2121;transform:translateY(-1px)}
+.btn-ghost{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:#aeb8c0;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#ffffff30}
+.btn-ghost:hover{color:#fff}
+.chips{display:flex;gap:10px;margin-top:30px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:#c3ccd2;border:1px solid #ffffff1f;padding:8px 12px;background:#ffffff08;display:flex;gap:8px;align-items:center}
+.chip b{color:#fff;font-weight:600}
+.chip .up{color:#7ed99a}
+.record{position:relative;border:1px solid #ffffff1f;background:#0f151ccc;backdrop-filter:blur(8px);box-shadow:0 30px 60px -30px #000}
+.record .rhead{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid #ffffff14}
+.record .rhead .t{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#fff}
+.record .rhead .src{font-family:var(--mono);font-size:10.5px;color:#8a949c}
+.record .rbody{padding:6px 18px}
+.rrow{display:flex;justify-content:space-between;align-items:flex-start;padding:13px 0;border-bottom:1px dashed #ffffff14}
+.rrow:last-child{border-bottom:0}
+.rrow .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a949c;padding-top:3px}
+.rrow .v{text-align:right;font-family:var(--serif);font-size:20px;color:#fff;max-width:62%}
+.rrow .v small{display:block;font-family:var(--mono);font-size:10.5px;color:#8a949c;margin-top:4px}
+.figure{font-family:var(--mono);font-size:28px;font-weight:500;color:#fff}
+.verdict{display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;background:#9B2C2C26;color:#e08a7a;border:1px solid #9B2C2C66;padding:5px 11px}
+.caveat{padding:12px 18px 16px;font-family:var(--mono);font-size:10.5px;color:#8a949c;line-height:1.5;border-top:1px solid #ffffff14}
+.caveat b{color:#e08a7a}
+.spark{width:100%;height:46px;display:block;margin:2px 0 10px}
+.ticker{background:#070a0e;color:var(--paper);overflow:hidden;border-bottom:1px solid #000}
+.ticker .row{display:flex;gap:48px;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:11px 0;animation:scroll 38s linear infinite;width:max-content}
+.ticker .row span b{color:var(--accent-2);font-weight:600;margin-right:8px}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.chartband{background:var(--paper);border-bottom:1px solid var(--line-strong);padding:74px 0}
+.chartband .wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
+.chartband h2{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.015em;margin:14px 0 16px;line-height:1.1}
+.chartband p{color:#3a444d;font-size:16px;max-width:30em;margin-bottom:18px}
+.chartband ul{list-style:none;font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;color:var(--slate)}
+.chartband li{padding:8px 0;border-bottom:1px dashed var(--line)}
+.chartband li b{color:var(--ink)}
+.chartwrap{border:1px solid var(--line-strong);background:#fff;padding:22px 24px 14px;box-shadow:0 20px 40px -30px #0f141950}
+.chartwrap .ch-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.chartwrap .ch-head .lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+.chartwrap .ch-head .big{font-family:var(--mono);font-size:26px;font-weight:600}
+.chartwrap .ch-head .big .up{color:#1f9d55;font-size:14px;margin-left:6px}
+#growthChart{width:100%;height:230px;display:block}
+.section{padding:70px 0;border-bottom:1px solid var(--line-strong)}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:34px}
+.section-head h2{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em}
+.section-head a{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);text-decoration:underline;text-underline-offset:4px}
+.section-head a:hover{color:var(--accent)}
+.desk-grid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line-strong)}
+.desk{padding:24px 26px 26px 0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);transition:.2s}
+.desk:nth-child(3n){border-right:0;padding-right:0}
+.desk:hover{background:#fff;box-shadow:0 14px 30px -24px #0f141955}
+.desk .tag{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.desk .tag em{font-family:var(--mono);font-style:normal;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.desk .tag time{font-family:var(--mono);font-size:11px;color:var(--slate)}
+.desk h3{font-family:var(--serif);font-size:21px;line-height:1.25;font-weight:600;margin-bottom:9px;transition:.15s}
+.desk:hover h3{color:var(--accent)}
+.desk p{font-size:14.5px;color:#3a444d;line-height:1.5;margin-bottom:14px}
+.desk .src{font-family:var(--mono);font-size:10.5px;color:var(--slate)}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+.product{background:var(--ink);color:var(--paper);border-bottom:1px solid #000}
+.product .wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;padding:78px 32px;align-items:center}
+.product .eyebrow{color:#9aa6ae}
+.product h2{font-family:var(--serif);font-size:40px;line-height:1.08;font-weight:600;letter-spacing:-.015em;margin:16px 0 20px}
+.product h2 em{font-style:italic;color:#d98a8a}
+.product p{color:#c3ccd2;max-width:34em;margin-bottom:26px;font-size:16.5px}
+.steps{border-top:1px solid #ffffff1f}
+.step{display:flex;gap:18px;padding:16px 0;border-bottom:1px solid #ffffff14;align-items:baseline}
+.step .n{font-family:var(--mono);font-size:12px;color:var(--accent-2);min-width:28px}
+.step .x b{font-weight:600}
+.step .x small{display:block;font-family:var(--mono);font-size:11px;color:#9aa6ae;margin-top:3px}
+.subscribe{padding:80px 0;text-align:center;background:var(--paper-2)}
+.subscribe .eyebrow{margin-bottom:14px}
+.subscribe h2{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.015em;margin-bottom:14px}
+.subscribe p{color:#3a444d;max-width:34em;margin:0 auto 28px;font-size:16.5px}
+.subform{display:flex;max-width:460px;margin:0 auto;border:1px solid var(--ink)}
+.subform input{flex:1;border:0;padding:15px 16px;font-family:var(--mono);font-size:14px;background:#fff}
+.subform input:focus{outline:2px solid var(--accent);outline-offset:-2px}
+.subform button{background:var(--ink);color:var(--paper);border:0;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:0 22px;cursor:pointer;transition:.18s}
+.subform button:hover{background:var(--accent)}
+.subnote{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:14px}
+footer{background:var(--ink);color:#aeb8c0;padding:54px 0 40px;font-size:13.5px}
+footer .wrap{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+footer .logo{color:var(--paper);font-size:24px;margin-bottom:12px}
+footer .logo b{color:var(--accent)}
+footer p.bl{max-width:26em;line-height:1.5;color:#8a949c}
+footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--paper);margin-bottom:14px}
+footer ul{list-style:none}
+footer li{margin-bottom:9px}
+footer a:hover{color:var(--paper)}
+footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;padding-top:22px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#6b757d;flex-wrap:wrap;gap:10px}
+@media(max-width:880px){
+  .hero .wrap,.chartband .wrap,.product .wrap{grid-template-columns:1fr;gap:36px}
+  .hero h1{font-size:42px}
+  #globe-canvas{opacity:.4}
+  .hero-grad{background:linear-gradient(180deg,#0B0F14cc,#0B0F14)}
+  .desk-grid{grid-template-columns:1fr}
+  .desk{border-right:0!important;padding-right:0!important}
+  footer .wrap{grid-template-columns:1fr 1fr}
+  nav.primary,.mast-cta{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto}.reveal{opacity:1;transform:none}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
 </head>
 <body>
-  <main class="page">
-    <nav class="nav">
-      <div class="brand">GovRevenue Agent</div>
-      <div class="pill">Commercial demand intelligence for UK public-sector revenue</div>
-    </nav>
-
-    <section class="hero">
-      <div class="card hero-copy">
-        <div class="kicker">GovRevenue Scan</div>
-        <h1>Find where your business can win before demand reaches Google.</h1>
-        <p class="lede">
-          GovRevenue Agent scans UK public-sector demand signals, procurement routes and buyer patterns,
-          then turns them into a practical commercial report your business can act on.
-        </p>
-
-        <div class="cta-row">
-          <a class="btn" href="#scan-intake">Run a scan</a>
-          <a class="btn secondary" href="/health">Check system health</a>
-        </div>
-
-        <div class="proof">
-          <div><strong>1</strong><span>Submit your company profile and target services.</span></div>
-          <div><strong>2</strong><span>The agent scans opportunity, buyer and route-to-market signals.</span></div>
-          <div><strong>3</strong><span>You receive a commercial intelligence report with next actions.</span></div>
-        </div>
+<div class="topstrip"><div class="wrap">
+  <div class="live"><span class="dot"></span> Public record &middot; updated continuously</div>
+  <div>Birmingham, UK &middot; Confidential intelligence</div>
+</div></div>
+<header class="mast"><div class="wrap">
+  <div class="logo">Gov<b>Revenue</b></div>
+  <nav class="primary">
+    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="#product">The Scan</a><a href="#subscribe">Briefing</a>
+  </nav>
+  <a class="mast-cta" href="#product">Run a scan</a>
+</div></header>
+<div class="verticals"><div class="wrap">
+  <a href="#desks">Government</a><a href="#desks">Business</a><a href="#desks">Finance</a>
+  <a href="#desks">Economics</a><a href="#desks">Technology</a><a href="#desks">AI</a>
+</div></div>
+<section class="hero">
+  <canvas id="globe-canvas"></canvas>
+  <div class="hero-grad"></div>
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Public-sector revenue intelligence</div>
+      <h1>Stop bidding blind.<br>Read the <em>record</em> first.</h1>
+      <p class="lede">Public bodies already spend on what you sell. We map who buys it, who supplies it now, and the one route where your firm can realistically win &mdash; before the tender goes live.</p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#product">Run a revenue scan</a>
+        <a class="btn-ghost" href="#chart">See live signals</a>
       </div>
-
-      <div id="scan-intake" class="card form-card">
-        <h2 class="form-title">Scan intake</h2>
-        <p class="form-sub">Give the agent enough context to judge fit, route and commercial priority.</p>
-
-        <form method="POST" action="/form-submit" autocomplete="off">
-          <label>Company name</label>
-          <input name="companyName" required />
-
-          <label>Website</label>
-          <input name="website" />
-
-          <label>Location / base</label>
-          <input name="location" />
-
-          <label>Areas served</label>
-          <textarea name="areasServed"></textarea>
-
-          <label>Main services</label>
-          <textarea name="mainServices" required></textarea>
-
-          <label>Secondary services</label>
-          <textarea name="secondaryServices"></textarea>
-
-          <label>Ideal public-sector buyers</label>
-          <textarea name="idealBuyers"></textarea>
-
-          <label>Ideal contract size</label>
-          <input name="idealContractSize" />
-
-          <label>Maximum contract size</label>
-          <input name="maximumContractSize" />
-
-          <label>Team size</label>
-          <input name="teamSize" />
-
-          <label>Public-sector experience</label>
-          <input name="publicSectorExperience" />
-
-          <label>Case studies or proof</label>
-          <textarea name="caseStudies"></textarea>
-
-          <label>Certifications / policies / accreditations</label>
-          <textarea name="certifications"></textarea>
-
-          <label>Services they do NOT want</label>
-          <textarea name="excludedServices"></textarea>
-
-          <label>Regions to scan first</label>
-          <textarea name="regionsToScan"></textarea>
-
-          <label>Main business goal</label>
-          <textarea name="mainGoal"></textarea>
-
-          <label>Biggest concern</label>
-          <textarea name="biggestConcern"></textarea>
-
-          <label>Preferred output</label>
-          <textarea name="preferredOutput"></textarea>
-
-          <button type="submit">Run GovRevenue Scan</button>
-        </form>
-
-        
+      <div class="chips">
+        <div class="chip"><b>&pound;400bn</b> annual public spend</div>
+        <div class="chip"><b id="liveNotices">128</b> notices today <span class="up">&#9650;</span></div>
+        <div class="chip"><b>2</b> sources live &middot; CF &middot; FTS</div>
       </div>
-    </section>
-
-    <section class="card section">
-      <h2>Built for companies selling into the public sector.</h2>
-      <div class="grid">
-        <div class="mini"><strong>Demand signals</strong><p>Spot where public money, planning needs and procurement activity point to future demand.</p></div>
-        <div class="mini"><strong>Buyer routes</strong><p>Understand whether to pursue tenders, frameworks, subcontracting, partnerships or pre-market positioning.</p></div>
-        <div class="mini"><strong>Commercial action</strong><p>Turn scan findings into practical next steps, not generic AI research.</p></div>
+    </div>
+    <div class="record">
+      <div class="rhead"><span class="t">Extracted signal</span><span class="src">CF &middot; FTS &middot; LA spend &gt;&pound;500</span></div>
+      <div class="rbody">
+        <svg class="spark" id="spark" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
+        <div class="rrow"><span class="k">Category</span><span class="v">Housing maintenance<small>West Midlands &middot; 18mo window</small></span></div>
+        <div class="rrow"><span class="k">Recurring spend</span><span class="v"><span class="figure" data-count="4.2">&pound;0.0m</span><small>6 buyers &middot; 24mo</small></span></div>
+        <div class="rrow"><span class="k">Incumbent</span><span class="v">Mears Group<small>won 8 of 12 awards &middot; 3yr term</small></span></div>
+        <div class="rrow"><span class="k">Verdict</span><span class="v"><span class="verdict">Partner, not bid</span></span></div>
       </div>
-    </section>
-  </main>
-  <script>
-    window.addEventListener("pageshow", () => {
-      document.querySelectorAll("#scan-intake input, #scan-intake textarea").forEach((field) => {
-        field.value = "";
-        field.setAttribute("autocomplete", "off");
-      });
-    });
-  </script>
+      <div class="caveat"><b>Caveat.</b> Spend data shows payments, not wrongdoing. Confidence: medium. Two buyer names unresolved &mdash; flagged, not merged.</div>
+    </div>
+  </div>
+</section>
+<div class="ticker" aria-hidden="true"><div class="row" id="tickerRow"></div></div>
+<section class="chartband" id="chart">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="eyebrow">Category signal</div>
+      <h2>Watch the money move before the tender does.</h2>
+      <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
+      <ul>
+        <li><b>Housing maintenance</b> &middot; West Midlands &middot; +34% / 24mo</li>
+        <li><b>Re-let signal</b> &middot; framework expiry clustering in Q1</li>
+        <li><b>Entry window</b> &middot; 18 months to incumbent renewal</li>
+      </ul>
+    </div>
+    <div class="chartwrap reveal">
+      <div class="ch-head">
+        <span class="lab">Recurring category spend &middot; &pound;m</span>
+        <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
+      </div>
+      <canvas id="growthChart"></canvas>
+    </div>
+  </div>
+</section>
+<section class="section" id="desks">
+  <div class="wrap">
+    <div class="section-head"><h2>The desks</h2><a href="#">All intelligence &rarr;</a></div>
+    <div class="desk-grid">
+      <article class="desk reveal"><div class="tag"><em>Government</em><time>17 Jun 2026</time></div><h3>The Procurement Act, one year on: what changed for SMEs</h3><p>New rules took effect Feb 2025. We read the award data to see whether the SME-access promises show up in who actually wins.</p><div class="src">Source: GOV.UK &middot; FTS awards</div></article>
+      <article class="desk reveal"><div class="tag"><em>Finance</em><time>16 Jun 2026</time></div><h3>Where the &pound;400bn goes: a spend map of procurement</h3><p>Annual public procurement runs near &pound;400bn. We break the flow by category and region to show where the addressable money concentrates.</p><div class="src">Source: GOV.UK &middot; LA transparency</div></article>
+      <article class="desk reveal"><div class="tag"><em>Business</em><time>14 Jun 2026</time></div><h3>Incumbent maps: finding the entry window in award data</h3><p>Who wins, contract length, and when the renewal clock starts. The award record tells you the window &mdash; if you can read it.</p><div class="src">Source: Contracts Finder</div></article>
+      <article class="desk reveal"><div class="tag"><em>Economics</em><time>11 Jun 2026</time></div><h3>Supplier concentration as a market signal</h3><p>When one supplier holds most of a category, the route is not a direct bid &mdash; it is a partnership. Concentration tells you which.</p><div class="src">Source: FTS &middot; OCDS</div></article>
+      <article class="desk reveal"><div class="tag"><em>Technology</em><time>09 Jun 2026</time></div><h3>OCDS and the open-data layer beneath every tender</h3><p>How structured notice data via API/OCDS changes what is knowable about procurement &mdash; and what still is not.</p><div class="src">Source: FTS developer docs</div></article>
+      <article class="desk reveal"><div class="tag"><em>AI</em><time>06 Jun 2026</time></div><h3>Why a procurement agent must show its sources or stay quiet</h3><p>Confident paragraphs over weak public data are a liability, not intelligence. Inside the red-team layer that strips overclaiming.</p><div class="src">Source: GovRevenue architecture</div></article>
+    </div>
+  </div>
+</section>
+<section class="product" id="product">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">The product underneath</div>
+      <h2>One profile in.<br>A <em>sourced verdict</em> out.</h2>
+      <p>Submit your firm&rsquo;s services, region and contract range. The agent scans the public record, scores route-to-revenue fit, and returns a premium report &mdash; every claim timestamped, sourced, and caveated.</p>
+      <a class="btn-primary" href="/scan">Run your first scan</a>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="n">01</span><span class="x"><b>Profile</b><small>Services &middot; region &middot; contract range &middot; evidence</small></span></div>
+      <div class="step"><span class="n">02</span><span class="x"><b>Scan</b><small>Contracts Finder &middot; Find a Tender &middot; LA spend &middot; awards</small></span></div>
+      <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Buyer fit &middot; evidence grade &middot; route-to-revenue</small></span></div>
+      <div class="step"><span class="n">04</span><span class="x"><b>Verdict</b><small>Bid &middot; partner &middot; monitor &middot; prepare &middot; ignore</small></span></div>
+    </div>
+  </div>
+</section>
+<section class="subscribe" id="subscribe">
+  <div class="wrap">
+    <div class="eyebrow">Join the briefing</div>
+    <h2>Intelligence before the tender.</h2>
+    <p>One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
+    <form class="subform" onsubmit="return false">
+      <input type="email" placeholder="you@firm.co.uk" aria-label="Email address">
+      <button type="submit">Reserve</button>
+    </form>
+    <div class="subnote">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
+  </div>
+</section>
+<footer><div class="wrap">
+  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence house. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><h4>Desks</h4><ul><li><a href="#desks">Government</a></li><li><a href="#desks">Finance</a></li><li><a href="#desks">Economics</a></li><li><a href="#desks">Technology &middot; AI</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="#product">Watchlist</a></li><li><a href="#product">Consultant license</a></li></ul></div>
+  <div><h4>Sources</h4><ul><li><a href="#">Contracts Finder</a></li><li><a href="#">Find a Tender</a></li><li><a href="#">LA transparency</a></li><li><a href="#">Companies House</a></li></ul></div>
+  <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
+</div></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+(function(){
+  const canvas = document.getElementById('globe-canvas');
+  if(!window.THREE) return;
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0,0,6.2);
+  const group = new THREE.Group(); scene.add(group);
+  const coreGeo = new THREE.SphereGeometry(2, 64, 64);
+  const coreMat = new THREE.MeshPhongMaterial({color:0x12202c,emissive:0x0a1622,specular:0x6fa8d6,shininess:60,transparent:true,opacity:0.55});
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+  const wire = new THREE.Mesh(new THREE.SphereGeometry(2.02,36,24),new THREE.MeshBasicMaterial({color:0x3d5d72,wireframe:true,transparent:true,opacity:0.28}));
+  group.add(wire);
+  const N=320, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random(),r=2.04;pos[i*3]=r*Math.sin(phi)*Math.cos(th);pos[i*3+1]=r*Math.cos(phi);pos[i*3+2]=r*Math.sin(phi)*Math.sin(th);}
+  const pg=new THREE.BufferGeometry();
+  pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const points=new THREE.Points(pg,new THREE.PointsMaterial({color:0xC2553F,size:0.045,transparent:true,opacity:0.85}));
+  group.add(points);
+  const halo=new THREE.Mesh(new THREE.SphereGeometry(2.28,48,48),new THREE.MeshBasicMaterial({color:0x9B2C2C,transparent:true,opacity:0.06,side:THREE.BackSide}));
+  group.add(halo);
+  scene.add(new THREE.AmbientLight(0x335577,0.7));
+  const key=new THREE.DirectionalLight(0x9fc4e6,1.1); key.position.set(5,3,5); scene.add(key);
+  const rim=new THREE.DirectionalLight(0xC2553F,0.6); rim.position.set(-4,-2,2); scene.add(rim);
+  group.rotation.x=0.35;
+  function size(){const r=canvas.parentElement.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
+  size(); window.addEventListener('resize',size);
+  let t=0;
+  (function loop(){requestAnimationFrame(loop);t+=0.0016;if(!reduce){group.rotation.y+=0.0022;points.rotation.y+=0.0004;}halo.scale.setScalar(1+Math.sin(t*2)*0.01);renderer.render(scene,camera);})();
+})();
+(function(){
+  const cv=document.getElementById('growthChart'); if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const data=[1.9,2.1,2.0,2.4,2.7,2.6,3.0,3.3,3.5,3.8,4.0,4.2];
+  function fit(){const dpr=Math.min(devicePixelRatio,2);const r=cv.getBoundingClientRect();cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);return r;}
+  let r=fit(); window.addEventListener('resize',()=>{r=fit();});
+  const pad={l:34,r:8,t:14,b:22},max=4.6,min=1.6;
+  function X(i){return pad.l+(i/(data.length-1))*(r.width-pad.l-pad.r);}
+  function Y(v){return pad.t+(1-(v-min)/(max-min))*(r.height-pad.t-pad.b);}
+  let prog=0,started=false;
+  function draw(){
+    ctx.clearRect(0,0,r.width,r.height);
+    ctx.strokeStyle='#0f14140f';ctx.lineWidth=1;ctx.font='10px monospace';ctx.fillStyle='#5A6B7B';
+    for(let g=2;g<=4;g++){const y=Y(g);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(r.width-pad.r,y);ctx.stroke();ctx.fillText(''+g+'m',6,y+3);}
+    const upto=prog*(data.length-1);
+    ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
+    for(let i=1;i<=Math.floor(upto);i++) ctx.lineTo(X(i),Y(data[i]));
+    const fi=Math.floor(upto),fr=upto-fi;
+    if(fi<data.length-1){const cy=data[fi]+(data[fi+1]-data[fi])*fr;ctx.lineTo(X(fi+fr),Y(cy));}
+    const lastX=fi<data.length-1?X(fi+fr):X(data.length-1);
+    ctx.lineTo(lastX,r.height-pad.b);ctx.lineTo(X(0),r.height-pad.b);ctx.closePath();
+    const grad=ctx.createLinearGradient(0,pad.t,0,r.height-pad.b);
+    grad.addColorStop(0,'#9B2C2C2e');grad.addColorStop(1,'#9B2C2C00');ctx.fillStyle=grad;ctx.fill();
+    ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
+    for(let i=1;i<=Math.floor(upto);i++) ctx.lineTo(X(i),Y(data[i]));
+    if(fi<data.length-1){const cy=data[fi]+(data[fi+1]-data[fi])*fr;ctx.lineTo(X(fi+fr),Y(cy));}
+    ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2.4;ctx.lineJoin='round';ctx.stroke();
+    const hy=fi<data.length-1?(data[fi]+(data[fi+1]-data[fi])*fr):data[data.length-1];
+    ctx.beginPath();ctx.arc(lastX,Y(hy),4.5,0,7);ctx.fillStyle='#9B2C2C';ctx.fill();
+    ctx.beginPath();ctx.arc(lastX,Y(hy),9,0,7);ctx.fillStyle='#9B2C2C22';ctx.fill();
+  }
+  function animate(){if(prog<1){prog+=reduce?1:0.018;if(prog>1)prog=1;draw();requestAnimationFrame(animate);}else draw();}
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!started){started=true;animate();
+    const el=document.getElementById('chartTotal');let v=0;
+    const ci=setInterval(()=>{v+=0.12;if(v>=4.2){v=4.2;clearInterval(ci);}el.firstChild.textContent=v.toFixed(1)+'m';},22);
+  }}),{threshold:.4});
+  io.observe(cv);
+})();
+(function(){
+  const s=document.getElementById('spark'); if(!s) return;
+  const d=[6,9,7,12,11,16,14,20,19,26,24,32,30,40];
+  const max=42,W=320,H=46; let pts='';
+  d.forEach((v,i)=>{pts+=(i?' ':'')+( i/(d.length-1)*W).toFixed(1)+','+(H-(v/max)*H).toFixed(1);});
+  s.innerHTML='<polyline points="'+pts+'" fill="none" stroke="#C2553F" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round"/>';
+})();
+(function(){
+  const el=document.querySelector('.figure[data-count]'); if(!el) return;
+  const target=parseFloat(el.dataset.count); let v=0;
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
+    const t=setInterval(()=>{v+=target/30;if(v>=target){v=target;clearInterval(t);}el.textContent=v.toFixed(1)+'m';},20);
+    io.disconnect();
+  }}),{threshold:.5}); io.observe(el);
+})();
+(function(){
+  const items=['<b>FTS</b> 14 new construction-PM notices','<b>CF</b> Cleaning framework re-let signalled','<b>SPEND</b> Council passenger transport up 9% QoQ','<b>AWARD</b> 3yr facilities contract renewal Q1','<b>FRAMEWORK</b> CCS lot expressions of interest closing'];
+  const row=document.getElementById('tickerRow');
+  const html=items.map(i=>'<span>'+i+'</span>').join('');
+  row.innerHTML=html+html;
+  const ln=document.getElementById('liveNotices'); let n=128;
+  setInterval(()=>{if(Math.random()>.6){n+=1;ln.textContent=n;}},3400);
+})();
+(function(){
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
 </body>
 </html>`);
 });
