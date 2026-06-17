@@ -3713,7 +3713,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
         <li><b>Entry window</b> &middot; 18 months to incumbent renewal</li>
       </ul>
     </div>
-    <div class="chartwrap reveal">
+    <div class="chartwrap">
       <div class="ch-head">
         <span class="lab">Recurring category spend &middot; &pound;m</span>
         <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
@@ -3785,17 +3785,20 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
   function resize(){
     const pr=Math.min(window.devicePixelRatio||1,2);
-    const rect=cv.parentElement.getBoundingClientRect();
-    if(!rect.width||!rect.height) return;
-    W=rect.width; H=rect.height;
-    cv.width=W*pr; cv.height=H*pr;
+    const hero=document.querySelector('.hero');
+    const rw=hero?hero.offsetWidth:window.innerWidth;
+    const rh=hero?hero.offsetHeight:600;
+    if(rw<10||rh<10) return;
+    W=rw; H=rh;
+    cv.width=Math.round(W*pr); cv.height=Math.round(H*pr);
     ctx.setTransform(pr,0,0,pr,0,0);
     cx=W*0.73; cy=H*0.50;
     R=Math.min(W*0.31,H*0.43);
     ready=true;
   }
   window.addEventListener('resize',resize);
-  requestAnimationFrame(function init(){resize(); if(!ready){requestAnimationFrame(init);}else{frame();}});
+  function tryInit(){resize();if(!ready){setTimeout(tryInit,80);}else{frame();}}
+  setTimeout(tryInit,0);
   function proj(phi,th,a){
     const x=Math.sin(phi)*Math.cos(th+a),y=Math.cos(phi),z=Math.sin(phi)*Math.sin(th+a);
     return{x:cx+R*x,y:cy-R*y*0.97,z,vis:z>-0.14};
