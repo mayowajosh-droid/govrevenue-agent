@@ -1011,6 +1011,43 @@ async function findSamplePdf(): Promise<string | null> {
   return null;
 }
 
+async function queryDeskSignals(categories: string[]): Promise<Map<string, HomepageSignal>> {
+  const out = new Map<string, HomepageSignal>();
+  if (pool) {
+    const r = await pool.query<HomepageSignal>(
+      `SELECT DISTINCT ON (category) id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at
+       FROM homepage_signals WHERE category = ANY($1) ORDER BY category, fetched_at DESC`,
+      [categories]
+    );
+    for (const row of r.rows) out.set(row.category, row);
+    return out;
+  }
+  for (const s of sigMemStore.values()) {
+    if (categories.includes(s.category)) {
+      const existing = out.get(s.category);
+      if (!existing || s.fetched_at > existing.fetched_at) out.set(s.category, s);
+    }
+  }
+  return out;
+}
+
+type ChartDataPoint = { month: string; total_m: number };
+async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean }> {
+  if (pool) {
+    const r = await pool.query<ChartDataPoint>(
+      `SELECT to_char(date_trunc('month', fetched_at), 'Mon') AS month,
+              ROUND(SUM(COALESCE(value_amount, 0)) / 1e6::numeric, 2)::float AS total_m
+       FROM homepage_signals
+       WHERE fetched_at > NOW() - INTERVAL '12 months'
+         AND value_amount IS NOT NULL
+       GROUP BY date_trunc('month', fetched_at)
+       ORDER BY date_trunc('month', fetched_at)`
+    );
+    return { points: r.rows, illustrative: r.rows.length < 3 };
+  }
+  return { points: [], illustrative: true };
+}
+
 async function createScan(input: z.infer<typeof intakeSchema>): Promise<ScanRecord> {
   const record: ScanRecord = {
     id: makeId(),
@@ -2578,6 +2615,23 @@ const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
   SIGNAL_CATEGORIES.map(c => [c.key, c.label])
 );
 
+const DESK_MAPPING: Array<{ tag: string; category: string }> = [
+  { tag: "Government", category: "housing-maintenance" },
+  { tag: "Finance",    category: "recruitment-staffing" },
+  { tag: "Business",   category: "cleaning-facilities" },
+  { tag: "Economics",  category: "construction-pm" },
+  { tag: "Technology", category: "passenger-transport" },
+];
+
+function renderDeskCard(sig: HomepageSignal, tag: string): string {
+  const dateStr = sig.notice_date
+    ? new Date(sig.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+  const buyer = sig.buyer ? escapeHtml(sig.buyer.slice(0, 60)) : "Buyer not stated";
+  const title = escapeHtml(sig.title.slice(0, 90));
+  return `<article class="desk reveal"><div class="tag"><em>${escapeHtml(tag)}</em><time>${escapeHtml(dateStr)}</time></div><h3>${title}</h3><p>${buyer}</p><div class="src">Source: ${escapeHtml(sig.source)} &middot; public record</div></article>`;
+}
+
 async function refreshHomepageSignals(): Promise<void> {
   console.log("[signals] refresh started");
   for (const cat of SIGNAL_CATEGORIES) {
@@ -3730,10 +3784,12 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/", asyncRoute(async (_req, res) => {
-  const [signals, count24h, samplePdfUrl] = await Promise.all([
+  const [signals, count24h, samplePdfUrl, deskSignals, chartResult] = await Promise.all([
     queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
     count24hSignals().catch(() => 0),
-    findSamplePdf().catch(() => null as string | null)
+    findSamplePdf().catch(() => null as string | null),
+    queryDeskSignals(DESK_MAPPING.map(d => d.category)).catch(() => new Map<string, HomepageSignal>()),
+    queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true }))
   ]);
 
   const heroSignal = signals[0] || null;
@@ -3958,15 +4014,15 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
       </div>
     </div>
     <div class="record">
-      <div class="rhead"><span class="t">${isLive ? "Live signal" : "Illustrative signal"}</span><span class="src">${escapeHtml(heroSource)} &middot; public record</span></div>
+      <div class="rhead"><span class="t" id="hc-type">${isLive ? "Live signal" : "Illustrative signal"}</span><span class="src" id="hc-src">${escapeHtml(heroSource)} &middot; public record</span></div>
       <div class="rbody">
         <svg class="spark" id="spark" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
-        <div class="rrow"><span class="k">Category</span><span class="v">${escapeHtml(heroCategory)}<small>${escapeHtml(heroDate)}</small></span></div>
-        <div class="rrow"><span class="k">Notice</span><span class="v" style="font-size:14px;line-height:1.3">${escapeHtml(heroTitle)}</span></div>
-        <div class="rrow"><span class="k">Buyer</span><span class="v" style="font-size:16px">${escapeHtml(heroBuyer)}</span></div>
-        <div class="rrow"><span class="k">Value</span><span class="v">${heroVal}<small>${escapeHtml(heroStatus)}</small></span></div>
+        <div class="rrow"><span class="k">Category</span><span class="v" id="hc-cat">${escapeHtml(heroCategory)}<small id="hc-date">${escapeHtml(heroDate)}</small></span></div>
+        <div class="rrow"><span class="k">Notice</span><span class="v" id="hc-title" style="font-size:14px;line-height:1.3">${escapeHtml(heroTitle)}</span></div>
+        <div class="rrow"><span class="k">Buyer</span><span class="v" id="hc-buyer" style="font-size:16px">${escapeHtml(heroBuyer)}</span></div>
+        <div class="rrow"><span class="k">Value</span><span class="v" id="hc-val">${heroVal}<small id="hc-status">${escapeHtml(heroStatus)}</small></span></div>
       </div>
-      <div class="caveat"><b>Caveat.</b> ${isLive ? "Source: public procurement record. Confidence varies by notice quality — buyer names taken verbatim, not verified." : "Illustrative sample &mdash; live data loads on first refresh (hourly)."}</div>
+      <div class="caveat" id="hc-caveat"><b>Caveat.</b> ${isLive ? "Source: public procurement record. Confidence varies by notice quality — buyer names taken verbatim, not verified." : "Illustrative sample &mdash; live data loads on first refresh (hourly)."}</div>
     </div>
   </div>
 </section>
@@ -3985,7 +4041,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
     </div>
     <div class="chartwrap">
       <div class="ch-head">
-        <span class="lab">Recurring category spend &middot; &pound;m</span>
+        <span class="lab">Recurring category spend &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
         <span class="big" id="chartTotal">&pound;0.0m<span class="up">&#9650; 34%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
@@ -3996,12 +4052,13 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div class="wrap">
     <div class="section-head"><h2>The desks</h2><a href="#">All intelligence &rarr;</a></div>
     <div class="desk-grid">
-      <article class="desk reveal"><div class="tag"><em>Government</em><time>17 Jun 2026</time></div><h3>The Procurement Act, one year on: what changed for SMEs</h3><p>New rules took effect Feb 2025. We read the award data to see whether the SME-access promises show up in who actually wins.</p><div class="src">Source: GOV.UK &middot; FTS awards</div></article>
-      <article class="desk reveal"><div class="tag"><em>Finance</em><time>16 Jun 2026</time></div><h3>Where the &pound;400bn goes: a spend map of procurement</h3><p>Annual public procurement runs near &pound;400bn. We break the flow by category and region to show where the addressable money concentrates.</p><div class="src">Source: GOV.UK &middot; LA transparency</div></article>
-      <article class="desk reveal"><div class="tag"><em>Business</em><time>14 Jun 2026</time></div><h3>Incumbent maps: finding the entry window in award data</h3><p>Who wins, contract length, and when the renewal clock starts. The award record tells you the window &mdash; if you can read it.</p><div class="src">Source: Contracts Finder</div></article>
-      <article class="desk reveal"><div class="tag"><em>Economics</em><time>11 Jun 2026</time></div><h3>Supplier concentration as a market signal</h3><p>When one supplier holds most of a category, the route is not a direct bid &mdash; it is a partnership. Concentration tells you which.</p><div class="src">Source: FTS &middot; OCDS</div></article>
-      <article class="desk reveal"><div class="tag"><em>Technology</em><time>09 Jun 2026</time></div><h3>OCDS and the open-data layer beneath every tender</h3><p>How structured notice data via API/OCDS changes what is knowable about procurement &mdash; and what still is not.</p><div class="src">Source: FTS developer docs</div></article>
-      <article class="desk reveal"><div class="tag"><em>AI</em><time>06 Jun 2026</time></div><h3>Why a procurement agent must show its sources or stay quiet</h3><p>Confident paragraphs over weak public data are a liability, not intelligence. Inside the red-team layer that strips overclaiming.</p><div class="src">Source: GovRevenue architecture</div></article>
+      ${DESK_MAPPING.map(d => {
+        const sig = deskSignals.get(d.category);
+        return sig
+          ? renderDeskCard(sig, d.tag)
+          : `<article class="desk reveal"><div class="tag"><em>${escapeHtml(d.tag)}</em><time>—</time></div><h3>${escapeHtml(CATEGORY_LABELS[d.category] || d.category)} — scanning</h3><p>Data loads on next hourly refresh.</p><div class="src">Source: Contracts Finder &middot; FTS</div></article>`;
+      }).join("")}
+      <article class="desk reveal"><div class="tag"><em>AI</em><time>Jun 2026</time></div><h3>Why a procurement agent must show its sources or stay quiet</h3><p>Confident paragraphs over weak public data are a liability, not intelligence. Inside the red-team layer that strips overclaiming.</p><div class="src">Source: GovRevenue architecture</div></article>
     </div>
   </div>
 </section>
@@ -4173,11 +4230,65 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.15});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 })();
+(function(){
+  if(reduce) return;
+  function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+  function g(id){return document.getElementById(id);}
+  function poll(){
+    fetch('/api/signals/latest').then(function(r){return r.ok?r.json():null;}).then(function(d){
+      if(!d||!d.hero) return;
+      const h=d.hero;
+      if(g('hc-type')) g('hc-type').textContent=h.type;
+      if(g('hc-src')) g('hc-src').textContent=h.src+' · public record';
+      if(g('hc-cat')&&g('hc-cat').childNodes[0]) g('hc-cat').childNodes[0].nodeValue=h.category;
+      if(g('hc-date')) g('hc-date').textContent=h.date;
+      if(g('hc-title')) g('hc-title').textContent=h.title;
+      if(g('hc-buyer')) g('hc-buyer').textContent=h.buyer;
+      if(g('hc-val')&&g('hc-val').childNodes[0]) g('hc-val').childNodes[0].nodeValue=h.val;
+      if(g('hc-status')) g('hc-status').textContent=h.status;
+      if(g('hc-caveat')) g('hc-caveat').innerHTML='<b>Caveat.</b> '+esc(h.caveat);
+      if(d.count24h&&g('liveNotices')) g('liveNotices').textContent=String(d.count24h);
+    }).catch(function(){});
+  }
+  const t=setInterval(poll,75000);
+  window.addEventListener('pagehide',function(){clearInterval(t);});
+})();
 </script>
 </body>
 </html>`);
 }));
 
+
+app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
+  const [signals, count24h] = await Promise.all([
+    queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
+    count24hSignals().catch(() => 0)
+  ]);
+  const hero = signals[0] || null;
+  const ticker = signals.map(s => ({
+    src: s.source,
+    title: s.title.slice(0, 70),
+    buyer: s.buyer ? s.buyer.slice(0, 40) : null
+  }));
+  const heroOut = hero ? {
+    type: "Live signal",
+    src: hero.source,
+    category: CATEGORY_LABELS[hero.category] || hero.category,
+    date: hero.notice_date
+      ? new Date(hero.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "date not stated",
+    title: hero.title.slice(0, 80),
+    buyer: hero.buyer || "Buyer not stated",
+    val: hero.value_amount && hero.value_amount > 0
+      ? (hero.value_amount >= 1_000_000
+          ? `£${(hero.value_amount / 1_000_000).toFixed(1)}m`
+          : `£${Math.round(hero.value_amount / 1000)}k`)
+      : "Value not stated",
+    status: hero.status || "unknown",
+    caveat: "Source: public procurement record. Confidence varies by notice quality — buyer names taken verbatim, not verified."
+  } : null;
+  res.json({ count24h, hero: heroOut, ticker });
+}));
 
 app.post("/form-submit", asyncRoute(async (req, res) => {
   const parsed = intakeSchema.safeParse(req.body);
