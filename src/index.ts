@@ -3479,7 +3479,7 @@ app.get("/", (_req, res) => {
     </section>
 
     <section class="card section">
-      <h2>Built for companies selling into the built environment.</h2>
+      <h2>Built for companies selling into the public sector.</h2>
       <div class="grid">
         <div class="mini"><strong>Demand signals</strong><p>Spot where public money, planning needs and procurement activity point to future demand.</p></div>
         <div class="mini"><strong>Buyer routes</strong><p>Understand whether to pursue tenders, frameworks, subcontracting, partnerships or pre-market positioning.</p></div>
