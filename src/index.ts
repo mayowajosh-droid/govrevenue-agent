@@ -2686,7 +2686,7 @@ function startSignalsWorker(): void {
     const worker = new Worker(
       "govrevenue-signals",
       async () => { await refreshHomepageSignals(); },
-      { connection: redisConnection as any, concurrency: 1 }
+      { connection: redisConnection as any, concurrency: 1, lockDuration: 300_000, stalledInterval: 60_000 }
     );
     worker.on("completed", () => console.log("[signals] refresh job completed"));
     worker.on("failed", (job, err) => {
