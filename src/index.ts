@@ -4,6 +4,7 @@ generateGovRevenueReport,
   type CompanyIntake,
   type ProcurementRecord,
 } from "./lib/govrevenue/govrevenue-report-engine.js";
+import { EventEmitter } from "events";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -32,6 +33,7 @@ type ScanRecord = {
   pdf_storage_url?: string | null;
   pdf_storage_etag?: string | null;
   pdf_storage_updated_at?: string | null;
+  progress_stage?: string | null;
 };
 
 type SubscriptionRecord = {
@@ -143,6 +145,7 @@ const pool = process.env.DATABASE_URL
 const memoryStore = new Map<string, ScanRecord>();
 const subMemStore = new Map<string, SubscriptionRecord>();
 const sigMemStore = new Map<string, HomepageSignal>();
+const scanEvents = new EventEmitter();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const redisConnection = REDIS_URL
@@ -921,6 +924,7 @@ async function initDb() {
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_url TEXT;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_etag TEXT;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_updated_at TIMESTAMPTZ;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS progress_stage TEXT;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -1113,6 +1117,31 @@ async function updateScan(id: string, patch: Partial<ScanRecord>) {
   } else {
     memoryStore.set(id, next);
   }
+}
+
+async function emitScanStage(id: string, stage: string): Promise<void> {
+  if (pool) {
+    await pool.query(`UPDATE scans SET progress_stage=$2, updated_at=$3 WHERE id=$1`, [id, stage, nowIso()])
+      .catch(() => {});
+  } else {
+    const s = memoryStore.get(id);
+    if (s) memoryStore.set(id, { ...s, progress_stage: stage, updated_at: nowIso() });
+  }
+  scanEvents.emit(`scan:${id}`, stage);
+}
+
+async function getScansByCompany(companyName: string, excludeId: string): Promise<ScanRecord[]> {
+  if (pool) {
+    const r = await pool.query<ScanRecord>(
+      `SELECT * FROM scans WHERE company_name=$1 AND id!=$2 AND status='completed' ORDER BY created_at DESC LIMIT 10`,
+      [companyName, excludeId]
+    );
+    return r.rows;
+  }
+  return [...memoryStore.values()]
+    .filter(s => s.company_name === companyName && s.id !== excludeId && s.status === "completed")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 10);
 }
 
 async function updateScanPdfStorage(
@@ -1816,6 +1845,70 @@ function noticeRecordId(notice: any) {
   return String(notice?.id || "").trim();
 }
 
+type IncumbentEntry = { name: string; count: number; totalValue: number; latestAward: string | null };
+
+function buildIncumbentMap(data: ProcurementData): IncumbentEntry[] {
+  const awarded = (data?.contractsFinder?.awarded || []) as any[];
+  const map = new Map<string, IncumbentEntry>();
+  for (const n of awarded) {
+    const raw = String(n.awardedSupplier || "").trim();
+    if (!raw || raw.toLowerCase().includes("not stated") || raw.length < 3) continue;
+    const key = normaliseCompanyName(raw);
+    if (!key) continue;
+    const entry = map.get(key) || { name: raw, count: 0, totalValue: 0, latestAward: null };
+    entry.count++;
+    const v = Number(n.awardedValue || n.valueHigh || 0);
+    entry.totalValue += v;
+    if (n.awardedDate && (!entry.latestAward || n.awardedDate > entry.latestAward)) entry.latestAward = n.awardedDate;
+    if (entry.count === 1) entry.name = raw; // keep display name from first seen
+    map.set(key, entry);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+}
+
+function renderIncumbentSection(data: ProcurementData): string {
+  const incumbents = buildIncumbentMap(data);
+  if (incumbents.length === 0) return "";
+  const total = incumbents.reduce((s, e) => s + e.count, 0);
+  const rows = incumbents.map(e => {
+    const pct = total > 0 ? Math.round((e.count / total) * 100) : 0;
+    const val = e.totalValue > 0
+      ? (e.totalValue >= 1_000_000 ? `£${(e.totalValue / 1_000_000).toFixed(1)}m` : `£${Math.round(e.totalValue / 1000)}k`)
+      : "—";
+    const latest = e.latestAward
+      ? new Date(e.latestAward).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+      : "—";
+    return `<tr>
+      <td style="padding:9px 14px;font-size:14px;color:#24140f;border-bottom:1px solid #e8d9c4">${escapeHtml(e.name)}</td>
+      <td style="padding:9px 14px;text-align:center;font-size:13px;font-family:monospace;border-bottom:1px solid #e8d9c4">${e.count}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:13px;font-family:monospace;border-bottom:1px solid #e8d9c4">${escapeHtml(val)}</td>
+      <td style="padding:9px 14px;border-bottom:1px solid #e8d9c4">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="height:6px;width:${Math.max(pct, 2)}%;background:#a97932;border-radius:3px"></div>
+          <span style="font-size:11px;font-family:monospace;color:#6f5b50">${pct}%</span>
+        </div>
+      </td>
+      <td style="padding:9px 14px;font-size:12px;font-family:monospace;color:#6f5b50;border-bottom:1px solid #e8d9c4">${escapeHtml(latest)}</td>
+    </tr>`;
+  }).join("");
+  return `<section style="margin:40px 0;background:#fffaf3;border:1px solid #d2b88f;padding:28px 32px" class="no-print">
+  <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:6px;color:#24140f">Incumbent map</h2>
+  <p style="font-size:13px;color:#6f5b50;margin-bottom:18px;font-family:monospace">Derived from awarded contract records in this dataset. Not exhaustive — covers notices returned by keyword search only.</p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr style="background:#f3eadc">
+        <th style="padding:8px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Supplier</th>
+        <th style="padding:8px 14px;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Awards</th>
+        <th style="padding:8px 14px;text-align:right;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Total value</th>
+        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Share</th>
+        <th style="padding:8px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600">Latest award</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</section>`;
+}
+
 function noticeText(notice: any) {
   return [
     notice?.title,
@@ -2293,22 +2386,17 @@ End with:
 }
 
 
-async function createReport(input: z.infer<typeof intakeSchema>) {
-  const data = await pullProcurementData(input);
-  const prompt = buildPrompt(input, data);
-
+async function callLlmReport(prompt: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90_000);
-
   try {
     const response = await openai.responses.create({
       model: OPENAI_MODEL,
       tools: [{ type: "web_search" } as any],
       input: prompt
     }, { signal: controller.signal });
-
     clearTimeout(timer);
-    return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
+    return enforceDataQualityLanguage(response.output_text || "No report returned.");
   } catch (firstError: any) {
     try {
       const response = await openai.responses.create({
@@ -2316,17 +2404,12 @@ async function createReport(input: z.infer<typeof intakeSchema>) {
         tools: [{ type: "web_search_preview" } as any],
         input: prompt
       }, { signal: controller.signal });
-
       clearTimeout(timer);
-      return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
+      return enforceDataQualityLanguage(response.output_text || "No report returned.");
     } catch (secondError: any) {
       clearTimeout(timer);
       captureError(secondError, {
-        openai: {
-          model: OPENAI_MODEL,
-          fallbackAfterPrimaryFailure: true,
-          primaryError: firstError?.message || String(firstError)
-        }
+        openai: { model: OPENAI_MODEL, fallbackAfterPrimaryFailure: true, primaryError: firstError?.message || String(firstError) }
       });
       throw secondError;
     }
@@ -2335,9 +2418,16 @@ async function createReport(input: z.infer<typeof intakeSchema>) {
 
 async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
   await updateScan(id, { status: "running", error_message: null });
+  await emitScanStage(id, "fetching");
 
   try {
-    const { data, report } = await createReport(input);
+    const data = await pullProcurementData(input);
+    await emitScanStage(id, "scoring");
+
+    const prompt = buildPrompt(input, data);
+    await emitScanStage(id, "report");
+
+    const report = await callLlmReport(prompt);
 
     await updateScan(id, {
       status: "completed",
@@ -2345,6 +2435,7 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
       report_markdown: report,
       error_message: null
     });
+    await emitScanStage(id, "done");
 
     const links = buildScanLinks(id);
     await notifyScanCompleted({
@@ -2365,6 +2456,7 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
       status: "failed",
       error_message: err?.message || String(err)
     });
+    await emitScanStage(id, "failed");
 
     await notifyScanFailed({
       scanId: id,
@@ -3106,7 +3198,81 @@ function validateReportConsistency(
   };
 }
 
+function waitingPage(scan: ScanRecord): string {
+  const scanId = escapeHtml(scan.id);
+  const isFailed = scan.status === "failed";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(scan.company_name)} &mdash; Scanning &mdash; GovRevenue</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f3eadc;color:#24140f;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+.card{max-width:560px;width:100%;background:#fffaf3;border:1px solid #d2b88f;padding:40px 44px}
+.brand{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a6f5a;margin-bottom:28px}
+h1{font-family:Georgia,serif;font-size:24px;font-weight:600;line-height:1.25;margin-bottom:28px}
+h1 b{color:#24140f}
+.stage-list{list-style:none;margin-bottom:28px}
+.stage{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #e8d9c4;font-size:14px;color:#6f5b50;transition:color .3s}
+.stage:last-child{border-bottom:0}
+.dot{width:10px;height:10px;border-radius:50%;background:#d2b88f;flex-shrink:0;transition:background .3s}
+.stage.active{color:#24140f}
+.stage.active .dot{background:#a97932;box-shadow:0 0 0 4px #a9793230}
+.stage.done{color:#1d6b4f}
+.stage.done .dot{background:#1d6b4f}
+.stage.fail{color:#9b2d20}
+.stage.fail .dot{background:#9b2d20}
+.eta{font-size:13px;color:#8a6f5a;font-family:monospace}
+.err{margin-top:20px;padding:14px;background:#fdf0ee;border:1px solid #e0a090;font-size:13px;color:#9b2d20}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">GovRevenue &mdash; Scan</div>
+  <h1>${isFailed ? "Scan failed for " : "Scanning for "}<b>${escapeHtml(scan.company_name)}</b></h1>
+  <ul class="stage-list" id="stages">
+    <li class="stage" id="s-fetching"><span class="dot"></span><span>Fetching procurement data from Contracts Finder &amp; Find a Tender</span></li>
+    <li class="stage" id="s-scoring"><span class="dot"></span><span>Scoring opportunities and routes to revenue</span></li>
+    <li class="stage" id="s-report"><span class="dot"></span><span>Generating intelligence report</span></li>
+    <li class="stage" id="s-done"><span class="dot"></span><span>Report complete &mdash; loading</span></li>
+  </ul>
+  <p class="eta" id="eta">Typically 2&ndash;4 minutes. Stay on this page.</p>
+  ${isFailed ? `<div class="err">Error: ${escapeHtml(scan.error_message || "Unknown error")}. <a href="/scan/${scanId}">Refresh</a></div>` : ""}
+</div>
+<script>
+(function(){
+  const stages=['fetching','scoring','report','done'];
+  let cur=-1;
+  function mark(stage,cls){const el=document.getElementById('s-'+stage);if(el){el.classList.remove('active','done','fail');el.classList.add(cls);}}
+  function setStage(stage){
+    const idx=stages.indexOf(stage);
+    if(stage==='failed'){stages.forEach(s=>mark(s,''));mark('fetching','fail');document.getElementById('eta').textContent='Scan failed. Refresh the page for details.';return;}
+    if(idx<0||idx<=cur) return;
+    cur=idx;
+    stages.forEach((s,i)=>{if(i<idx)mark(s,'done');else if(i===idx)mark(s,'active');});
+    if(stage==='done'){setTimeout(()=>location.reload(),900);}
+  }
+  const es=new EventSource('/api/scans/${scanId}/stream');
+  es.onmessage=function(e){try{const d=JSON.parse(e.data);setStage(d.stage);}catch{}};
+  es.onerror=function(){};
+  const poll=setInterval(async function(){
+    try{const r=await fetch('/api/scans/${scanId}/status');const d=await r.json();
+    if(d.status==='completed'){clearInterval(poll);location.reload();}
+    else if(d.status==='failed'){clearInterval(poll);location.reload();}
+    else if(d.progress_stage){setStage(d.progress_stage);}
+    }catch{}
+  },8000);
+  window.addEventListener('pagehide',function(){es.close();clearInterval(poll);});
+})();
+</script>
+</body>
+</html>`;
+}
+
 function reportPage(scan: ScanRecord) {
+  if (scan.status === "pending" || scan.status === "running") return waitingPage(scan);
   const data = scan.procurement_json as ProcurementData | null;
   const sectorLens = resolveSectorFromScan(scan).label;
   const dataQuality = assessDataQuality(scan);
@@ -3682,6 +3848,7 @@ function reportPage(scan: ScanRecord) {
         <button class="btn secondary" onclick="window.print()">Browser Print</button>
         <a class="btn secondary" href="/api/scans/${scan.id}/report.md">Download Markdown</a>
         <a class="btn secondary" href="/api/scans/${scan.id}/data.json">View Data</a>
+        <a class="btn secondary" href="/scan/${scan.id}/compare" title="Compare with a previous scan">Compare &uarr;</a>
       </div>
     </div>
 
@@ -3714,6 +3881,8 @@ function reportPage(scan: ScanRecord) {
     </section>
 
     ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
+
+    ${data ? renderIncumbentSection(data) : ""}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
 
@@ -4259,6 +4428,50 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }));
 
 
+app.get("/api/scans/:id/status", asyncRoute(async (req, res) => {
+  const scan = await getScan(req.params.id);
+  if (!scan) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ status: scan.status, progress_stage: scan.progress_stage || null, error_message: scan.error_message || null });
+}));
+
+app.get("/api/scans/:id/stream", (req, res) => {
+  const scanId = req.params.id;
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive"
+  });
+  res.write(": connected\n\n");
+  let closed = false;
+  function send(stage: string) {
+    if (!closed) res.write(`data: ${JSON.stringify({ stage })}\n\n`);
+  }
+  getScan(scanId).then(scan => {
+    if (!scan) { send("not_found"); res.end(); closed = true; return; }
+    if (scan.status === "completed") { send("done"); res.end(); closed = true; return; }
+    if (scan.status === "failed") { send("failed"); res.end(); closed = true; return; }
+    if (scan.progress_stage) send(scan.progress_stage);
+  }).catch(() => {});
+  const listener = (stage: string) => {
+    send(stage);
+    if (stage === "done" || stage === "failed") { res.end(); closed = true; }
+  };
+  scanEvents.on(`scan:${scanId}`, listener);
+  const poll = setInterval(async () => {
+    if (closed) { clearInterval(poll); return; }
+    const scan = await getScan(scanId).catch(() => null);
+    if (!scan) return;
+    if (scan.status === "completed") { send("done"); clearInterval(poll); res.end(); closed = true; }
+    else if (scan.status === "failed") { send("failed"); clearInterval(poll); res.end(); closed = true; }
+  }, 5000);
+  req.on("close", () => {
+    closed = true;
+    scanEvents.off(`scan:${scanId}`, listener);
+    clearInterval(poll);
+  });
+});
+
 app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
   const [signals, count24h] = await Promise.all([
     queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
@@ -4545,6 +4758,98 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   res.type("html").send(reportPage(scan));
 }));
 
+app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
+  const scan = await getScan(req.params.id);
+  if (!scan || scan.status !== "completed") {
+    res.status(404).send("Scan not found or not completed");
+    return;
+  }
+  const prior = (await getScansByCompany(scan.company_name, scan.id))[0] || null;
+  res.type("html").send(comparePage(scan, prior));
+}));
+
+function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
+  const curEdp = current.report_markdown ? parseEdpFromMarkdown(current.report_markdown) : null;
+  const priEdp = prior?.report_markdown ? parseEdpFromMarkdown(prior.report_markdown) : null;
+  const curData = current.procurement_json as ProcurementData | null;
+  const priData = prior?.procurement_json as ProcurementData | null;
+  const curOpen = (curData?.contractsFinder?.open?.length || 0) + (curData?.findTender?.notices?.length || 0);
+  const priOpen = (priData?.contractsFinder?.open?.length || 0) + (priData?.findTender?.notices?.length || 0);
+  const curAwarded = curData?.contractsFinder?.awarded?.length || 0;
+  const priAwarded = priData?.contractsFinder?.awarded?.length || 0;
+  const curBuyers = new Set<string>((curData?.contractsFinder?.open || []).map((n: any) => n.buyer).filter(Boolean));
+  const priBuyers = prior ? new Set<string>((priData?.contractsFinder?.open || []).map((n: any) => n.buyer).filter(Boolean)) : new Set<string>();
+  const newBuyers = [...curBuyers].filter(b => !priBuyers.has(b)).slice(0, 8);
+  const droppedBuyers = [...priBuyers].filter(b => !curBuyers.has(b)).slice(0, 8);
+
+  function gradeColour(g: string) {
+    const map: Record<string, string> = { A: "#1d6b4f", B: "#2a7a3b", C: "#a97932", D: "#c05c20", E: "#9b2d20" };
+    return map[g?.charAt(0).toUpperCase()] || "#24140f";
+  }
+  function row(label: string, cur: string, pri: string, changed: boolean) {
+    return `<tr>
+      <td style="padding:10px 14px;font-size:13px;color:#6f5b50;border-bottom:1px solid #e8d9c4;font-family:monospace;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(label)}</td>
+      <td style="padding:10px 14px;font-size:15px;font-weight:600;border-bottom:1px solid #e8d9c4;color:${escapeHtml(gradeColour(cur))}">${escapeHtml(cur)}</td>
+      <td style="padding:10px 14px;font-size:15px;border-bottom:1px solid #e8d9c4;color:#8a6f5a">${escapeHtml(pri)}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid #e8d9c4">${changed ? '<span style="background:#fdf0ee;color:#9b2d20;font-size:11px;font-family:monospace;padding:2px 7px">CHANGED</span>' : '<span style="font-size:11px;font-family:monospace;color:#b0a090">same</span>'}</td>
+    </tr>`;
+  }
+  const ce = curEdp, pe = priEdp;
+  const tableRows = [
+    row("Verdict", ce?.verdict||"—", pe?.verdict||"—", ce?.verdict !== pe?.verdict),
+    row("Evidence grade", ce?.evidenceGrade||"—", pe?.evidenceGrade||"—", ce?.evidenceGrade !== pe?.evidenceGrade),
+    row("Can win now?", ce?.canTheyWinNow||"—", pe?.canTheyWinNow||"—", ce?.canTheyWinNow !== pe?.canTheyWinNow),
+    row("Route", ce?.recommendedRoute||"—", pe?.recommendedRoute||"—", ce?.recommendedRoute !== pe?.recommendedRoute),
+    row("Open notices", String(curOpen), String(priOpen), curOpen !== priOpen),
+    row("Awarded notices", String(curAwarded), String(priAwarded), curAwarded !== priAwarded),
+  ].join("");
+  const formatDate = (s: string) => s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare &mdash; ${escapeHtml(current.company_name)} &mdash; GovRevenue</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f3eadc;color:#24140f;font-family:Arial,sans-serif;padding:40px 24px}
+.page{max-width:900px;margin:0 auto}
+.brand{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a6f5a;margin-bottom:8px}
+h1{font-family:Georgia,serif;font-size:28px;font-weight:600;margin-bottom:4px}
+.sub{font-size:13px;color:#8a6f5a;font-family:monospace;margin-bottom:32px}
+.back{font-size:12px;color:#8a6f5a;text-decoration:underline;font-family:monospace;display:inline-block;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;background:#fffaf3;border:1px solid #d2b88f}
+thead tr{background:#f3eadc}
+th{padding:9px 14px;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6f5a;font-weight:600}
+.section-head{font-family:Georgia,serif;font-size:18px;font-weight:600;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid #d2b88f}
+.buyer-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.buyer{font-size:12px;font-family:monospace;padding:4px 10px;border-radius:2px}
+.buyer.new{background:#e8f5ee;color:#1d6b4f;border:1px solid #a8d4b8}
+.buyer.gone{background:#fdf0ee;color:#9b2d20;border:1px solid #e0a090}
+.none{font-size:13px;color:#8a6f5a;font-family:monospace}
+${prior ? "" : ".no-prior{background:#fffaf3;border:1px solid #d2b88f;padding:24px 28px;font-size:14px;color:#6f5b50}"}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="brand">GovRevenue &mdash; Scan comparison</div>
+  <h1>${escapeHtml(current.company_name)}</h1>
+  <div class="sub">Latest: ${escapeHtml(formatDate(current.created_at))}${prior ? ` &nbsp;&middot;&nbsp; Previous: ${escapeHtml(formatDate(prior.created_at))}` : ""}</div>
+  <a class="back" href="/scan/${escapeHtml(current.id)}">&larr; Back to latest scan</a>
+  ${prior ? `
+  <table>
+    <thead><tr><th>Metric</th><th>Latest scan</th><th>Previous scan</th><th>Change</th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <div class="section-head">New buyers in latest scan</div>
+  ${newBuyers.length > 0 ? `<div class="buyer-list">${newBuyers.map(b => `<span class="buyer new">+ ${escapeHtml(b)}</span>`).join("")}</div>` : '<p class="none">None detected</p>'}
+  <div class="section-head">Buyers no longer appearing</div>
+  ${droppedBuyers.length > 0 ? `<div class="buyer-list">${droppedBuyers.map(b => `<span class="buyer gone">&minus; ${escapeHtml(b)}</span>`).join("")}</div>` : '<p class="none">None detected</p>'}
+  ` : `<div class="no-prior">No previous completed scan found for <b>${escapeHtml(current.company_name)}</b>. Run a second scan after a few weeks to generate a comparison.</div>`}
+</div>
+</body>
+</html>`;
+}
 
 app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
