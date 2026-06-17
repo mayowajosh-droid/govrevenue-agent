@@ -4182,7 +4182,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </head>
 <body>
 <div class="topstrip"><div class="wrap">
-  <div class="live"><span class="dot"></span> Birmingham public procurement intelligence</div>
+  <div class="live"><span class="dot"></span> UK public procurement intelligence</div>
   <div>Birmingham, UK &middot; Confidential intelligence</div>
 </div></div>
 <header class="mast"><div class="wrap">
@@ -4309,7 +4309,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   </div>
 </section>
 <footer><div class="wrap">
-  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A Birmingham-based public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul><li><a href="#desks">Government</a></li><li><a href="#desks">Finance</a></li><li><a href="#desks">Economics</a></li><li><a href="#desks">Technology &middot; AI</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/scan" title="Buyer Watchlist is included in your scan report">Watchlist</a></li><li><a href="/scan" title="Available after your first scan">Consultant license</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
