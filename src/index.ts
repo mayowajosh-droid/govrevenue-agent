@@ -4263,7 +4263,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence house. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul><li><a href="#desks">Government</a></li><li><a href="#desks">Finance</a></li><li><a href="#desks">Economics</a></li><li><a href="#desks">Technology &middot; AI</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="#product">Watchlist</a></li><li><a href="#product">Consultant license</a></li></ul></div>
-  <div><h4>Sources</h4><ul><li><a href="#">Contracts Finder</a></li><li><a href="#">Find a Tender</a></li><li><a href="#">LA transparency</a></li><li><a href="#">Companies House</a></li></ul></div>
+  <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
 <script>
