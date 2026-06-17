@@ -1626,86 +1626,174 @@ Use this exact structure:
 
 # GovRevenue Scan: [Company Name]
 
-## 1. Brutally Honest Verdict
-Give 7 bullets. Each bullet must include one trust label:
-- Can they win now?
-- Best first revenue route
-- Biggest blocker
-- Buyer type most likely to care
-- Buyer type to avoid for now
-- Whether to bid, partner, subcontract, or prepare
-- What would make them credible in 30 days
+## 1. Executive Decision Panel
+Give a clear commercial decision panel with these exact fields:
 
-## 2. Data Pulled vs Relevant Evidence
+| Field | Answer |
+|---|---|
+| Verdict | |
+| Can they win now? | |
+| Best first money route | |
+| Fastest action this week | |
+| Main blocker | |
+| Evidence Grade | |
+| Recommended route | |
+
+Rules:
+- The verdict must be commercially honest.
+- If verified evidence is weak, do not pretend they are bid-ready.
+- Evidence Grade must be A, B, C, D or E:
+  - A = strong source-backed evidence and strong sector alignment
+  - B = good market signal but some readiness checks needed
+  - C = usable but mixed/noisy evidence
+  - D = low exact-match evidence; strategic scan, not bid-ready map
+  - E = insufficient evidence
+- Do not use the phrase "Data quality: Weak" anywhere. Use Evidence Grade instead.
+
+## 2. Evidence Grade and Scan Basis
+Include:
+- Corrected sector lens
+- Regions searched
+- Keywords searched
+- Open records shown
+- Award signals shown
+- Total records pulled
+- Relevant records
+- Verified evidence records
+- Inferred records
+- Strategic target records
+- Excluded / noisy records
+- Addressable value signal
+- Relevant pulled-record value
+- Evidence interpretation
+
+Rules:
+- If sector lens and keywords conflict, say this is a QA issue and correct the lens/keyword interpretation.
+- Cleaning reports must not use property-survey keywords like building surveying, condition survey, estate consultancy, asset management, property consultancy or built asset consultancy unless the company is actually property/built-environment.
+- Software/ICT reports must be framed as software, ICT and digital transformation, not generic professional services.
+- Training/enterprise support reports must be framed as training, skills, enterprise support and professional services.
+
+## 3. Intelligence Dashboard Summary
+Explain commercially what the dashboard means:
+- pulled records vs relevant records
+- verified vs inferred evidence
+- addressable value signal
+- why gross pulled value is not forecast revenue
+- compact value view, using £k / £m / £bn where useful
+
+## 4. Source-Backed Evidence
+Only use pulled source records or clearly labelled client-provided evidence.
+For each top record:
+- Record name
+- Buyer
+- Evidence status
+- Confidence
+- Value shown
+- Source reference
+- Commercial meaning
+- Best use
+
+Rules:
+- If verified evidence count is 0, do not label any recommendation [Verified] unless it is explicitly client-provided.
+- Client-provided evidence must be labelled [Client-provided], not generic [Verified].
+- Do not invent buyers, awards, suppliers, values, source URLs, certifications or case studies.
+
+## 5. Money Map: Best Routes to Revenue
 Create a table:
-Metric | Number | What It Means | Trust Note
+Route | Buyer type | Speed to revenue | Difficulty | Evidence strength | Why money exists | Best next action | Score /100
 
-Include pulled records, relevant records, excluded/noisy records, verified records, inferred records, strategic target records, addressable opportunity value, and relevant pulled-record value.
+Include 5-7 routes where possible:
+- Direct tender
+- Framework
+- DPS
+- Subcontract / partner
+- Pilot or grant-funded route
+- Buyer outreach / renewal watch
+- Compliance preparation
 
-## 3. Money Route Ranking
+Rules:
+- Rank by evidence strength, buyer fit, speed, difficulty and readiness.
+- If evidence is weak, make the route cautious.
+
+## 6. Buyer Watchlist
 Create a table:
-Rank | Route | Trust Label | Source Record ID / URL | Why Money Exists | Fit Now | What To Do This Week | Score /100
+Buyer | Buyer type | Why they matter | Likely buying route | Evidence strength | Fit score | Next action
 
-## 4. Buyer Fit Matrix
-Table:
-Buyer Type | Fit | Spend Logic | Trust Label | Best Entry Route | Priority
+Rules:
+- Verified buyers must come from pulled records or verified sources.
+- Strategic buyers are allowed only when labelled [Strategic target].
+- Do not invent named buyers.
+- For weak evidence reports, use cautious language such as monitor, validate or qualify.
 
-## 5. Named Buyer Watchlist
-List 8-12 named buyers.
-Table:
-Buyer | Why They May Buy | Service to Pitch | Best Route | Trust Label | Source Record ID / URL | Confidence
+## 7. Bid Readiness Score
+Give:
+- Overall score /100
+- Verdict: Bid now / Bid selectively / Prepare first / Not ready
+- Category scores:
+  - Public-sector fit
+  - Evidence strength
+  - Buyer relevance
+  - Compliance readiness
+  - Capacity fit
+  - Case study strength
+  - Route clarity
+  - Immediate bid readiness
 
-If no source record supports the buyer, label it [Strategic target] or [Not confirmed].
+Then explain:
+- What blocks the next 20 points
+- What to fix in 30 days
 
-## 6. Opportunity Map
-List 8-12 opportunities.
-Table:
-Opportunity | Likely Buyer | Trust Label | Source Record ID / URL | Why Buyer Spends | Route | Addressable Value Signal | Evidence Needed | Next Action This Week
+Rules:
+- Market demand does not automatically mean bid readiness.
+- Missing insurance, accreditations, case studies, framework access, capacity or cyber/compliance proof should reduce readiness.
 
-## 7. Contract and Award Signals From Pulled Data
-Only use relevant pulled source records.
-For each:
-- Trust label
-- Source-backed fact
-- Source record ID
-- Source URL
-- Why it matters commercially
-- Fit for this company
-- Recommended action
+## 8. Do Not Chase These Yet
+Create a table:
+Contract / route to avoid | Why risky | Proof missing | When it becomes suitable
 
-## 8. Competitor and Supplier Landscape
-Name suppliers only when sourced from pulled records or verified web search.
-Each named supplier must include a trust label.
+Give honest negative guidance. Include unsuitable or premature routes such as:
+- oversized prime contracts
+- wrong-sector framework lots
+- low-relevance pulled records
+- generic low-margin work
+- tenders demanding proof the company does not yet have
 
-## 9. Evidence Gap Checklist
-Use this table:
-Asset | Status Green/Amber/Red | Why It Matters | Fix This Week
+## 9. 30-Day Activation Pack
+Include:
+- Week 1: evidence and access verification
+- Week 2: capability statement and bid pack
+- Week 3: buyer outreach and route qualification
+- Week 4: selective bid / partner activation
 
-## 10. Bid / Partner / Subcontract / Ignore Rules
-Give strict decision rules. Include trust labels where recommendations depend on data.
+Then include:
+- Documents needed before bidding
+- Capability statement bullets
+- Buyer outreach email
+- Partner outreach email
+- LinkedIn message
+- Bid/no-bid checklist
 
-## 11. 30-Day Activation Plan
-Week 1:
-Week 2:
-Week 3:
-Week 4:
+Make every item sector-specific. Avoid generic filler.
 
-## 12. Outreach Pack
-Write:
-1. Capability positioning statement
-2. Partner outreach email
-3. Public buyer intro email
-4. LinkedIn message
-
-## 13. Risks and Caveats
-Be clear about uncertainty, noisy data, weak evidence, unconfirmed facts, and human-verification needs.
-
-## 14. Source Appendix
-List source record IDs, URLs, buyer, supplier if available, trust label, and relevance reason.
-
-## 15. Human Verification Layer
+## 10. QA Notes / Integrity Checks
 Create a final table:
-Claim / Recommendation | Status: Verified/Inferred/Strategic target/Not confirmed | Evidence | Human Check Needed
+Check | Status | Notes
+
+Include checks for:
+- sector and keyword match
+- verified labels
+- zero verified evidence with verified claims
+- buyer invention
+- client-provided evidence labelling
+- company punctuation
+- HTML entity cleanup
+- source formatting
+- required sections
+- human verification required
+
+Final commercial note:
+End with:
+"No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions."
 `;
 }
 
