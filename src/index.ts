@@ -2890,9 +2890,11 @@ function premiumDashboardHtml(scan: ScanRecord) {
   `;
 }
 
-function premiumClosingHtml(scan: ScanRecord) {
+function premiumClosingHtml(scan: ScanRecord, parsedEdp?: ParsedEdp | null) {
   const scores = calcPremiumScores(scan);
   const company = scan.company_name;
+  const finalRoute = parsedEdp?.recommendedRoute || scores.route;
+  const finalSector = scores.sector;
 
   return `
     <section class="marketing-close">
@@ -2902,11 +2904,11 @@ function premiumClosingHtml(scan: ScanRecord) {
       <div class="close-grid">
         <div>
           <b>Recommended route</b>
-          <span>${escapeHtml(scores.route)}</span>
+          <span>${escapeHtml(finalRoute)}</span>
         </div>
         <div>
           <b>Sector lens</b>
-          <span>${escapeHtml(scores.sector)}</span>
+          <span>${escapeHtml(finalSector)}</span>
         </div>
         <div>
           <b>Next value unlock</b>
@@ -2914,6 +2916,7 @@ function premiumClosingHtml(scan: ScanRecord) {
         </div>
       </div>
       <p class="close-note">GovRevenue helps businesses stop guessing at public-sector opportunities. The product turns buyer signals, contract records and readiness gaps into a focused revenue plan that teams can act on immediately.</p>
+      <p class="close-note" style="margin-top:8px;font-size:12px;color:var(--muted)">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
     </section>
   `;
 }
@@ -3093,6 +3096,112 @@ function assessDataQuality(scan: ScanRecord) {
   return "Early signal — limited records found; use as directional intelligence only.";
 }
 
+interface ParsedEdp {
+  verdict: string;
+  canTheyWinNow: string;
+  bestFirstMoneyRoute: string;
+  fastestActionThisWeek: string;
+  mainBlocker: string;
+  evidenceGrade: string;
+  recommendedRoute: string;
+}
+
+function parseEdpFromMarkdown(markdown: string): ParsedEdp | null {
+  const sectionMatch = markdown.match(
+    /##\s*1\.\s*Executive Decision Panel([\s\S]*?)(?=\n##\s+\d+\.|\n##\s+[A-Z]|$)/i
+  );
+  if (!sectionMatch) return null;
+
+  const section = sectionMatch[1];
+
+  function extractRow(fieldPattern: string): string {
+    const re = new RegExp(
+      `\\|\\s*${fieldPattern}\\s*\\|\\s*([^|\\n]+?)\\s*\\|`,
+      "i"
+    );
+    const m = section.match(re);
+    return m ? m[1].trim() : "";
+  }
+
+  const verdict = extractRow("Verdict");
+  const evidenceGrade = extractRow("Evidence Grade");
+
+  if (!verdict && !evidenceGrade) return null;
+
+  return {
+    verdict: verdict || "",
+    canTheyWinNow: extractRow("Can they win now\\?"),
+    bestFirstMoneyRoute: extractRow("Best first money route"),
+    fastestActionThisWeek: extractRow("Fastest action this week"),
+    mainBlocker: extractRow("Main blocker"),
+    evidenceGrade: evidenceGrade || "",
+    recommendedRoute: extractRow("Recommended route"),
+  };
+}
+
+function stripEdpFromMarkdown(markdown: string): string {
+  return markdown.replace(
+    /##\s*1\.\s*Executive Decision Panel[\s\S]*?(?=\n##\s+\d+\.|\n##\s+[A-Z])/i,
+    ""
+  );
+}
+
+function stripReportTitleFromMarkdown(markdown: string): string {
+  return markdown.replace(/^#\s+GovRevenue\s+Scan:[^\n]*\n?/im, "");
+}
+
+interface ConsistencyReport {
+  valid: boolean;
+  errors: string[];
+  conflicts: string[];
+}
+
+function validateReportConsistency(
+  edp: ParsedEdp | null,
+  markdown: string
+): ConsistencyReport {
+  const errors: string[] = [];
+  const conflicts: string[] = [];
+
+  if (!edp) {
+    errors.push("Executive Decision Panel could not be parsed from the report markdown.");
+    return { valid: false, errors, conflicts };
+  }
+
+  if (!edp.verdict) errors.push("EDP verdict is missing.");
+  if (!edp.evidenceGrade) errors.push("EDP evidence grade is missing.");
+  if (!edp.canTheyWinNow) errors.push("EDP can-they-win-now is missing.");
+  if (!edp.recommendedRoute) errors.push("EDP recommended route is missing.");
+
+  const gradePattern = /\|\s*Evidence Grade\s*\|\s*([A-E])\s*\|/gi;
+  const foundGrades = new Set<string>();
+  for (const m of markdown.matchAll(gradePattern)) {
+    foundGrades.add(m[1].toUpperCase());
+  }
+  if (foundGrades.size > 1) {
+    conflicts.push(
+      `Conflicting evidence grades in report: ${[...foundGrades].join(", ")}`
+    );
+  }
+
+  const verdictPattern = /\|\s*Verdict\s*\|\s*([^|\n]+?)\s*\|/gi;
+  const foundVerdicts = new Set<string>();
+  for (const m of markdown.matchAll(verdictPattern)) {
+    foundVerdicts.add(m[1].trim().toLowerCase());
+  }
+  if (foundVerdicts.size > 1) {
+    conflicts.push(
+      `Conflicting verdicts in report: ${[...foundVerdicts].join("; ")}`
+    );
+  }
+
+  return {
+    valid: errors.length === 0 && conflicts.length === 0,
+    errors,
+    conflicts,
+  };
+}
+
 function reportPage(scan: ScanRecord) {
   const data = scan.procurement_json as ProcurementData | null;
   const sectorLens = inferSectorLens(scan);
@@ -3103,8 +3212,24 @@ function reportPage(scan: ScanRecord) {
   const regions = data?.regions || "Pending";
   const scores = calcPremiumScores(scan);
 
-  const content = scan.report_markdown
-    ? markdownToHtml(scan.report_markdown)
+  const parsedEdp = scan.report_markdown
+    ? parseEdpFromMarkdown(scan.report_markdown)
+    : null;
+
+  const edpVerdict = parsedEdp?.verdict || "";
+  const edpGrade = parsedEdp?.evidenceGrade || "";
+  const edpCanWin = parsedEdp?.canTheyWinNow || "";
+  const edpRoute = parsedEdp?.recommendedRoute || scores.route;
+  const edpBestRoute = parsedEdp?.bestFirstMoneyRoute || scores.route;
+  const edpFastestAction = parsedEdp?.fastestActionThisWeek || "";
+  const edpMainBlocker = parsedEdp?.mainBlocker || "";
+
+  const bodyMarkdown = scan.report_markdown
+    ? stripEdpFromMarkdown(stripReportTitleFromMarkdown(scan.report_markdown))
+    : null;
+
+  const content = bodyMarkdown
+    ? markdownToHtml(bodyMarkdown)
     : `<p>Status: <strong>${escapeHtml(scan.status)}</strong></p><p>${scan.error_message ? escapeHtml(scan.error_message) : "Still running. Refresh shortly."}</p>`;
 
   return `<!doctype html>
@@ -3661,16 +3786,16 @@ function reportPage(scan: ScanRecord) {
       <p class="subtitle">Commercial public-sector revenue intelligence for <strong>${escapeHtml(scan.company_name)}</strong>. Built from intake data, Contracts Finder records, verified web research and analyst scoring.</p>
 
       <div class="meta">
-        <div class="metric"><b>Verdict</b><span style="font-size:20px">${escapeHtml(data?.quality?.level === "Strong" ? "Bid selectively" : data?.quality?.level === "Medium" ? "Proceed cautiously" : "Prepare first")}</span><small>Commercial recommendation</small></div>
-        <div class="metric"><b>Evidence Grade</b><span>${escapeHtml(data?.quality?.level === "Strong" ? "B" : data?.quality?.level === "Medium" ? "C" : data?.quality?.level === "Weak" ? "D" : "Pending")}</span><small>${escapeHtml(data?.quality?.level || "Pending")} evidence base</small></div>
-        <div class="metric"><b>Can they win now?</b><span style="font-size:20px">${Number(data?.quality?.verifiedRecords || 0) > 0 ? "Yes, selectively" : "Prepare first"}</span><small>Based on verified evidence</small></div>
-        <div class="metric"><b>Recommended route</b><span style="font-size:20px">${escapeHtml(scores.route)}</span><small>Best first money route</small></div>
+        <div class="metric"><b>Verdict</b><span style="font-size:20px">${escapeHtml(edpVerdict || "Pending")}</span><small>Commercial recommendation</small></div>
+        <div class="metric"><b>Evidence Grade</b><span>${escapeHtml(edpGrade || "Pending")}</span><small>Source-backed evidence basis</small></div>
+        <div class="metric"><b>Can they win now?</b><span style="font-size:20px">${escapeHtml(edpCanWin || "Pending")}</span><small>Based on verified evidence</small></div>
+        <div class="metric"><b>Recommended route</b><span style="font-size:20px">${escapeHtml(edpRoute)}</span><small>Best first money route</small></div>
       </div>
 
       <div class="data-strip">
-        <p><strong>Best first money route:</strong> ${escapeHtml(scores.route)}</p>
-        <p><strong>Fastest action this week:</strong> validate evidence, capacity, compliance documents and route access before chasing live tenders.</p>
-        <p><strong>Main blocker:</strong> ${Number(data?.quality?.verifiedRecords || 0) > 0 ? "Convert evidence into a bid-ready pack and buyer-specific proof." : "Low verified evidence. Treat this as a route map until source-backed proof is strengthened."}</p>
+        <p><strong>Best first money route:</strong> ${escapeHtml(edpBestRoute)}</p>
+        ${edpFastestAction ? `<p><strong>Fastest action this week:</strong> ${escapeHtml(edpFastestAction)}</p>` : ""}
+        ${edpMainBlocker ? `<p><strong>Main blocker:</strong> ${escapeHtml(edpMainBlocker)}</p>` : ""}
         <p><strong>Sector lens:</strong> ${escapeHtml(scores.sector)}</p>
         <p><strong>Regions searched:</strong> ${escapeHtml(regions)}</p>
         <p><strong>Generated:</strong> ${escapeHtml(formatDate(scan.updated_at))}</p>
@@ -3684,7 +3809,7 @@ function reportPage(scan: ScanRecord) {
       ${content}
     </section>
 
-    ${scan.report_markdown ? premiumClosingHtml(scan) : ""}
+    ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
   </main>
@@ -4070,6 +4195,22 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
     res.status(404).send("Report not found or not complete yet.");
     return;
   }
+
+  const pdfEdp = parseEdpFromMarkdown(scan.report_markdown);
+  const consistency = validateReportConsistency(pdfEdp, scan.report_markdown);
+
+  if (!consistency.valid) {
+    const detail = [...consistency.errors, ...consistency.conflicts].join(" | ");
+    console.error("[pdf] blocked — consistency validation failed:", detail, { scanId: scan.id });
+    res.status(422).json({
+      error: "PDF export blocked: report consistency validation failed.",
+      detail,
+      errors: consistency.errors,
+      conflicts: consistency.conflicts
+    });
+    return;
+  }
+
   const html = reportPage(scan).replace(
     "</head>",
     `<style>
