@@ -3654,9 +3654,9 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 <header class="mast"><div class="wrap">
   <div class="logo">Gov<b>Revenue</b></div>
   <nav class="primary">
-    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="#product">The Scan</a><a href="#subscribe">Briefing</a>
+    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="#subscribe">Briefing</a>
   </nav>
-  <a class="mast-cta" href="#product">Run a scan</a>
+  <a class="mast-cta" href="/scan">Run a scan</a>
 </div></header>
 <div class="verticals"><div class="wrap">
   <a href="#desks">Government</a><a href="#desks">Business</a><a href="#desks">Finance</a>
@@ -3671,7 +3671,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
       <h1>Stop bidding blind.<br>Read the <em>record</em> first.</h1>
       <p class="lede">Public bodies already spend on what you sell. We map who buys it, who supplies it now, and the one route where your firm can realistically win &mdash; before the tender goes live.</p>
       <div class="hero-actions">
-        <a class="btn-primary" href="#product">Run a revenue scan</a>
+        <a class="btn-primary" href="/scan">Run a revenue scan</a>
         <a class="btn-ghost" href="#chart">See live signals</a>
       </div>
       <div class="chips">
@@ -3949,6 +3949,168 @@ app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
   }
   res.json(scan.procurement_json);
 }));
+
+app.get("/scan", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Run a Scan &mdash; GovRevenue</title>
+<style>
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:0 32px;display:flex;justify-content:space-between;align-items:center;height:34px}
+.topstrip a{color:var(--paper);opacity:.7}
+.topstrip a:hover{opacity:1}
+header{border-bottom:1px solid var(--line-strong);padding:0 32px}
+.mast{display:flex;align-items:baseline;justify-content:space-between;padding:22px 0 16px}
+.logo{font-family:var(--serif);font-weight:600;font-size:26px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+.back{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);text-decoration:underline;text-underline-offset:4px}
+.back:hover{color:var(--ink)}
+.page{max-width:780px;margin:0 auto;padding:56px 32px 80px}
+.page-head{margin-bottom:40px;border-bottom:1px solid var(--line-strong);padding-bottom:28px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
+h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:12px}
+.sub{color:#3a444d;font-size:16px;line-height:1.5}
+.form-grid{display:grid;gap:0}
+.field{padding:18px 0;border-bottom:1px solid var(--line-strong)}
+.field:last-of-type{border-bottom:0}
+.field label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin-bottom:8px}
+.field label span{color:var(--accent)}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--line-strong);background:#fff;padding:12px 14px;font-family:var(--sans);font-size:15px;color:var(--ink);transition:.15s;resize:vertical}
+.field input:focus,.field textarea:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.field textarea{min-height:76px}
+.field .hint{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:6px;line-height:1.5}
+.section-label{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);background:var(--paper-2);padding:10px 0;margin:28px 0 0;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong)}
+.submit-row{margin-top:36px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.btn-submit{background:var(--accent);color:#fff;font-family:var(--mono);font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:15px 28px;border:0;cursor:pointer;transition:.18s}
+.btn-submit:hover{background:#7a2121}
+.submit-note{font-family:var(--mono);font-size:11px;color:var(--slate);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="topstrip">
+  <a href="/">&#8592; GovRevenue</a>
+  <span>Public record &middot; updated continuously</span>
+</div>
+<header><div class="mast">
+  <a class="logo" href="/">Gov<b>Revenue</b></a>
+  <a class="back" href="/">&#8592; Back to home</a>
+</div></header>
+<main class="page">
+  <div class="page-head">
+    <div class="eyebrow">Revenue scan</div>
+    <h1>Tell us about your firm.</h1>
+    <p class="sub">The more context you give, the sharper the signal. We scan Contracts Finder, Find a Tender and LA spend data, then return a sourced verdict on where the money is and how to reach it.</p>
+  </div>
+  <form method="POST" action="/form-submit" autocomplete="off" class="form-grid">
+
+    <div class="section-label">Your firm</div>
+
+    <div class="field">
+      <label>Company name <span>*</span></label>
+      <input name="companyName" required placeholder="e.g. Apex Facilities Ltd">
+    </div>
+    <div class="field">
+      <label>Website</label>
+      <input name="website" placeholder="e.g. https://apexfacilities.co.uk">
+    </div>
+    <div class="field">
+      <label>Location / base</label>
+      <input name="location" placeholder="e.g. Birmingham, West Midlands">
+    </div>
+    <div class="field">
+      <label>Team size</label>
+      <input name="teamSize" placeholder="e.g. 12 FTE">
+    </div>
+
+    <div class="section-label">Services &amp; scope</div>
+
+    <div class="field">
+      <label>Main services <span>*</span></label>
+      <textarea name="mainServices" required placeholder="e.g. facilities management, reactive maintenance, cleaning"></textarea>
+      <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
+    </div>
+    <div class="field">
+      <label>Secondary services</label>
+      <textarea name="secondaryServices" placeholder="e.g. grounds maintenance, pest control"></textarea>
+    </div>
+    <div class="field">
+      <label>Areas / regions served</label>
+      <textarea name="areasServed" placeholder="e.g. West Midlands, East Midlands, national frameworks"></textarea>
+    </div>
+    <div class="field">
+      <label>Services you do NOT want</label>
+      <textarea name="excludedServices" placeholder="e.g. residential, defence, high-security sites"></textarea>
+    </div>
+
+    <div class="section-label">Contract appetite</div>
+
+    <div class="field">
+      <label>Ideal contract size</label>
+      <input name="idealContractSize" placeholder="e.g. £100k &ndash; £500k per year">
+    </div>
+    <div class="field">
+      <label>Maximum contract size</label>
+      <input name="maximumContractSize" placeholder="e.g. £2m">
+    </div>
+    <div class="field">
+      <label>Ideal public-sector buyers</label>
+      <textarea name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
+    </div>
+    <div class="field">
+      <label>Regions to scan first</label>
+      <textarea name="regionsToScan" placeholder="e.g. West Midlands priority, then national frameworks"></textarea>
+    </div>
+
+    <div class="section-label">Track record &amp; credentials</div>
+
+    <div class="field">
+      <label>Public-sector experience</label>
+      <input name="publicSectorExperience" placeholder="e.g. 3 years, 6 active public contracts">
+    </div>
+    <div class="field">
+      <label>Case studies or proof</label>
+      <textarea name="caseStudies" placeholder="e.g. 2yr cleaning contract with Birmingham City Council (2022&ndash;24), £180k/yr"></textarea>
+    </div>
+    <div class="field">
+      <label>Certifications / accreditations</label>
+      <textarea name="certifications" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
+    </div>
+
+    <div class="section-label">Goals &amp; context</div>
+
+    <div class="field">
+      <label>Main business goal</label>
+      <textarea name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
+    </div>
+    <div class="field">
+      <label>Biggest concern</label>
+      <textarea name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
+    </div>
+    <div class="field">
+      <label>Preferred output</label>
+      <textarea name="preferredOutput" placeholder="e.g. Focus on frameworks we can get on now, not long tender processes"></textarea>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="btn-submit">Run GovRevenue Scan &rarr;</button>
+      <span class="submit-note">Takes 2&ndash;4 minutes &middot; sourced PDF report returned</span>
+    </div>
+  </form>
+</main>
+<script>
+window.addEventListener("pageshow", () => {
+  document.querySelectorAll("input, textarea").forEach(f => { f.value = ""; f.setAttribute("autocomplete","off"); });
+});
+</script>
+</body>
+</html>`);
+});
 
 app.get("/scan/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
