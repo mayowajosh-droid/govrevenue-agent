@@ -3845,7 +3845,6 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   frame();
 })();
 (function(){
-  const cv=document.getElementById('growthChart')
 (function(){
   const cv=document.getElementById('growthChart'); if(!cv) return;
   const ctx=cv.getContext('2d');
