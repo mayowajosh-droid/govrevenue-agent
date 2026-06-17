@@ -1203,16 +1203,20 @@ function dataQualitySummary(open: ProcurementNotice[], awarded: ProcurementNotic
       ? 0
       : Math.round(all.reduce((sum, item) => sum + (item.relevanceScore || 0), 0) / total);
 
+  // Use relevant-record counts, not averageRelevance — CPV noise tanks the average
+  // even when genuine strong matches exist.
+  const relevantRatio = total === 0 ? 0 : moderate / total;
+
   let level = "Weak";
   let warning = "The data pull returned limited or noisy matches. Treat named buyer suggestions as strategy targets unless linked to pulled records or verified source URLs.";
 
   if (total === 0) {
     level = "Critical";
     warning = "No structured Contracts Finder records were returned for this scan. The report must rely on strategy mapping and verified web facts only.";
-  } else if (strong >= 6 && average >= 60) {
+  } else if (strong >= 8 && relevantRatio >= 0.25) {
     level = "Strong";
     warning = "The structured data pull returned several relevant records. Pulled records can be used as source-backed market signals.";
-  } else if (moderate >= 6 && average >= 45) {
+  } else if (strong >= 3 || (moderate >= 10 && relevantRatio >= 0.15)) {
     level = "Moderate";
     warning = "The structured data pull returned some useful records, but not every buyer or supplier in the report should be treated as confirmed.";
   }
@@ -1283,14 +1287,17 @@ Main goal: ${input.mainGoal || "win public sector contracts"}`;
     .slice(0, 8);
 }
 
+// CPV codes are supplementary — kept tight to avoid noisy cross-sector matches.
+// 45000000 (general construction) and 79000000 (all business services) are intentionally
+// excluded: too broad, they pull new-build and unrelated contracts.
 const SECTOR_CPV: Record<string, string[]> = {
-  "social-housing":    ["45000000", "50700000", "45453100", "70330000"],
+  "social-housing":    ["50700000", "45453100", "45262700"],  // maintenance, renovation, conversion
   "cleaning":          ["90910000", "90911000", "90919000", "90920000"],
-  "facilities":        ["79993000", "50700000", "90910000", "79993100"],
-  "built-environment": ["71000000", "71300000", "45000000", "71500000"],
-  "creative":          ["79000000", "79342200", "79970000", "79952000"],
+  "facilities":        ["50700000", "79993000"],               // maintenance + facilities mgmt only
+  "built-environment": ["71315300", "71315200", "45453100"],   // building surveying, testing, renovation
+  "creative":          ["79342200", "79952000"],               // promotional, events
   "photography":       ["79962000"],
-  "energy":            ["71314000", "09000000", "50710000", "71314300"],
+  "energy":            ["71314000", "50710000"],               // energy services, heating/ventilation maintenance
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise<ProcurementData> {
@@ -1365,7 +1372,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     const cpvBase = { ...staticCriteria, cpvCodes };
     try {
       open.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"] }, size: 20 },
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"] }, size: 10 },
         "cpv"
       )));
     } catch (error: any) {
@@ -1373,7 +1380,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     }
     try {
       awarded.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"] }, size: 20 },
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"] }, size: 10 },
         "cpv"
       )));
     } catch (error: any) {
