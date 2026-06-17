@@ -4009,7 +4009,7 @@ app.get("/", asyncRoute(async (_req, res) => {
   // Hero card values
   const heroCategory = isLive ? (CATEGORY_LABELS[heroSignal!.category] || heroSignal!.category) : "Housing maintenance";
   const heroTitle = isLive ? heroSignal!.title.slice(0, 80) : "Responsive maintenance framework — West Midlands";
-  const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Birmingham City Council";
+  const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Local Authority Buyer";
   const heroSource = isLive ? heroSignal!.source : "CF";
   const heroDateRaw = isLive ? (heroSignal!.notice_date || null) : null;
   const heroDate = heroDateRaw
@@ -4183,7 +4183,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 <body>
 <div class="topstrip"><div class="wrap">
   <div class="live"><span class="dot"></span> UK public procurement intelligence</div>
-  <div>Birmingham, UK &middot; Confidential intelligence</div>
+  <div>United Kingdom &middot; Confidential intelligence</div>
 </div></div>
 <header class="mast"><div class="wrap">
   <div class="logo">Gov<b>Revenue</b></div>
@@ -4313,7 +4313,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div><h4>Desks</h4><ul><li><a href="#desks">Government</a></li><li><a href="#desks">Finance</a></li><li><a href="#desks">Economics</a></li><li><a href="#desks">Technology &middot; AI</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/scan" title="Buyer Watchlist is included in your scan report">Watchlist</a></li><li><a href="/scan" title="Available after your first scan">Consultant license</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
-  <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
+  <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
 <script>
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
