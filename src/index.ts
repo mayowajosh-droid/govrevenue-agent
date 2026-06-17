@@ -16,7 +16,7 @@ import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
-import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed } from "./lib/emailNotifications.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert } from "./lib/emailNotifications.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
 type ScanRecord = {
   id: string;
@@ -32,6 +32,18 @@ type ScanRecord = {
   pdf_storage_url?: string | null;
   pdf_storage_etag?: string | null;
   pdf_storage_updated_at?: string | null;
+};
+
+type SubscriptionRecord = {
+  id: string;
+  scan_id: string;
+  company_name: string;
+  email: string;
+  input_json: any;
+  alerted_notice_ids: string[];
+  active: boolean;
+  created_at: string;
+  last_alerted_at: string | null;
 };
 
 type ProcurementNotice = {
@@ -116,6 +128,7 @@ const pool = process.env.DATABASE_URL
   : null;
 
 const memoryStore = new Map<string, ScanRecord>();
+const subMemStore = new Map<string, SubscriptionRecord>();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const redisConnection = REDIS_URL
@@ -127,6 +140,10 @@ const redisConnection = REDIS_URL
 
 const scanQueue = redisConnection
   ? new Queue("govrevenue-scans", { connection: redisConnection as any })
+  : null;
+
+const alertQueue = redisConnection
+  ? new Queue("govrevenue-alerts", { connection: redisConnection as any })
   : null;
 
 type AsyncRouteHandler = (
@@ -886,6 +903,21 @@ async function initDb() {
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_url TEXT;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_etag TEXT;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_updated_at TIMESTAMPTZ;`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY,
+      scan_id TEXT NOT NULL,
+      company_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      input_json JSONB NOT NULL,
+      alerted_notice_ids TEXT[] NOT NULL DEFAULT '{}',
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL,
+      last_alerted_at TIMESTAMPTZ
+    );
+  `);
+
   console.log("[db] ready");
 }
 
@@ -1000,6 +1032,75 @@ async function deleteScan(id: string) {
   }
 
   memoryStore.delete(id);
+}
+
+async function createSubscription(
+  scanId: string,
+  email: string,
+  input: z.infer<typeof intakeSchema>,
+  companyName: string
+): Promise<SubscriptionRecord> {
+  const record: SubscriptionRecord = {
+    id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    scan_id: scanId,
+    company_name: companyName,
+    email,
+    input_json: input,
+    alerted_notice_ids: [],
+    active: true,
+    created_at: nowIso(),
+    last_alerted_at: null
+  };
+
+  if (pool) {
+    await pool.query(
+      `INSERT INTO subscriptions (id, scan_id, company_name, email, input_json, alerted_notice_ids, active, created_at, last_alerted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [record.id, record.scan_id, record.company_name, record.email, record.input_json,
+       record.alerted_notice_ids, record.active, record.created_at, record.last_alerted_at]
+    );
+  } else {
+    subMemStore.set(record.id, record);
+  }
+  return record;
+}
+
+async function getSubscription(id: string): Promise<SubscriptionRecord | null> {
+  if (pool) {
+    const result = await pool.query(`SELECT * FROM subscriptions WHERE id=$1`, [id]);
+    return result.rows[0] || null;
+  }
+  return subMemStore.get(id) || null;
+}
+
+async function updateSubscriptionAlerted(id: string, noticeIds: string[]) {
+  const now = nowIso();
+  if (pool) {
+    await pool.query(
+      `UPDATE subscriptions SET alerted_notice_ids=$2, last_alerted_at=$3 WHERE id=$1`,
+      [id, noticeIds, now]
+    );
+  } else {
+    const sub = subMemStore.get(id);
+    if (sub) subMemStore.set(id, { ...sub, alerted_notice_ids: noticeIds, last_alerted_at: now });
+  }
+}
+
+async function deactivateSubscription(id: string) {
+  if (pool) {
+    await pool.query(`UPDATE subscriptions SET active=FALSE WHERE id=$1`, [id]);
+  } else {
+    const sub = subMemStore.get(id);
+    if (sub) subMemStore.set(id, { ...sub, active: false });
+  }
+}
+
+async function listAllSubscriptions(): Promise<SubscriptionRecord[]> {
+  if (pool) {
+    const result = await pool.query(`SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT 200`);
+    return result.rows;
+  }
+  return Array.from(subMemStore.values()).sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -2205,6 +2306,113 @@ function startScanWorker() {
   console.log("[queue] worker started");
 }
 
+function appBaseUrl() {
+  const explicit = process.env.PUBLIC_APP_URL || process.env.APP_BASE_URL || process.env.BASE_URL;
+  const railway = process.env.RAILWAY_PUBLIC_DOMAIN;
+  return (explicit || (railway ? `https://${railway}` : "")).replace(/\/+$/, "");
+}
+
+function absoluteAppUrl(path: string) {
+  const base = appBaseUrl();
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return base ? `${base}${p}` : p;
+}
+
+async function runWeeklyAlert(subscriptionId: string) {
+  const sub = await getSubscription(subscriptionId);
+  if (!sub || !sub.active) return;
+
+  const input = sub.input_json as z.infer<typeof intakeSchema>;
+  const data = await pullProcurementData(input);
+
+  const allNotices: ProcurementNotice[] = [
+    ...(data.contractsFinder?.open || []),
+    ...(data.contractsFinder?.awarded || []),
+    ...(data.findTender?.notices || [])
+  ];
+
+  const alreadySent = new Set(sub.alerted_notice_ids || []);
+  const newNotices = allNotices.filter(n => n.id && !alreadySent.has(n.id));
+
+  if (newNotices.length > 0) {
+    await sendWeeklyAlert({
+      subscriptionId: sub.id,
+      companyName: sub.company_name,
+      email: sub.email,
+      newNotices: newNotices.slice(0, 20).map(n => ({
+        title: n.title || "Untitled",
+        buyer: n.buyer || "Unknown buyer",
+        value: n.valueHigh
+          ? `£${Math.round(n.valueHigh / 1000)}k`
+          : n.valueLow ? `£${Math.round(n.valueLow / 1000)}k` : "Value not stated",
+        deadline: n.deadlineDate || null,
+        url: noticeUrl(n.id || ""),
+        source: n.source || "Contracts Finder"
+      })),
+      totalNewCount: newNotices.length,
+      reportUrl: absoluteAppUrl(`/scan/${sub.scan_id}`),
+      unsubscribeUrl: absoluteAppUrl(`/unsubscribe/${sub.id}`)
+    });
+  }
+
+  const updatedIds = [
+    ...alreadySent,
+    ...newNotices.map(n => n.id).filter((id): id is string => Boolean(id))
+  ];
+  await updateSubscriptionAlerted(sub.id, updatedIds);
+
+  console.log(`[alerts] ${sub.company_name}: ${newNotices.length} new, ${updatedIds.length} total tracked`);
+}
+
+async function enqueueWeeklyAlert(subscriptionId: string) {
+  if (!alertQueue) {
+    console.log("[alerts] Redis not available — weekly alerts require Redis.");
+    return;
+  }
+  await alertQueue.add(
+    "weekly-alert",
+    { subscriptionId },
+    {
+      repeat: { every: 7 * 24 * 60 * 60 * 1000 },
+      jobId: subscriptionId,
+      attempts: 2,
+      backoff: { type: "exponential", delay: 10_000 },
+      removeOnComplete: { age: 60 * 60 * 24 * 30 },
+      removeOnFail: { age: 60 * 60 * 24 * 30 }
+    }
+  );
+  console.log(`[alerts] scheduled weekly alert for ${subscriptionId}`);
+}
+
+function startAlertWorker() {
+  if (!redisConnection) {
+    console.log("[alerts] Redis not configured. Weekly alerts disabled.");
+    return;
+  }
+
+  const worker = new Worker(
+    "govrevenue-alerts",
+    async job => {
+      const { subscriptionId } = job.data || {};
+      if (!subscriptionId) throw new Error("Invalid alert job payload.");
+      console.log(`[alerts] processing ${subscriptionId}`);
+      await runWeeklyAlert(subscriptionId);
+    },
+    { connection: redisConnection as any, concurrency: 2 }
+  );
+
+  worker.on("completed", job => {
+    console.log(`[alerts] completed job ${job.id}`);
+  });
+
+  worker.on("failed", (job, error) => {
+    console.error(`[alerts] failed job ${job?.id}`, error);
+    captureError(error, { alertWorker: { subscriptionId: job?.data?.subscriptionId } });
+  });
+
+  console.log("[alerts] worker started");
+}
+
 
 function clampScore(value: number) {
   const safe = Number.isFinite(value) ? value : 0;
@@ -3218,6 +3426,44 @@ function reportPage(scan: ScanRecord) {
     ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
+
+    ${scan.status === "completed" ? `
+    <div class="no-print" style="margin:40px auto;max-width:680px;padding:24px 28px;background:#fffaf3;border:1px solid #d2b88f;border-radius:8px">
+      <h3 style="margin-top:0;font-family:Georgia,serif;color:#24140f">Get weekly opportunity alerts</h3>
+      <p style="color:#5a3e28;margin-bottom:16px">We'll re-scan Contracts Finder every 7 days and email you when new tenders match your profile.</p>
+      <form id="alert-form" style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="email" id="alert-email" placeholder="your@email.com" required
+          style="flex:1;min-width:220px;padding:10px 14px;border:1px solid #c9a87c;border-radius:6px;font-size:15px;background:#fff" />
+        <button type="submit"
+          style="padding:10px 20px;background:#1a4a2e;color:#fff;border:0;border-radius:6px;font-size:15px;cursor:pointer;white-space:nowrap">
+          Subscribe
+        </button>
+      </form>
+      <p id="alert-msg" style="margin-top:12px;font-size:14px;color:#1a4a2e;display:none"></p>
+      <script>
+        document.getElementById("alert-form").addEventListener("submit", async function(e) {
+          e.preventDefault();
+          const email = document.getElementById("alert-email").value;
+          const msg = document.getElementById("alert-msg");
+          try {
+            const r = await fetch("/api/scans/${escapeHtml(scan.id)}/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email })
+            });
+            const data = await r.json();
+            msg.style.display = "block";
+            msg.textContent = r.ok ? "Subscribed. We'll email you when new opportunities appear." : (data.error || "Subscription failed.");
+            msg.style.color = r.ok ? "#1a4a2e" : "#9b2d20";
+            if (r.ok) document.getElementById("alert-form").style.display = "none";
+          } catch {
+            msg.style.display = "block";
+            msg.textContent = "Subscription failed. Please try again.";
+            msg.style.color = "#9b2d20";
+          }
+        });
+      </script>
+    </div>` : ""}
   </main>
   <script>
     window.addEventListener("pageshow", () => {
@@ -3747,6 +3993,88 @@ ${scans
 </html>`);
 }));
 
+app.post("/api/scans/:id/subscribe", asyncRoute(async (req, res) => {
+  const scan = await getScan(req.params.id);
+  if (!scan) {
+    res.status(404).json({ error: "Scan not found" });
+    return;
+  }
+  if (scan.status !== "completed") {
+    res.status(400).json({ error: "Scan must be completed before subscribing" });
+    return;
+  }
+
+  const emailParsed = z.string().email().safeParse(req.body?.email);
+  if (!emailParsed.success) {
+    res.status(400).json({ error: "Valid email required" });
+    return;
+  }
+
+  const sub = await createSubscription(scan.id, emailParsed.data, scan.input_json, scan.company_name);
+  await enqueueWeeklyAlert(sub.id);
+
+  res.status(201).json({ id: sub.id, message: "Subscribed to weekly alerts." });
+}));
+
+app.get("/unsubscribe/:id", asyncRoute(async (req, res) => {
+  const sub = await getSubscription(req.params.id);
+  if (!sub) {
+    res.status(404).type("html").send(`<body style="font-family:Arial;padding:40px"><p>Subscription not found.</p></body>`);
+    return;
+  }
+  await deactivateSubscription(sub.id);
+  res.type("html").send(`<!doctype html>
+<html>
+<body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:40px">
+<div style="max-width:600px;margin:auto;background:#fffaf3;border:1px solid #d2b88f;padding:32px;border-radius:8px">
+  <h1 style="font-family:Georgia,serif;margin-top:0">Unsubscribed</h1>
+  <p>Weekly alerts for <strong>${escapeHtml(sub.company_name)}</strong> have been cancelled.</p>
+  <p><a href="/" style="color:#1a4a2e">Back to GovRevenue</a></p>
+</div>
+</body></html>`);
+}));
+
+app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
+  const subs = await listAllSubscriptions();
+  const token = String(req.query.token || "");
+  res.type("html").send(`<!doctype html>
+<html>
+<body style="font-family:Arial;background:#f3eadc;color:#24140f;padding:32px">
+<h1 style="font-family:Georgia,serif">Weekly Alert Subscriptions</h1>
+<p><a href="/admin/scans?token=${encodeURIComponent(token)}">← Back to scans</a></p>
+<table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1200px">
+<tr><th>Created</th><th>Company</th><th>Email</th><th>Active</th><th>Last Alerted</th><th>Tracked</th><th>Fire</th></tr>
+${subs.map(s => `
+  <tr>
+    <td>${escapeHtml(formatDate(s.created_at))}</td>
+    <td>${escapeHtml(s.company_name)}</td>
+    <td>${escapeHtml(s.email)}</td>
+    <td>${s.active ? "Yes" : "No"}</td>
+    <td>${s.last_alerted_at ? escapeHtml(formatDate(s.last_alerted_at)) : "Never"}</td>
+    <td>${(s.alerted_notice_ids || []).length}</td>
+    <td>
+      <form method="POST" action="/admin/subscriptions/${s.id}/fire?token=${encodeURIComponent(token)}">
+        <button style="background:#1a4a2e;color:#fff;border:0;padding:6px 10px;cursor:pointer">Fire Now</button>
+      </form>
+    </td>
+  </tr>`).join("")}
+</table>
+</body></html>`);
+}));
+
+app.post("/admin/subscriptions/:id/fire", requireAdmin, asyncRoute(async (req, res) => {
+  const sub = await getSubscription(req.params.id);
+  if (!sub) {
+    res.status(404).json({ error: "Subscription not found" });
+    return;
+  }
+  runWeeklyAlert(sub.id).catch(err => {
+    console.error(`[alerts] manual fire failed for ${sub.id}`, err);
+    captureError(err, { alertFire: { subscriptionId: sub.id } });
+  });
+  res.json({ message: "Alert fired. Check logs for result." });
+}));
+
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("[route] failed", err);
   captureError(err, { route: { method: req.method, path: req.path } });
@@ -3764,6 +4092,7 @@ initDb()
     // Missing flags keep the current beta single-service behavior and run both.
     if (RUN_WORKER) {
       startScanWorker();
+      startAlertWorker();
     } else {
       console.log("[queue] worker disabled by RUN_WORKER=false");
     }

@@ -111,3 +111,56 @@ export async function notifyScanFailed(input: ScanEmailInput) {
     ].join("\n")
   });
 }
+
+export type WeeklyAlertNotice = {
+  title: string;
+  buyer: string;
+  value: string;
+  deadline: string | null;
+  url: string;
+  source: string;
+};
+
+export async function sendWeeklyAlert(input: {
+  subscriptionId: string;
+  companyName: string;
+  email: string;
+  newNotices: WeeklyAlertNotice[];
+  totalNewCount: number;
+  reportUrl: string;
+  unsubscribeUrl: string;
+}) {
+  const client = getResend();
+  const from = env("FROM_EMAIL");
+  if (!client || !from || !input.email) return;
+
+  const noticeLines = input.newNotices.slice(0, 15).map((n, i) =>
+    [
+      `${i + 1}. ${n.title}`,
+      `   Buyer: ${n.buyer}`,
+      `   Value: ${n.value}`,
+      n.deadline ? `   Deadline: ${n.deadline}` : null,
+      `   ${n.source}: ${n.url}`
+    ].filter(Boolean).join("\n")
+  ).join("\n\n");
+
+  const overflow = input.totalNewCount > 15
+    ? `\n\n...and ${input.totalNewCount - 15} more opportunities.`
+    : "";
+
+  await sendEmail({
+    to: input.email,
+    subject: `${input.totalNewCount} new ${input.totalNewCount === 1 ? "opportunity" : "opportunities"} for ${input.companyName}`,
+    text: [
+      `Weekly procurement alert — ${input.companyName}`,
+      ``,
+      `${input.totalNewCount} new ${input.totalNewCount === 1 ? "opportunity" : "opportunities"} found since your last alert:`,
+      ``,
+      noticeLines + overflow,
+      ``,
+      `View your report: ${input.reportUrl}`,
+      ``,
+      `Unsubscribe: ${input.unsubscribeUrl}`
+    ].join("\n")
+  });
+}
