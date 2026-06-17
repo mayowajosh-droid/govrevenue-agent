@@ -618,7 +618,7 @@ function buildRegion(input: z.infer<typeof intakeSchema>) {
   if (raw.includes("east midlands")) regions.push("East Midlands");
   if (raw.includes("south east")) regions.push("South East");
 
-  return regions.length ? Array.from(new Set(regions)).join(",") : "West Midlands,London";
+  return regions.length ? Array.from(new Set(regions)).join(",") : "";
 }
 
 function noticeUrl(id: string) {
@@ -773,6 +773,7 @@ async function findTenderSearch(keywords: string[]): Promise<{ notices: Procurem
     const data = await response.json();
     const releases = Array.isArray(data.releases) ? data.releases : [];
 
+    const scored: { notice: ProcurementNotice; score: number }[] = [];
     for (const release of releases) {
       const haystack = [
         release?.tender?.title,
@@ -781,12 +782,17 @@ async function findTenderSearch(keywords: string[]): Promise<{ notices: Procurem
         release?.parties?.map?.((party: any) => party?.name).join(" ")
       ].filter(Boolean).join(" ").toLowerCase();
 
-      const matchedKeyword = keywordSet.find(keyword => haystack.includes(keyword));
-      if (!matchedKeyword) continue;
+      const matchCount = keywordSet.filter(kw => haystack.includes(kw)).length;
+      if (!matchCount) continue;
 
+      const matchedKeyword = keywordSet.find(kw => haystack.includes(kw))!;
       const notice = normaliseFindTenderRelease(release, matchedKeyword);
-      if (notice) notices.push(notice);
+      if (notice) scored.push({ notice, score: matchCount });
     }
+
+    // highest keyword-match-count first so dedupe cap keeps the most relevant
+    scored.sort((a, b) => b.score - a.score);
+    const notices = scored.map(s => s.notice);
 
     return { notices: dedupeNotices(notices).map(notice => enrichNoticeQuality(notice, keywords)), errors };
   } catch (error: any) {
@@ -842,7 +848,7 @@ function dedupeNotices(notices: ProcurementNotice[]) {
     output.push(notice);
   }
 
-  return output.slice(0, 18);
+  return output.slice(0, 60);
 }
 
 
@@ -1148,13 +1154,20 @@ Secondary services: ${input.secondaryServices || "none"}
 Ideal buyers: ${input.idealBuyers || "public sector"}
 Main goal: ${input.mainGoal || "win public sector contracts"}`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0.1,
-    max_tokens: 300
-  });
+  const kwController = new AbortController();
+  const kwTimer = setTimeout(() => kwController.abort(), 90_000);
+  let response;
+  try {
+    response = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 300
+    }, { signal: kwController.signal });
+  } finally {
+    clearTimeout(kwTimer);
+  }
 
   const raw = response.choices[0]?.message?.content ?? "{}";
   const parsed = JSON.parse(raw);
@@ -1168,6 +1181,16 @@ Main goal: ${input.mainGoal || "win public sector contracts"}`;
     .filter((k): k is string => typeof k === "string" && k.length >= 3 && k.length <= 80)
     .slice(0, 8);
 }
+
+const SECTOR_CPV: Record<string, string[]> = {
+  "social-housing":    ["45000000", "50700000", "45453100", "70330000"],
+  "cleaning":          ["90910000", "90911000", "90919000", "90920000"],
+  "facilities":        ["79993000", "50700000", "90910000", "79993100"],
+  "built-environment": ["71000000", "71300000", "45000000", "71500000"],
+  "creative":          ["79000000", "79342200", "79970000", "79952000"],
+  "photography":       ["79962000"],
+  "energy":            ["71314000", "09000000", "50710000", "71314300"],
+};
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise<ProcurementData> {
   let keywords: string[];
@@ -1183,30 +1206,32 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
   const awarded: ProcurementNotice[] = [];
   const errors: string[] = [];
 
+  const staticCriteria = {
+    keyword: null as string | null,
+    queryString: null,
+    regions,
+    postcode: null,
+    radius: 0,
+    valueFrom: null,
+    valueTo: null,
+    publishedFrom: null,
+    publishedTo: null,
+    deadlineFrom: null,
+    deadlineTo: null,
+    approachMarketFrom: null,
+    approachMarketTo: null,
+    awardedFrom: null,
+    awardedTo: null,
+    isSubcontract: null,
+    suitableForSme: true,
+    suitableForVco: null,
+    awardedToSme: null,
+    awardedToVcse: null,
+    cpvCodes: null as string[] | null
+  };
+
   for (const keyword of keywords) {
-    const base = {
-      keyword,
-      queryString: null,
-      regions,
-      postcode: null,
-      radius: 0,
-      valueFrom: null,
-      valueTo: null,
-      publishedFrom: null,
-      publishedTo: null,
-      deadlineFrom: null,
-      deadlineTo: null,
-      approachMarketFrom: null,
-      approachMarketTo: null,
-      awardedFrom: null,
-      awardedTo: null,
-      isSubcontract: null,
-      suitableForSme: true,
-      suitableForVco: null,
-      awardedToSme: null,
-      awardedToVcse: null,
-      cpvCodes: null
-    };
+    const base = { ...staticCriteria, keyword };
 
     try {
       open.push(
@@ -1230,6 +1255,28 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     } catch (error: any) {
       captureError(error, { dataPull: { source: "contracts_finder", status: "awarded", keyword } });
       errors.push(`Awarded search failed for "${keyword}": ${error?.message || error}`);
+    }
+  }
+
+  // CPV-code parallel pass — catches notices that keyword search misses
+  const cpvCodes = SECTOR_CPV[resolveSectorFromInput(input).key] ?? null;
+  if (cpvCodes) {
+    const cpvBase = { ...staticCriteria, cpvCodes };
+    try {
+      open.push(...(await contractsFinderSearch(
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"] }, size: 20 },
+        "cpv"
+      )));
+    } catch (error: any) {
+      errors.push(`CPV open search failed: ${error?.message || error}`);
+    }
+    try {
+      awarded.push(...(await contractsFinderSearch(
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"] }, size: 20 },
+        "cpv"
+      )));
+    } catch (error: any) {
+      errors.push(`CPV awarded search failed: ${error?.message || error}`);
     }
   }
 
@@ -1390,16 +1437,17 @@ function parseMoneyCap(input: any) {
     .join(" ")
     .toLowerCase();
 
-  const matches = [...text.matchAll(/£?\s?([0-9]+(?:\.[0-9]+)?)\s?(k|m|million|thousand)?/g)];
+  // Require £ prefix OR explicit k/m/million/thousand suffix to avoid matching bare years/counts
+  const matches = [...text.matchAll(/£\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|m|million|thousand)?|([0-9,]+(?:\.[0-9]+)?)\s*(k|m|million|thousand)/gi)];
   const values = matches
     .map(match => {
-      const n = Number(match[1]);
-      const unit = match[2] || "";
+      const n = parseFloat((match[1] || match[3]).replace(/,/g, ""));
+      const unit = (match[2] || match[4] || "").toLowerCase();
       if (unit === "m" || unit === "million") return n * 1_000_000;
       if (unit === "k" || unit === "thousand") return n * 1_000;
       return n;
     })
-    .filter(value => value > 0);
+    .filter(value => value >= 1_000);
 
   if (values.length) return Math.max(...values);
 
@@ -2014,13 +2062,17 @@ async function createReport(input: z.infer<typeof intakeSchema>) {
   const data = await pullProcurementData(input);
   const prompt = buildPrompt(input, data);
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000);
+
   try {
     const response = await openai.responses.create({
       model: OPENAI_MODEL,
       tools: [{ type: "web_search" } as any],
       input: prompt
-    });
+    }, { signal: controller.signal });
 
+    clearTimeout(timer);
     return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
   } catch (firstError: any) {
     try {
@@ -2028,10 +2080,12 @@ async function createReport(input: z.infer<typeof intakeSchema>) {
         model: OPENAI_MODEL,
         tools: [{ type: "web_search_preview" } as any],
         input: prompt
-      });
+      }, { signal: controller.signal });
 
+      clearTimeout(timer);
       return { data, report: enforceDataQualityLanguage(response.output_text || "No report returned.") };
     } catch (secondError: any) {
+      clearTimeout(timer);
       captureError(secondError, {
         openai: {
           model: OPENAI_MODEL,
