@@ -3763,40 +3763,89 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div><h4>Sources</h4><ul><li><a href="#">Contracts Finder</a></li><li><a href="#">Find a Tender</a></li><li><a href="#">LA transparency</a></li><li><a href="#">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; Birmingham, UK &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 (function(){
-  const canvas = document.getElementById('globe-canvas');
-  if(!window.THREE) return;
-  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  camera.position.set(0,0,6.2);
-  const group = new THREE.Group(); scene.add(group);
-  const coreGeo = new THREE.SphereGeometry(2, 64, 64);
-  const coreMat = new THREE.MeshPhongMaterial({color:0x12202c,emissive:0x0a1622,specular:0x6fa8d6,shininess:60,transparent:true,opacity:0.55});
-  group.add(new THREE.Mesh(coreGeo, coreMat));
-  const wire = new THREE.Mesh(new THREE.SphereGeometry(2.02,36,24),new THREE.MeshBasicMaterial({color:0x3d5d72,wireframe:true,transparent:true,opacity:0.28}));
-  group.add(wire);
-  const N=320, pos=new Float32Array(N*3);
-  for(let i=0;i<N;i++){const phi=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random(),r=2.04;pos[i*3]=r*Math.sin(phi)*Math.cos(th);pos[i*3+1]=r*Math.cos(phi);pos[i*3+2]=r*Math.sin(phi)*Math.sin(th);}
-  const pg=new THREE.BufferGeometry();
-  pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const points=new THREE.Points(pg,new THREE.PointsMaterial({color:0xC2553F,size:0.045,transparent:true,opacity:0.85}));
-  group.add(points);
-  const halo=new THREE.Mesh(new THREE.SphereGeometry(2.28,48,48),new THREE.MeshBasicMaterial({color:0x9B2C2C,transparent:true,opacity:0.06,side:THREE.BackSide}));
-  group.add(halo);
-  scene.add(new THREE.AmbientLight(0x335577,0.7));
-  const key=new THREE.DirectionalLight(0x9fc4e6,1.1); key.position.set(5,3,5); scene.add(key);
-  const rim=new THREE.DirectionalLight(0xC2553F,0.6); rim.position.set(-4,-2,2); scene.add(rim);
-  group.rotation.x=0.35;
-  function size(){const r=canvas.parentElement.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
-  size(); window.addEventListener('resize',size);
-  let t=0;
-  (function loop(){requestAnimationFrame(loop);t+=0.0016;if(!reduce){group.rotation.y+=0.0022;points.rotation.y+=0.0004;}halo.scale.setScalar(1+Math.sin(t*2)*0.01);renderer.render(scene,camera);})();
+  const cv=document.getElementById('globe-canvas');
+  if(!cv) return;
+  const ctx=cv.getContext('2d');
+  let W=0,H=0,R=0,cx=0,cy=0,angle=0;
+  const dots=[];
+  for(let i=0;i<260;i++){
+    const phi=Math.acos(2*Math.random()-1);
+    const th=2*Math.PI*Math.random();
+    dots.push({phi,th,r:Math.random()>.7?2.2:1.4,a:0.4+Math.random()*0.6});
+  }
+  function resize(){
+    const pr=window.devicePixelRatio||1;
+    const p=cv.parentElement.getBoundingClientRect();
+    W=p.width; H=p.height;
+    cv.width=W*pr; cv.height=H*pr;
+    ctx.setTransform(pr,0,0,pr,0,0);
+    cx=W*.72; cy=H*.46; R=Math.min(W,H)*.30;
+  }
+  resize(); window.addEventListener('resize',resize);
+  function project(phi,th,a){
+    const x=Math.sin(phi)*Math.cos(th+a);
+    const y=Math.cos(phi);
+    const z=Math.sin(phi)*Math.sin(th+a);
+    return {x:cx+R*x*.98,y:cy-R*y*.98,z,vis:z>-0.18};
+  }
+  function drawGrid(a){
+    ctx.strokeStyle='rgba(61,93,114,0.22)'; ctx.lineWidth=0.7;
+    for(let lat=-75;lat<=75;lat+=15){
+      const phi=(90-lat)*Math.PI/180;
+      ctx.beginPath();
+      let first=true;
+      for(let lon=0;lon<=360;lon+=4){
+        const th2=lon*Math.PI/180;
+        const p=project(phi,th2,a);
+        if(!p.vis){first=true;continue;}
+        if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();
+    }
+    for(let lon=0;lon<360;lon+=20){
+      const th2=lon*Math.PI/180;
+      ctx.beginPath();
+      let first=true;
+      for(let lat=90;lat>=-90;lat-=4){
+        const phi=(90-lat)*Math.PI/180;
+        const p=project(phi,th2,a);
+        if(!p.vis){first=true;continue;}
+        if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();
+    }
+  }
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    const glow=ctx.createRadialGradient(cx,cy,R*0.1,cx,cy,R*1.4);
+    glow.addColorStop(0,'rgba(155,44,44,0.08)');
+    glow.addColorStop(1,'rgba(11,15,20,0)');
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx,cy,R*1.4,0,7); ctx.fill();
+    const sphere=ctx.createRadialGradient(cx-R*.28,cy-R*.2,R*.05,cx,cy,R);
+    sphere.addColorStop(0,'rgba(30,48,68,0.7)');
+    sphere.addColorStop(1,'rgba(10,16,24,0.85)');
+    ctx.fillStyle=sphere; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+    drawGrid(angle);
+    for(const d of dots){
+      const p=project(d.phi,d.th,angle);
+      if(!p.vis) continue;
+      const fade=(p.z+0.18)/1.18;
+      ctx.beginPath(); ctx.arc(p.x,p.y,d.r,0,7);
+      ctx.fillStyle='rgba(194,85,63,'+( d.a*fade).toFixed(2)+')';
+      ctx.fill();
+    }
+    ctx.strokeStyle='rgba(100,130,150,0.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+    if(!reduce) angle+=0.004;
+    requestAnimationFrame(frame);
+  }
+  frame();
 })();
+(function(){
+  const cv=document.getElementById('growthChart')
 (function(){
   const cv=document.getElementById('growthChart'); if(!cv) return;
   const ctx=cv.getContext('2d');
