@@ -146,6 +146,8 @@ const memoryStore = new Map<string, ScanRecord>();
 const subMemStore = new Map<string, SubscriptionRecord>();
 const sigMemStore = new Map<string, HomepageSignal>();
 const briefMemStore = new Map<string, { id: string; email: string; category: string | null; created_at: string }>();
+const deskCacheMemStore = new Map<string, { data: ProcurementData; cached_at: string }>();
+const compilingDesks = new Set<string>();
 const scanEvents = new EventEmitter();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -980,6 +982,14 @@ async function initDb() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS desk_cache (
+      slug        TEXT PRIMARY KEY,
+      data        JSONB NOT NULL,
+      cached_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
   console.log("[db] ready");
 }
 
@@ -1071,6 +1081,48 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
     return { points: r.rows, illustrative: r.rows.length < 3 };
   }
   return { points: [], illustrative: true };
+}
+
+const DESK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function getDeskCache(slug: string): Promise<{ data: ProcurementData; cached_at: string } | null> {
+  if (pool) {
+    const r = await pool.query<{ data: ProcurementData; cached_at: string }>(
+      `SELECT data, cached_at::text FROM desk_cache WHERE slug = $1`,
+      [slug]
+    );
+    return r.rows[0] || null;
+  }
+  return deskCacheMemStore.get(slug) || null;
+}
+
+async function setDeskCache(slug: string, data: ProcurementData): Promise<void> {
+  const now = nowIso();
+  if (pool) {
+    await pool.query(
+      `INSERT INTO desk_cache (slug, data, cached_at) VALUES ($1, $2, $3)
+       ON CONFLICT (slug) DO UPDATE SET data = EXCLUDED.data, cached_at = EXCLUDED.cached_at`,
+      [slug, JSON.stringify(data), now]
+    );
+    return;
+  }
+  deskCacheMemStore.set(slug, { data, cached_at: now });
+}
+
+async function compileDeskInBackground(profile: DeskProfile): Promise<void> {
+  if (compilingDesks.has(profile.slug)) return;
+  compilingDesks.add(profile.slug);
+  try {
+    console.log(`[desk] compiling ${profile.slug}`);
+    const data = await pullProcurementData(profile.pinnedProfile);
+    await setDeskCache(profile.slug, data);
+    console.log(`[desk] compiled ${profile.slug} — ${data.contractsFinder.open.length} open, ${data.contractsFinder.awarded.length} awarded`);
+  } catch (err: any) {
+    console.error(`[desk] compile failed for ${profile.slug}: ${err?.message}`);
+    captureError(err, { desk: { slug: profile.slug } });
+  } finally {
+    compilingDesks.delete(profile.slug);
+  }
 }
 
 async function createScan(input: z.infer<typeof intakeSchema>): Promise<ScanRecord> {
@@ -2736,6 +2788,89 @@ const DESK_MAPPING: Array<{ tag: string; category: string }> = [
   { tag: "Technology", category: "passenger-transport" },
 ];
 
+type DeskProfile = {
+  slug: string;
+  label: string;
+  standfirst: string;
+  live: boolean;        // false = interstitial; set to true to promote a desk
+  pinnedProfile: z.infer<typeof intakeSchema>;
+};
+
+const DESK_PROFILES: DeskProfile[] = [
+  {
+    slug: "construction",
+    label: "Construction & Estates",
+    standfirst: "Capital works, building refurbishment, and estate management across local authorities and housing associations — the largest-value category on Contracts Finder.",
+    live: true,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "construction project management estate management building refurbishment capital works planned maintenance",
+      idealBuyers: "local authorities housing associations NHS trusts",
+      mainGoal: "find construction and estate management contracts"
+    })
+  },
+  {
+    slug: "facilities",
+    label: "Facilities",
+    standfirst: "Hard and soft FM, mechanical and electrical maintenance, and managed services across the public estate.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "facilities management hard FM soft FM mechanical electrical maintenance managed services",
+      idealBuyers: "local authorities NHS trusts central government",
+      mainGoal: "find facilities management contracts"
+    })
+  },
+  {
+    slug: "transport",
+    label: "Transport & SEND",
+    standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "passenger transport SEND home to school transport community transport special educational needs",
+      idealBuyers: "local authorities councils transport authorities",
+      mainGoal: "find passenger transport and SEND contracts"
+    })
+  },
+  {
+    slug: "recruitment",
+    label: "Recruitment",
+    standfirst: "Temporary and permanent staffing frameworks across the NHS, councils, and central government.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider",
+      idealBuyers: "NHS trusts local councils central government departments",
+      mainGoal: "find recruitment and staffing contracts"
+    })
+  },
+  {
+    slug: "frameworks",
+    label: "Frameworks",
+    standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "framework agreement dynamic purchasing system DPS call-off contract multi-provider",
+      idealBuyers: "Crown Commercial Service local authorities NHS central government",
+      mainGoal: "find framework and DPS opportunities"
+    })
+  },
+  {
+    slug: "procurement-act",
+    label: "Procurement Act",
+    standfirst: "The 24 February 2025 reform: new notice types, SME provisions, transparency pipeline notices, and what changes for bidders under the Procurement Act 2023.",
+    live: false,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "framework agreement dynamic purchasing system transparency notice pipeline notice competitive flexible procedure",
+      idealBuyers: "Cabinet Office Crown Commercial Service contracting authorities",
+      mainGoal: "track Procurement Act 2023 implementation notices and new procurement routes"
+    })
+  }
+];
+
 function renderDeskCard(sig: HomepageSignal, tag: string): string {
   const dateStr = sig.notice_date
     ? new Date(sig.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
@@ -4203,9 +4338,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <a class="mast-cta" href="/scan">Run a scan</a>
 </div></header>
 <div class="verticals"><div class="wrap">
-  <!-- TODO(deferred): each ribbon link becomes /desk/:category once category pages are built -->
-  <a href="#desks">Government</a><a href="#desks">Business</a><a href="#desks">Finance</a>
-  <a href="#desks">Economics</a><a href="#desks">Technology</a><a href="#desks">AI</a>
+  ${DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("")}
 </div></div>
 <section class="hero">
   <canvas id="globe-canvas"></canvas>
@@ -4262,8 +4395,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </section>
 <section class="section" id="desks">
   <div class="wrap">
-    <!-- TODO(deferred): "All intelligence" becomes /intelligence index once desk-content decision is made -->
-    <div class="section-head"><h2>The desks</h2><a href="#desks">All intelligence &rarr;</a></div>
+    <div class="section-head"><h2>The desks</h2><a href="/desk/construction">All desks &rarr;</a></div>
     <div class="desk-grid">
       ${DESK_MAPPING.map(d => {
         const sig = deskSignals.get(d.category);
@@ -4817,6 +4949,21 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   res.type("html").send(reportPage(scan));
 }));
 
+app.get("/desk/:slug", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
+  if (!profile) { res.status(404).send("Desk not found"); return; }
+
+  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+
+  if (isStale) {
+    // fire-and-forget; if cold the page renders the compiling state
+    compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+  }
+
+  res.type("html").send(deskPage(profile, cached));
+}));
+
 app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || scan.status !== "completed") {
@@ -4826,6 +4973,307 @@ app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const prior = (await getScansByCompany(scan.company_name, scan.id))[0] || null;
   res.type("html").send(comparePage(scan, prior));
 }));
+
+// ─── Desk page helpers ────────────────────────────────────────────────────────
+
+function renderNoticeRow(n: ProcurementNotice): string {
+  const dateStr = (n.publishedDate || n.awardedDate)
+    ? new Date((n.publishedDate || n.awardedDate)!).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+  const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
+  const val = rawVal != null
+    ? (rawVal >= 1_000_000 ? `£${(rawVal / 1_000_000).toFixed(1)}m` : `£${Math.round(rawVal / 1000)}k`)
+    : "—";
+  return `<tr>
+    <td><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
+    <td class="nt-buyer">${escapeHtml(n.buyer.slice(0, 55))}</td>
+    <td class="nt-val">${escapeHtml(val)}</td>
+    <td class="nt-date">${escapeHtml(dateStr)}</td>
+    <td><span class="src-badge">${n.source === "Find a Tender" ? "FTS" : "CF"}</span></td>
+  </tr>`;
+}
+
+function renderDeskBuyerWatchlist(data: ProcurementData): string {
+  type BuyerEntry = { count: number; totalValue: number; latestDate: string | null };
+  const map = new Map<string, BuyerEntry>();
+  for (const n of data.contractsFinder.awarded) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = map.get(n.buyer) || { count: 0, totalValue: 0, latestDate: null };
+    e.count++;
+    if (n.awardedValue) e.totalValue += n.awardedValue;
+    if (n.awardedDate && (!e.latestDate || n.awardedDate > e.latestDate)) e.latestDate = n.awardedDate;
+    map.set(n.buyer, e);
+  }
+  const sorted = [...map.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+  if (sorted.length === 0) return "";
+
+  const rows = sorted.map(([buyer, info]) => {
+    const tv = info.totalValue > 0
+      ? (info.totalValue >= 1_000_000 ? `£${(info.totalValue / 1_000_000).toFixed(1)}m` : `£${Math.round(info.totalValue / 1000)}k`)
+      : "—";
+    const ld = info.latestDate
+      ? new Date(info.latestDate).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+      : "—";
+    return `<tr>
+      <td>${escapeHtml(buyer.slice(0, 60))}</td>
+      <td class="nt-val">${escapeHtml(String(info.count))}</td>
+      <td class="nt-val">${escapeHtml(tv)}</td>
+      <td class="nt-date">${escapeHtml(ld)}</td>
+    </tr>`;
+  }).join("");
+
+  return `<section class="desk-section">
+  <div class="wrap">
+    <div class="section-head"><h2>Active buyers</h2><span class="eyebrow">Derived from awarded contract records</span></div>
+    <table class="notice-table">
+      <thead><tr><th>Buyer</th><th>Awards found</th><th>Total awarded value</th><th>Latest award</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="nt-caveat">Source: Contracts Finder public award records &middot; not exhaustive &middot; covers notices matched by desk keywords only.</p>
+  </div>
+</section>`;
+}
+
+function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null): string {
+  const isCompiling = cached === null;
+  const data = cached?.data;
+
+  const openNotices = (data?.contractsFinder.open || [])
+    .concat(data?.findTender?.notices || [])
+    .slice(0, 30);
+  const awardedNotices = data?.contractsFinder.awarded || [];
+
+  const totalAwarded = awardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+  const awardedCount = awardedNotices.filter(n => n.awardedValue).length;
+  const totalAwardedM = (totalAwarded / 1_000_000).toFixed(1);
+
+  const cacheAge = cached
+    ? (() => {
+        const ms = Date.now() - new Date(cached.cached_at).getTime();
+        const h = Math.floor(ms / 3_600_000);
+        return h < 1 ? "< 1h ago" : `${h}h ago`;
+      })()
+    : null;
+
+  const navLinks = DESK_PROFILES.map(d =>
+    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' style="color:var(--ink);border-bottom:1.5px solid var(--ink)"' : ''}>${escapeHtml(d.label)}</a>`
+  ).join("");
+
+  const spendCard = !isCompiling && profile.live ? `
+    <div class="chartwrap">
+      <div class="ch-head">
+        <span class="lab">Awarded category spend &middot; &pound;m &middot; keyword-filtered public record</span>
+        <span class="big">&pound;${escapeHtml(totalAwardedM)}m<span class="up">${escapeHtml(String(awardedCount))} awards</span></span>
+      </div>
+      <p style="font-size:13px;color:var(--slate);margin-top:12px;font-family:var(--mono)">Derived from ${escapeHtml(String(awardedNotices.length))} awarded notices matched to desk keywords. Not exhaustive — covers public record only.</p>
+    </div>` : `
+    <div class="chartwrap">
+      <div class="ch-head">
+        <span class="lab">Awarded category spend &middot; &pound;m &middot; illustrative</span>
+        <span class="big" style="opacity:.4">&pound;—</span>
+      </div>
+      <p style="font-size:13px;color:var(--slate);margin-top:12px;font-family:var(--mono)">Spend data loads when this desk is compiled.</p>
+    </div>`;
+
+  const feedHtml = !profile.live || isCompiling ? `` : `
+<section class="desk-section">
+  <div class="wrap">
+    <div class="section-head"><h2>Open opportunities</h2><span class="eyebrow">CF &middot; FTS &middot; public record &middot; ${escapeHtml(String(openNotices.length))} notices</span></div>
+    ${openNotices.length ? `<table class="notice-table">
+      <thead><tr><th>Notice</th><th>Buyer</th><th>Value</th><th>Published</th><th>Source</th></tr></thead>
+      <tbody>${openNotices.map(renderNoticeRow).join("")}</tbody>
+    </table>` : `<p class="nt-caveat">No open notices matched desk keywords at last refresh. Check back after the next compile.</p>`}
+  </div>
+</section>
+${renderDeskBuyerWatchlist(data!)}`;
+
+  const interstitialHtml = !profile.live || isCompiling ? `
+<section class="desk-section">
+  <div class="wrap">
+    <div class="interstitial-card">
+      <div class="eyebrow">${isCompiling ? "Compiling the record" : "Desk opening"}</div>
+      <h2>${isCompiling ? "Pulling the public record&hellip;" : "This desk opens soon."}</h2>
+      <p>${isCompiling
+        ? "The first pull takes 60–90 seconds. This page will have live data within the hour — refresh then, or run a targeted scan now."
+        : "This sector desk is being compiled. In the meantime, run a targeted scan for your firm to see your specific fit."
+      }</p>
+      <a class="btn-primary" href="/scan">Run a scan for this sector &rarr;</a>
+    </div>
+  </div>
+</section>` : ``;
+
+  const compilingBadge = isCompiling
+    ? `<span class="chip chip-amber">Compiling &mdash; data within the hour</span>`
+    : `<span class="chip chip-green">Updated ${escapeHtml(cacheAge!)}</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${escapeHtml(profile.label)} &mdash; GovRevenue Desk</title>
+<style>
+:root{
+  --ink:#0B0F14; --paper:#FAF8F3; --paper-2:#F3EFE6;
+  --accent:#9B2C2C; --accent-2:#C2553F; --slate:#5A6B7B;
+  --line:#1f262e1a; --line-strong:#0F141926;
+  --serif:"Spectral","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
+.topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
+.topstrip .wrap{display:flex;justify-content:space-between;align-items:center;height:34px}
+header.mast{border-bottom:1px solid var(--line-strong)}
+.mast .wrap{display:flex;align-items:baseline;justify-content:space-between;padding-top:26px;padding-bottom:18px}
+.logo{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em}
+.logo b{color:var(--accent)}
+nav.primary{display:flex;gap:30px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
+nav.primary a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
+nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
+.mast-cta{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--ink);padding:9px 16px;transition:.18s}
+.mast-cta:hover{background:var(--ink);color:var(--paper)}
+.verticals{border-bottom:1px solid var(--line-strong);background:var(--paper-2)}
+.verticals .wrap{display:flex;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;overflow-x:auto}
+.verticals a{padding:13px 22px 13px 0;color:var(--slate);white-space:nowrap;position:relative;transition:.18s}
+.verticals a:not(:last-child){margin-right:22px}
+.verticals a:not(:last-child):after{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);width:1px;height:13px;background:var(--line-strong)}
+.verticals a:hover{color:var(--accent)}
+.desk-masthead{padding:60px 0 48px;border-bottom:1px solid var(--line-strong)}
+.desk-masthead h1{font-family:var(--serif);font-size:48px;line-height:1.05;letter-spacing:-.02em;margin:12px 0 16px}
+.desk-masthead .lede{font-size:18px;color:var(--slate);max-width:660px;line-height:1.6}
+.desk-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.chip{font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:6px 12px;border:1px solid var(--line-strong);background:var(--paper-2)}
+.chip-green{border-color:#1d6b4f44;color:#1d6b4f}
+.chip-amber{border-color:#a9793244;color:#a97932}
+.chartband-desk{padding:52px 0;border-bottom:1px solid var(--line-strong)}
+.chartband-desk .wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.chartwrap{border:1px solid var(--line-strong);padding:28px 30px;background:var(--paper-2)}
+.ch-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
+.lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+.big{font-family:var(--serif);font-size:36px;font-weight:600;letter-spacing:-.02em}
+.up{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--slate);margin-left:8px}
+.desk-section{padding:52px 0;border-bottom:1px solid var(--line-strong)}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
+.section-head h2{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em}
+.notice-table{width:100%;border-collapse:collapse;font-size:14px}
+.notice-table th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line-strong)}
+.notice-table td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.notice-table a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
+.notice-table a:hover{text-decoration-color:var(--accent)}
+.nt-buyer{color:var(--slate);font-size:13px}
+.nt-val{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.nt-date{font-family:var(--mono);font-size:12px;color:var(--slate);white-space:nowrap}
+.src-badge{font-family:var(--mono);font-size:11px;letter-spacing:.06em;padding:3px 7px;background:var(--paper-2);border:1px solid var(--line-strong);white-space:nowrap}
+.nt-caveat{font-family:var(--mono);font-size:12px;color:var(--slate);margin-top:14px}
+.interstitial-card{border:1px solid var(--line-strong);padding:52px 48px;background:var(--paper-2);max-width:640px}
+.interstitial-card h2{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.01em;margin:12px 0 16px}
+.interstitial-card p{color:var(--slate);margin-bottom:28px}
+.btn-primary{display:inline-block;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:14px 22px;transition:.18s}
+.btn-primary:hover{background:var(--accent)}
+.desk-cta{padding:72px 0 96px}
+.desk-cta h2{font-family:var(--serif);font-size:36px;font-weight:600;letter-spacing:-.02em;margin-bottom:12px}
+.desk-cta p{color:var(--slate);max-width:560px;margin-bottom:28px}
+footer{background:var(--ink);color:var(--paper);padding:52px 0 36px}
+footer .wrap{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px}
+footer .logo{font-family:var(--serif);font-size:22px;margin-bottom:10px}
+footer .logo b{color:var(--accent)}
+footer p{font-size:13px;color:#9aabb7;line-height:1.65}
+footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aabb7;margin-bottom:14px}
+footer ul{list-style:none}
+footer li{margin-bottom:8px;font-size:14px}
+footer a:hover{color:var(--accent)}
+.foot-copy{text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#4a5a68;margin-top:36px;padding-top:20px;border-top:1px solid #ffffff14}
+@media(max-width:768px){
+  .chartband-desk .wrap{grid-template-columns:1fr}
+  .desk-masthead h1{font-size:34px}
+  footer .wrap{grid-template-columns:1fr}
+  .nt-buyer,.nt-date{display:none}
+  nav.primary,.mast-cta{display:none}
+}
+</style>
+</head>
+<body>
+<div class="topstrip"><div class="wrap">
+  <div>UK public procurement intelligence</div>
+  <div>United Kingdom &middot; Public record</div>
+</div></div>
+<header class="mast"><div class="wrap">
+  <div class="logo">Gov<b>Revenue</b></div>
+  <nav class="primary">
+    <a href="/">Home</a><a href="/#desks">Desks</a><a href="/scan">The Scan</a>
+  </nav>
+  <a class="mast-cta" href="/scan">Run a scan</a>
+</div></header>
+<div class="verticals"><div class="wrap">
+  ${navLinks}
+</div></div>
+
+<section class="desk-masthead">
+  <div class="wrap">
+    <div class="eyebrow">Desk &middot; Public record &middot; Contracts Finder + Find a Tender</div>
+    <h1>${escapeHtml(profile.label)}</h1>
+    <p class="lede">${escapeHtml(profile.standfirst)}</p>
+    <div class="desk-meta">
+      ${compilingBadge}
+      ${!isCompiling && profile.live ? `<span class="chip">${escapeHtml(String(openNotices.length))} open notices</span>` : ""}
+      <span class="chip">Source: CF &middot; FTS</span>
+      <span class="chip">Public record &middot; UK-wide</span>
+    </div>
+  </div>
+</section>
+
+<section class="chartband-desk">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Spend signal &middot; ${profile.live && !isCompiling ? "public record" : "illustrative"}</div>
+      <h2 style="font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin:12px 0 16px">Awarded spend in this sector</h2>
+      <p style="color:var(--slate);line-height:1.6">Awarded contract value from Contracts Finder, filtered to desk keywords. Use this to gauge category-level spend before your firm enters.</p>
+    </div>
+    ${spendCard}
+  </div>
+</section>
+
+${feedHtml}
+${interstitialHtml}
+
+<section class="desk-cta">
+  <div class="wrap">
+    <div class="eyebrow">The product underneath</div>
+    <h2>This is the public record for ${escapeHtml(profile.label)}.<br>Run it against your firm.</h2>
+    <p>Submit your firm&rsquo;s services and the agent maps who is buying, who is winning, and the one route where you can realistically compete &mdash; every claim sourced from the same public record.</p>
+    <a class="btn-primary" href="/scan">Run a scan &rarr;</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="logo">Gov<b>Revenue</b></div>
+      <p>A public-sector revenue intelligence service.</p>
+    </div>
+    <div>
+      <h4>Desks</h4>
+      <ul>${DESK_PROFILES.map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}</ul>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="/scan">The Scan</a></li>
+        <li><a href="/">Home</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-copy">&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</div>
+</footer>
+</body>
+</html>`;
+}
 
 function comparePage(current: ScanRecord, prior: ScanRecord | null): string {
   const curEdp = current.report_markdown ? parseEdpFromMarkdown(current.report_markdown) : null;
