@@ -163,6 +163,8 @@ export interface ValueSummary {
 
 export interface DataQualitySummary {
   level: "Strong" | "Moderate" | "Weak" | "Unsafe";
+  evidenceGrade: "A" | "B" | "C" | "D" | "E";
+  gradeExplanation: string;
   averageRelevanceScore: number;
   pulledRecords: number;
   relevantRecords: number;
@@ -432,6 +434,317 @@ const CLEANING_CONFIG: SectorConfig = {
   ],
 };
 
+
+const SOFTWARE_CONFIG: SectorConfig = {
+  key: "software_ict",
+  label: "Software and ICT services",
+  sectorLens:
+    "Software, ICT managed services, cloud platforms, cyber, digital transformation, data services and public-sector business systems",
+  coreKeywords: [
+    "enterprise software",
+    "cloud software",
+    "ICT services",
+    "managed IT services",
+    "digital transformation",
+    "business systems",
+    "sector-specific software platforms",
+    "software services",
+    "application support",
+    "systems integration",
+    "public sector SaaS",
+  ],
+  specialistKeywords: [
+    "CRM",
+    "case management system",
+    "workflow software",
+    "grant management software",
+    "housing management software",
+    "data platform",
+    "service desk",
+    "hosting",
+    "automation",
+    "Microsoft 365",
+  ],
+  buyerKeywords: [
+    "local authority",
+    "NHS trust",
+    "university",
+    "college",
+    "central government",
+    "housing association",
+    "police",
+    "fire and rescue",
+  ],
+  frameworkKeywords: [
+    "G-Cloud",
+    "Digital Outcomes",
+    "technology services framework",
+    "ICT framework",
+    "software framework",
+    "Crown Commercial Service",
+    "DPS",
+  ],
+  negativeKeywords: [
+    "cleaning",
+    "facilities cleaning",
+    "building surveying",
+    "condition survey",
+    "quantity surveying",
+    "training course",
+  ],
+  forbiddenCarryoverKeywords: [
+    "building surveying",
+    "condition survey",
+    "quantity surveying",
+    "specialist cleaning",
+    "deep cleaning",
+    "school cleaning",
+  ],
+  cpvHints: ["48000000", "72000000", "72200000", "72250000", "72400000", "72500000", "72600000"],
+  buyerTypes: [
+    {
+      buyerType: "Local authority digital teams",
+      fit: "High",
+      spendLogic: "Councils modernise citizen services, case management, hosting and line-of-business systems.",
+      bestEntryRoute: "Framework / DPS / direct tender",
+      priority: "High",
+    },
+    {
+      buyerType: "NHS digital and informatics teams",
+      fit: "Medium",
+      spendLogic: "Health bodies buy secure systems, data support, service desk and integration services.",
+      bestEntryRoute: "NHS framework / partner route",
+      priority: "Medium",
+    },
+    {
+      buyerType: "Housing associations",
+      fit: "Medium",
+      spendLogic: "Housing providers buy systems for repairs, case management, resident services, compliance and reporting.",
+      bestEntryRoute: "Framework / direct tender",
+      priority: "Medium",
+    },
+  ],
+  routeTemplates: [
+    {
+      route: "Framework-led software and ICT route",
+      routeType: "framework",
+      baseScore: 82,
+      whyMoneyExists: "Public buyers use ICT frameworks to reduce procurement risk and buy approved digital services quickly.",
+      bestActionThisWeek: "Map relevant CCS, G-Cloud and sector frameworks against current eligibility.",
+    },
+    {
+      route: "Local authority digital transformation",
+      routeType: "direct_bid",
+      baseScore: 74,
+      whyMoneyExists: "Councils need better citizen journeys, automation, data and legacy-system support.",
+      bestActionThisWeek: "Build a council digital target list and match services to open ICT notices.",
+    },
+    {
+      route: "Partner/subcontract into prime ICT suppliers",
+      routeType: "partner",
+      baseScore: 68,
+      whyMoneyExists: "Large ICT programmes often need specialist suppliers under prime contractors.",
+      bestActionThisWeek: "Prepare a partner capability note with security, delivery and case-study proof.",
+    },
+  ],
+};
+
+const TRAINING_CONFIG: SectorConfig = {
+  key: "training_professional_services",
+  label: "Training and professional services",
+  sectorLens:
+    "Training, learning and development, enterprise support, consultancy, coaching, workforce development and professional advisory services",
+  coreKeywords: [
+    "entrepreneurship training",
+    "adult education",
+    "innovation bootcamps",
+    "startup support",
+    "business education",
+    "mentorship",
+    "skills programme",
+    "enterprise support",
+    "training services",
+    "professional services",
+    "consultancy",
+  ],
+  specialistKeywords: [
+    "e-learning",
+    "management training",
+    "leadership training",
+    "facilitation",
+    "change management",
+    "organisational development",
+    "business coaching",
+    "workforce development",
+  ],
+  buyerKeywords: [
+    "local authority",
+    "combined authority",
+    "NHS trust",
+    "university",
+    "college",
+    "central government",
+    "academy trust",
+  ],
+  frameworkKeywords: [
+    "training framework",
+    "learning framework",
+    "adult education budget",
+    "skills framework",
+    "professional services framework",
+    "DPS",
+  ],
+  negativeKeywords: ["cleaning", "building surveying", "quantity surveying", "software licence"],
+  forbiddenCarryoverKeywords: [
+    "building surveying",
+    "condition survey",
+    "quantity surveying",
+    "specialist cleaning",
+    "deep cleaning",
+    "ICT services",
+  ],
+  cpvHints: ["80000000", "80500000", "80510000", "80530000", "80570000", "79400000"],
+  buyerTypes: [
+    {
+      buyerType: "Councils and combined authorities",
+      fit: "High",
+      spendLogic: "Local public bodies fund enterprise, skills, employment, startup and business-support programmes.",
+      bestEntryRoute: "Grant / DPS / direct tender / delivery partner",
+      priority: "High",
+    },
+    {
+      buyerType: "Colleges and adult education teams",
+      fit: "High",
+      spendLogic: "Adult education and skills budgets create demand for training, mentoring and programme delivery.",
+      bestEntryRoute: "Adult education / skills framework / subcontract",
+      priority: "High",
+    },
+    {
+      buyerType: "NHS and public-sector workforce teams",
+      fit: "Medium",
+      spendLogic: "Public bodies need workforce development, coaching, change and compliance training.",
+      bestEntryRoute: "Framework / partner",
+      priority: "Medium",
+    },
+  ],
+  routeTemplates: [
+    {
+      route: "Adult education and skills programme route",
+      routeType: "direct_bid",
+      baseScore: 80,
+      whyMoneyExists: "Councils, colleges and skills bodies fund programmes that improve enterprise, employability and workforce outcomes.",
+      bestActionThisWeek: "Build a local skills-buyer list and prepare programme outcomes, trainer proof and evaluation measures.",
+    },
+    {
+      route: "Training DPS and framework route",
+      routeType: "dps",
+      baseScore: 72,
+      whyMoneyExists: "Training spend is often routed through DPS and framework lots to simplify repeat purchasing.",
+      bestActionThisWeek: "Identify open training DPS lots and required policies, case studies and trainer CVs.",
+    },
+    {
+      route: "Partner with larger education or consultancy suppliers",
+      routeType: "partner",
+      baseScore: 65,
+      whyMoneyExists: "Prime providers often need specialist trainers, mentors and facilitators for larger public programmes.",
+      bestActionThisWeek: "Prepare a subcontractor one-pager with topics, delivery model and references.",
+    },
+  ],
+};
+
+const PROPERTY_CONFIG: SectorConfig = {
+  key: "property_built_environment",
+  label: "Property and built environment",
+  sectorLens:
+    "Property consultancy, surveying, estates, cost management, project management and built environment advisory services",
+  coreKeywords: [
+    "building surveying",
+    "condition survey",
+    "estate consultancy",
+    "asset management",
+    "property consultancy",
+    "built asset consultancy",
+    "quantity surveying",
+    "cost management",
+    "construction consultancy",
+    "project management",
+  ],
+  specialistKeywords: [
+    "stock condition survey",
+    "planned maintenance",
+    "retrofit consultancy",
+    "decarbonisation",
+    "clerk of works",
+    "contract administration",
+    "employer's agent",
+  ],
+  buyerKeywords: [
+    "local authority",
+    "housing association",
+    "NHS estate",
+    "university estate",
+    "college estate",
+    "blue light estate",
+  ],
+  frameworkKeywords: [
+    "property framework",
+    "built environment framework",
+    "construction consultancy framework",
+    "estates framework",
+    "DPS",
+  ],
+  negativeKeywords: ["cleaning services", "deep cleaning", "software support", "training course"],
+  forbiddenCarryoverKeywords: ["specialist cleaning", "deep cleaning", "clinical cleaning", "software services", "training services"],
+  cpvHints: ["71000000", "71200000", "71300000", "71500000", "71600000"],
+  buyerTypes: [
+    {
+      buyerType: "Local authority estates teams",
+      fit: "High",
+      spendLogic: "Councils hold large property portfolios needing surveys, maintenance planning and project advice.",
+      bestEntryRoute: "Framework / direct tender",
+      priority: "High",
+    },
+    {
+      buyerType: "Housing associations",
+      fit: "High",
+      spendLogic: "Stock condition, retrofit, compliance and planned works generate repeat consultancy demand.",
+      bestEntryRoute: "Framework / DPS",
+      priority: "High",
+    },
+    {
+      buyerType: "NHS and education estates",
+      fit: "Medium",
+      spendLogic: "Complex estates need condition, cost, programme and compliance support.",
+      bestEntryRoute: "Framework / partner",
+      priority: "Medium",
+    },
+  ],
+  routeTemplates: [
+    {
+      route: "Estates and surveying framework route",
+      routeType: "framework",
+      baseScore: 80,
+      whyMoneyExists: "Public estates require recurring surveying, compliance, maintenance and project advisory support.",
+      bestActionThisWeek: "Map property frameworks and identify lots matching surveying, cost or project management capability.",
+    },
+    {
+      route: "Housing stock and retrofit consultancy",
+      routeType: "direct_bid",
+      baseScore: 72,
+      whyMoneyExists: "Housing providers need stock intelligence, decarbonisation planning and planned works advice.",
+      bestActionThisWeek: "Build a target list of housing associations with stock investment programmes.",
+    },
+    {
+      route: "Partner under multidisciplinary consultancies",
+      routeType: "partner",
+      baseScore: 64,
+      whyMoneyExists: "Large commissions often need niche built-environment capacity under lead consultants.",
+      bestActionThisWeek: "Create a partner pack showing disciplines, PI cover, capacity and project examples.",
+    },
+  ],
+};
+
+
 const GENERIC_CONFIG: SectorConfig = {
   key: "generic",
   label: "Public-sector services",
@@ -590,9 +903,48 @@ function detectSectorConfig(intake: CompanyIntake): SectorConfig {
     sectorText.includes("hygiene") ||
     sectorText.includes("sanitis") ||
     sectorText.includes("disinfect") ||
-    sectorText.includes("deep clean")
+    sectorText.includes("deep clean") ||
+    sectorText.includes("facilities")
   ) {
     return CLEANING_CONFIG;
+  }
+
+  if (
+    sectorText.includes("software") ||
+    sectorText.includes(" ict") ||
+    sectorText.includes(" it ") ||
+    sectorText.includes("digital") ||
+    sectorText.includes("cloud") ||
+    sectorText.includes("cyber") ||
+    sectorText.includes("saas") ||
+    sectorText.includes("business systems")
+  ) {
+    return SOFTWARE_CONFIG;
+  }
+
+  if (
+    sectorText.includes("training") ||
+    sectorText.includes("learning") ||
+    sectorText.includes("coaching") ||
+    sectorText.includes("mentorship") ||
+    sectorText.includes("adult education") ||
+    sectorText.includes("entrepreneurship") ||
+    sectorText.includes("startup support") ||
+    sectorText.includes("professional services") ||
+    sectorText.includes("consultancy")
+  ) {
+    return TRAINING_CONFIG;
+  }
+
+  if (
+    sectorText.includes("survey") ||
+    sectorText.includes("property") ||
+    sectorText.includes("estate") ||
+    sectorText.includes("built environment") ||
+    sectorText.includes("quantity") ||
+    sectorText.includes("construction")
+  ) {
+    return PROPERTY_CONFIG;
   }
 
   return GENERIC_CONFIG;
@@ -623,11 +975,11 @@ function buildSectorSearchQueries(
     }
 
     for (const buyer of buyerSeeds.slice(0, 8)) {
-      queries.push(`${buyer} cleaning ${region}`);
+      queries.push(`${buyer} ${sectorConfig.coreKeywords[0] || "services"} ${region}`);
     }
 
     for (const framework of sectorConfig.frameworkKeywords.slice(0, 5)) {
-      queries.push(`${framework} cleaning ${region}`);
+      queries.push(`${framework} ${sectorConfig.coreKeywords[0] || "services"} ${region}`);
     }
   }
 
@@ -721,7 +1073,7 @@ function scoreAndClassifyRecord(
 
   if (cpvMatches.length) {
     score += 22;
-    sectorMatchReasons.push(`Cleaning CPV hint: ${cpvMatches.slice(0, 3).join(", ")}`);
+    sectorMatchReasons.push(`Sector CPV hint: ${cpvMatches.slice(0, 3).join(", ")}`);
   }
 
   const intakeServiceMatches = matchedTerms(text, intake.services);
@@ -1118,8 +1470,22 @@ function buildDataQualitySummary(input: {
   else if (averageRelevanceScore >= 50 && relevanceRatio >= 0.35) level = "Moderate";
   else level = "Weak";
 
+  const verifiedCount = input.relevantRecords.filter(
+    (record) => record.evidenceLabel === "VERIFIED_RECORD",
+  ).length;
+
+  const evidenceGrade = calculateEvidenceGrade({
+    level,
+    averageRelevanceScore,
+    relevanceRatio,
+    verifiedCount,
+    relevantCount: input.relevantRecords.length,
+  });
+
   return {
     level,
+    evidenceGrade,
+    gradeExplanation: evidenceGradeExplanation(evidenceGrade),
     averageRelevanceScore,
     pulledRecords: input.pulledRecords.length,
     relevantRecords: input.relevantRecords.length,
@@ -1596,9 +1962,9 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
     </p>
 
     <div class="grid grid-4" style="margin-top:34px;">
-      ${metricCard("Status", "QA gated", "Template, source and relevance checks applied")}
-      ${metricCard("Pulled records", NUMBER.format(model.dataQuality.pulledRecords), "All raw procurement matches")}
+      ${metricCard("Evidence Grade", model.dataQuality.evidenceGrade, model.dataQuality.gradeExplanation)}
       ${metricCard("Relevant records", NUMBER.format(model.dataQuality.relevantRecords), "Records above sector relevance threshold")}
+      ${metricCard("Verified evidence", NUMBER.format(model.relevantRecords.filter((record) => record.evidenceLabel === "VERIFIED_RECORD").length), "Source-backed high-confidence records")}
       ${metricCard("Route", model.opportunities[0]?.opportunity ?? "Manual review", "Recommended first route")}
     </div>
 
@@ -1607,11 +1973,11 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
       <p><strong>Regions searched:</strong> ${escapeHtml(intake.regions.join(", "))}</p>
       <p><strong>Keywords searched:</strong> ${escapeHtml(model.searchQueries.slice(0, 12).join("; "))}</p>
       <p><strong>Generated:</strong> ${escapeHtml(formatDate(model.generatedAt))}</p>
-      <p><strong>Data quality:</strong> ${escapeHtml(model.dataQuality.level)} — ${escapeHtml(
-        model.dataQuality.warnings[0] ??
-          "Recommendations are tied to pulled records, verified sources, or clearly marked strategic targets.",
-      )}</p>
+      <p><strong>Evidence Grade:</strong> ${escapeHtml(model.dataQuality.evidenceGrade)} — ${escapeHtml(model.dataQuality.gradeExplanation)}</p>
     </div>
+
+    <h2>Executive Decision Panel</h2>
+    ${renderExecutiveDecisionPanel(model)}
   </section>
 
   <h2>Executive Evidence Dashboard</h2>
@@ -1655,7 +2021,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
 
   ${renderWarnings(model)}
 
-  <h2>Money Route Ranking</h2>
+  <h2>Money Map</h2>
   <p>
     Ranked by evidence strength, buyer fit, actionability and realistic route-to-revenue.
   </p>
@@ -1668,7 +2034,7 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
   </p>
   ${renderBuyerTypeTable(model.sectorConfig)}
 
-  <h2>Named Buyer Watchlist</h2>
+  <h2>Buyer Watchlist</h2>
   <p>
     Named buyers below are labelled by evidence confidence. Buyers without source URLs are treated as strategic targets, not confirmed opportunities.
   </p>
@@ -1686,13 +2052,19 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
   </p>
   ${renderNoiseTable(model.noiseRecords.slice(0, 12))}
 
+  <h2>Bid Readiness Score</h2>
+  ${renderBidReadinessScore(model)}
+
+  <h2>Do Not Chase These Yet</h2>
+  ${renderDoNotChase(model)}
+
   <h2>Evidence Gap Checklist</h2>
   <p>
     These items must be verified before aggressive bid decisions. A GovRevenue scan should never pretend unknown capacity is confirmed.
   </p>
   ${renderEvidenceGapTable(model.evidenceGaps)}
 
-  <h2>30-Day Activation Plan</h2>
+  <h2>30-Day Activation Pack</h2>
   <p>
     The report ends with commercial action: who to contact, what to send, and what evidence to prepare.
   </p>
@@ -1737,6 +2109,83 @@ function renderPremiumReportHtml(model: Omit<ReportModel, "qa">): string {
 </main>
 </body>
 </html>`;
+}
+
+function renderExecutiveDecisionPanel(model: Omit<ReportModel, "qa">): string {
+  const top = model.opportunities[0];
+  const redGap = model.evidenceGaps.find((gap) => gap.status === "Red");
+  const canWin =
+    model.dataQuality.evidenceGrade <= "C" && !redGap
+      ? "Yes — bid selectively"
+      : "Not yet — activate evidence first";
+  const verdict =
+    model.dataQuality.evidenceGrade <= "B"
+      ? "Priority revenue route identified"
+      : model.dataQuality.evidenceGrade === "C"
+        ? "Proceed with caution and source checks"
+        : "Preparation-stage intelligence, not bid-ready yet";
+
+  return `<div class="grid grid-2">
+    ${metricCard("Verdict", verdict, "Commercial decision for the next 30 days")}
+    ${metricCard("Can they win now?", canWin, "Based on evidence grade and readiness gaps")}
+    ${metricCard("Best first money route", top?.opportunity ?? "Manual route review", top?.whyTheySpend ?? "Route evidence pending")}
+    ${metricCard("Fastest action this week", top?.nextActionThisWeek ?? "Build source-backed target list", "Action before bidding")}
+    ${metricCard("Main blocker", redGap?.asset ?? model.dataQuality.warnings[0] ?? "Human verification", redGap?.fixThisWeek ?? "Validate claims before outreach")}
+    ${metricCard("Recommended route", top ? humanRoute(top.route) : "Monitor", "Route-to-revenue recommendation")}
+  </div>`;
+}
+
+function renderBidReadinessScore(model: Omit<ReportModel, "qa">): string {
+  const verified = model.relevantRecords.filter((record) => record.evidenceLabel === "VERIFIED_RECORD").length;
+  const greenGaps = model.evidenceGaps.filter((gap) => gap.status === "Green").length;
+  const scores = [
+    { label: "Public-sector fit", value: model.relevantRecords.length ? 72 : 45, note: "Relevant public procurement signals" },
+    { label: "Evidence strength", value: clamp(35 + verified * 10, 20, 92), note: "Verified records and source confidence" },
+    { label: "Buyer relevance", value: clamp(model.buyerWatchlist[0]?.score ?? 45, 0, 100), note: "Named and strategic buyer fit" },
+    { label: "Compliance readiness", value: clamp(35 + greenGaps * 10, 20, 95), note: "Insurance, policies and accreditations" },
+    { label: "Capacity fit", value: model.intake.maxDeliverableContractValue ? 72 : 48, note: "Contract size versus delivery capacity" },
+    { label: "Case study strength", value: model.intake.caseStudiesConfirmed ? 82 : 42, note: "Proof buyers can trust" },
+    { label: "Route clarity", value: model.opportunities.length ? 78 : 35, note: "Recommended route is explicit" },
+    { label: "Immediate bid readiness", value: model.dataQuality.evidenceGrade <= "C" ? 68 : 38, note: "Whether to bid now or prepare first" },
+  ];
+
+  const overall = Math.round(scores.reduce((sum, score) => sum + score.value, 0) / scores.length);
+
+  return `<div class="grid grid-2">
+    ${metricCard("Overall Bid Readiness", `${overall}/100`, overall >= 70 ? "Bid selectively with evidence checks" : overall >= 50 ? "Prepare before major bids" : "Build proof before bidding")}
+    ${scores.map((score) => metricCard(score.label, `${score.value}/100`, score.note)).join("")}
+  </div>`;
+}
+
+function renderDoNotChase(model: Omit<ReportModel, "qa">): string {
+  const cap = model.intake.maxDeliverableContractValue ?? model.intake.idealContractMax;
+  const rows = [
+    {
+      type: "Oversized prime contracts",
+      risky: "Capacity, mobilisation and cash-flow risk can overwhelm delivery.",
+      proof: "Confirmed team capacity, mobilisation plan, references and financial thresholds.",
+      when: cap ? `When the route fits the stated capacity cap of ${formatMoney(cap)} or a prime partner is secured.` : "When capacity cap and mobilisation proof are confirmed.",
+    },
+    {
+      type: "Wrong-sector framework lots",
+      risky: "Framework applications consume time and produce low conversion if lots do not match the service offer.",
+      proof: "Lot scope, eligibility, insurance levels and buyer usage evidence.",
+      when: "When the lot maps directly to the recommended route and evidence pack is ready.",
+    },
+    {
+      type: "Low-relevance pulled records",
+      risky: "They can distort revenue strategy and create false confidence.",
+      proof: "Sector keywords, CPV fit, buyer need and source URL matching the offer.",
+      when: "Only after human verification shows a real fit.",
+    },
+  ];
+
+  return `<div class="grid grid-3">${rows
+    .map(
+      (row) =>
+        `<div class="action-card"><h3>${escapeHtml(row.type)}</h3><p><strong>Why risky:</strong> ${escapeHtml(row.risky)}</p><p><strong>Proof missing:</strong> ${escapeHtml(row.proof)}</p><p><strong>When suitable:</strong> ${escapeHtml(row.when)}</p></div>`,
+    )
+    .join("")}</div>`;
 }
 
 function metricCard(label: string, value: string, note: string): string {
@@ -2266,6 +2715,36 @@ function normalise(value: unknown): string {
     .replace(/[^\p{L}\p{N}£$.\-/%\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function calculateEvidenceGrade(input: {
+  level: DataQualitySummary["level"];
+  averageRelevanceScore: number;
+  relevanceRatio: number;
+  verifiedCount: number;
+  relevantCount: number;
+}): DataQualitySummary["evidenceGrade"] {
+  if (input.level === "Unsafe") return "E";
+  if (input.verifiedCount >= 10 && input.averageRelevanceScore >= 75 && input.relevanceRatio >= 0.6) return "A";
+  if (input.verifiedCount >= 5 && input.averageRelevanceScore >= 65 && input.relevanceRatio >= 0.45) return "B";
+  if (input.relevantCount >= 5 && input.averageRelevanceScore >= 50) return "C";
+  if (input.relevantCount > 0) return "D";
+  return "E";
+}
+
+function evidenceGradeExplanation(grade: DataQualitySummary["evidenceGrade"]): string {
+  switch (grade) {
+    case "A":
+      return "Strong source-backed evidence and high sector alignment.";
+    case "B":
+      return "Good public-sector market signal; some buyer-fit and readiness assumptions still need human verification.";
+    case "C":
+      return "Usable but mixed evidence; verify buyer fit, route access and readiness before major bid decisions.";
+    case "D":
+      return "Low exact-match evidence; treat this as a strategic scan, not a bid-ready opportunity map.";
+    case "E":
+      return "Insufficient source-backed evidence; do not rely on this report for bid decisions without fresh research.";
+  }
 }
 
 function formatMoney(value: number): string {
