@@ -4161,6 +4161,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <a class="mast-cta" href="/scan">Run a scan</a>
 </div></header>
 <div class="verticals"><div class="wrap">
+  <!-- TODO(deferred): each ribbon link becomes /desk/:category once category pages are built -->
   <a href="#desks">Government</a><a href="#desks">Business</a><a href="#desks">Finance</a>
   <a href="#desks">Economics</a><a href="#desks">Technology</a><a href="#desks">AI</a>
 </div></div>
@@ -4219,7 +4220,8 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 </section>
 <section class="section" id="desks">
   <div class="wrap">
-    <div class="section-head"><h2>The desks</h2><a href="#">All intelligence &rarr;</a></div>
+    <!-- TODO(deferred): "All intelligence" becomes /intelligence index once desk-content decision is made -->
+    <div class="section-head"><h2>The desks</h2><a href="#desks">All intelligence &rarr;</a></div>
     <div class="desk-grid">
       ${DESK_MAPPING.map(d => {
         const sig = deskSignals.get(d.category);
