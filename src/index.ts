@@ -2614,6 +2614,7 @@ async function refreshHomepageSignals(): Promise<void> {
 
 function startSignalsWorker(): void {
   if (redisConnection && signalQueue) {
+    // hourly repeating job
     signalQueue.add(
       "refresh",
       {},
@@ -2624,6 +2625,9 @@ function startSignalsWorker(): void {
         removeOnFail: { age: 60 * 60 * 24 * 3 }
       }
     ).catch(err => console.error("[signals] failed to schedule job", err));
+    // immediate startup run (no repeat)
+    signalQueue.add("refresh", {}, { removeOnComplete: true, removeOnFail: { age: 60 * 60 * 24 } })
+      .catch(err => console.error("[signals] failed to queue startup run", err));
 
     const worker = new Worker(
       "govrevenue-signals",
