@@ -2598,7 +2598,7 @@ async function refreshHomepageSignals(): Promise<void> {
         source: n.source === "Find a Tender" ? "FTS" : "CF",
         source_url: n.url,
         notice_date: n.publishedDate || n.awardedDate || null,
-        value_amount: n.valueHigh ?? n.valueLow ?? n.awardedValue ?? null,
+        value_amount: (() => { const v = n.valueHigh ?? n.valueLow ?? n.awardedValue; return v != null ? Math.round(v) : null; })(),
         status: n.status || "unknown",
         fetched_at: now
       })).filter(s => s.id && s.title);
