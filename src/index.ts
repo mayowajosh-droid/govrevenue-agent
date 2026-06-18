@@ -5373,6 +5373,16 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   res.type("html").send(reportPage(scan));
 }));
 
+app.get("/desks", asyncRoute(async (req, res) => {
+  const entries = await Promise.all(
+    DESK_PROFILES.filter(d => d.live).map(async profile => ({
+      profile,
+      cached: await getDeskCache(profile.slug).catch(() => null),
+    }))
+  );
+  res.type("html").send(desksPage(entries));
+}));
+
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).send("Desk not found"); return; }
