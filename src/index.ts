@@ -5238,7 +5238,7 @@ app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
 
 // ─── Desk page helpers ────────────────────────────────────────────────────────
 
-type InferredCategory = { label: string; count: number; value: number; subcategories: string[] };
+type InferredCategory = { label: string; count: number; value: number; subcategories: string[]; latestDate: number };
 
 function timeAgo(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -5300,13 +5300,15 @@ function getCategoryIcon(label: string): string {
 }
 
 function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCategory[]): InferredCategory[] {
-  const result: InferredCategory[] = categories.map(c => ({ label: c.label, count: 0, value: 0, subcategories: c.subcategories }));
+  const result: InferredCategory[] = categories.map(c => ({ label: c.label, count: 0, value: 0, subcategories: c.subcategories, latestDate: 0 }));
   for (const notice of notices) {
     const text = (notice.title + " " + notice.description).toLowerCase();
     for (let i = 0; i < categories.length; i++) {
       if (categories[i].keywords.some(kw => text.includes(kw))) {
         result[i].count++;
         result[i].value += notice.awardedValue ?? 0;
+        const d = new Date(notice.publishedDate || notice.awardedDate || "").getTime();
+        if (!isNaN(d) && d > result[i].latestDate) result[i].latestDate = d;
         break;
       }
     }
@@ -5474,7 +5476,13 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   <p class="dp-caveat-foot">Watchlist rotates daily. Figures are indicative.</p>`;
 
   // Demand map grid
-  const dmGridHtml = profile.categories.map(cat => {
+  const sortedCategories = [...profile.categories].sort((a, b) => {
+    const da = demandCategories.find(c => c.label === a.label)?.latestDate ?? 0;
+    const db = demandCategories.find(c => c.label === b.label)?.latestDate ?? 0;
+    return db - da;
+  });
+
+  const dmGridHtml = sortedCategories.map(cat => {
     const inferred = demandCategories.find(c => c.label === cat.label);
     const count = inferred?.count ?? 0;
     const more = cat.subcategories.length - 7;
