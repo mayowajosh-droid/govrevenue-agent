@@ -5605,8 +5605,8 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const openNotices = allOpen.filter(n => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
     if (t <= cutoff365) return false;
-    const text = (n.title + " " + (n.description || "")).toLowerCase();
-    return deskKeywords.some(kw => text.includes(kw));
+    const title = n.title.toLowerCase();
+    return deskKeywords.some(kw => title.includes(kw));
   }).slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
