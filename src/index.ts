@@ -5533,7 +5533,9 @@ const AGGREGATOR_FRAGMENTS = [
   // OJEU aggregators
   "ojeu ltd",
   // Cirrus Purchasing — procurement intermediary for social housing/FM
-  "cirrus purchasing"
+  "cirrus purchasing",
+  // PROSPER — housing association procurement consortium (framework aggregator)
+  " prosper "
 ];
 
 function isAggregatorBuyer(buyer: string): boolean {
