@@ -6558,13 +6558,15 @@ ${pageShellCss()}
 .dl-sort-title{font-family:var(--serif);font-size:26px}
 .dl-sort-meta{font-family:var(--mono);font-size:11px;color:var(--slate);letter-spacing:.06em}
 .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-.dl-card{background:#fff;border:1px solid var(--line-strong);border-radius:2px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
+.dl-card{background:#fff;border:1px solid var(--line-strong);border-radius:2px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;position:relative;cursor:pointer}
 .dl-card:hover{border-color:rgba(15,25,35,.3);box-shadow:0 4px 24px rgba(15,25,35,.07)}
 .dl-card-head{padding:28px 28px 20px}
 .dl-card-rank{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:10px}
 .dl-card-label{font-family:var(--serif);font-size:24px;line-height:1.2;margin-bottom:8px}
 .dl-card-label a{color:var(--ink)}
 .dl-card-label a:hover{color:var(--accent)}
+.dl-card-label a::after{content:'';position:absolute;inset:0;z-index:0}
+.dl-meta a,.dl-cats,.dl-stats{position:relative;z-index:1}
 .dl-live-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#1a6b3a;background:#e8f5ee;padding:3px 8px;border-radius:100px;margin-bottom:10px}
 .dl-live-dot{width:5px;height:5px;border-radius:50%;background:#1a6b3a;animation:dlPulse 2s infinite}
 @keyframes dlPulse{0%,100%{opacity:1}50%{opacity:.4}}
