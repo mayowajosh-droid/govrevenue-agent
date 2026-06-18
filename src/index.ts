@@ -4517,14 +4517,19 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
 }));
 
 app.get("/", asyncRoute(async (_req, res) => {
-  const [signals, count24h, samplePdfUrl, deskSignals, chartResult] = await Promise.all([
-    queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
+  const [count24h, samplePdfUrl, deskSignals, chartResult] = await Promise.all([
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
     queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
     queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true }))
   ]);
 
+  // Derive hero and ticker from current desk signals (sorted by most recently published)
+  const signals = [...deskSignals.values()]
+    .filter(s => s.notice_date)
+    .sort((a, b) => new Date(b.notice_date!).getTime() - new Date(a.notice_date!).getTime());
+
+  // Hero: most recently published signal from current desks only
   const heroSignal = signals[0] || null;
   const isLive = heroSignal !== null;
 
@@ -5063,10 +5068,13 @@ app.get("/api/scans/:id/stream", (req, res) => {
 });
 
 app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
-  const [signals, count24h] = await Promise.all([
-    queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
+  const [deskSigs, count24h] = await Promise.all([
+    queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
     count24hSignals().catch(() => 0)
   ]);
+  const signals = [...deskSigs.values()]
+    .filter(s => s.notice_date)
+    .sort((a, b) => new Date(b.notice_date!).getTime() - new Date(a.notice_date!).getTime());
   const hero = signals[0] || null;
   const ticker = signals.map(s => ({
     src: s.source,
