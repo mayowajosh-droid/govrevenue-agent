@@ -18,6 +18,25 @@ import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
 import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert } from "./lib/emailNotifications.js";
+import {
+  normaliseFromProcurementNotice,
+  scoreAndBucketNotices,
+  buildWinBrief,
+  renderOpportunityCard,
+  renderWinBriefHtml,
+  renderOpportunityBoardContent,
+  renderChaseNowPanel,
+  renderHomepageTeaserSection,
+  oppCardCss,
+  winBriefCss,
+  deskOpportunityCss,
+  reportChaseNowCss,
+  homepageTeaserCss,
+  type ScoredOpportunity,
+  type ScanOpportunityContext,
+  type DeskOpportunityContext,
+  type HomepageTeaserSignal,
+} from "./lib/opportunityEngine.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
 type ScanRecord = {
   id: string;
@@ -1523,20 +1542,15 @@ Main goal: ${input.mainGoal || "win public sector contracts"}
 Framework access: ${input.frameworkStatus || "none stated"}
 Last public contract: ${input.lastPublicContract || "none stated"}`;
 
-  const kwController = new AbortController();
-  const kwTimer = setTimeout(() => kwController.abort(), 90_000);
-  let response;
-  try {
-    response = await openai.chat.completions.create({
+  const response = await withOpenAiTimeout(signal =>
+    openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.1,
       max_tokens: 300
-    }, { signal: kwController.signal });
-  } finally {
-    clearTimeout(kwTimer);
-  }
+    }, { signal })
+  );
 
   const raw = response.choices[0]?.message?.content ?? "{}";
   const parsed = JSON.parse(raw);
@@ -2670,34 +2684,37 @@ End with:
 }
 
 
-async function callLlmReport(prompt: string): Promise<string> {
+function withOpenAiTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90_000);
-  try {
-    const response = await openai.responses.create({
-      model: OPENAI_MODEL,
-      tools: [{ type: "web_search" } as any],
-      input: prompt
-    }, { signal: controller.signal });
-    clearTimeout(timer);
-    return enforceDataQualityLanguage(response.output_text || "No report returned.");
-  } catch (firstError: any) {
+  return fn(controller.signal).finally(() => clearTimeout(timer));
+}
+
+async function callLlmReport(prompt: string): Promise<string> {
+  return withOpenAiTimeout(async signal => {
     try {
       const response = await openai.responses.create({
         model: OPENAI_MODEL,
-        tools: [{ type: "web_search_preview" } as any],
+        tools: [{ type: "web_search" } as any],
         input: prompt
-      }, { signal: controller.signal });
-      clearTimeout(timer);
+      }, { signal });
       return enforceDataQualityLanguage(response.output_text || "No report returned.");
-    } catch (secondError: any) {
-      clearTimeout(timer);
-      captureError(secondError, {
-        openai: { model: OPENAI_MODEL, fallbackAfterPrimaryFailure: true, primaryError: firstError?.message || String(firstError) }
-      });
-      throw secondError;
+    } catch (firstError: any) {
+      try {
+        const response = await openai.responses.create({
+          model: OPENAI_MODEL,
+          tools: [{ type: "web_search_preview" } as any],
+          input: prompt
+        }, { signal });
+        return enforceDataQualityLanguage(response.output_text || "No report returned.");
+      } catch (secondError: any) {
+        captureError(secondError, {
+          openai: { model: OPENAI_MODEL, fallbackAfterPrimaryFailure: true, primaryError: firstError?.message || String(firstError) }
+        });
+        throw secondError;
+      }
     }
-  }
+  });
 }
 
 async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
@@ -4379,7 +4396,11 @@ function reportPage(scan: ScanRecord) {
         color:var(--ink);
         text-decoration:none;
       }
+      .no-print { display:none !important; }
     }
+    ${oppCardCss()}
+    ${winBriefCss()}
+    ${reportChaseNowCss()}
   </style>
 </head>
 <body>
@@ -4426,6 +4447,26 @@ function reportPage(scan: ScanRecord) {
     ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
 
     ${data ? renderIncumbentSection(data) : ""}
+
+    ${(() => {
+      if (!data || scan.status !== "completed") return "";
+      const intake = scan.input_json as any;
+      const allNotices = [
+        ...(data.contractsFinder.open || []),
+        ...(data.findTender?.notices || []),
+      ];
+      if (allNotices.length === 0) return "";
+      const scanCtx: ScanOpportunityContext = {
+        type: "scan",
+        services: String(intake?.mainServices || intake?.secondaryServices || ""),
+        sector: resolveSectorFromScan(scan).label,
+        regions: String(data.regions || intake?.areasServed || ""),
+        idealBuyers: String(intake?.idealBuyers || ""),
+        keywords: data.keywords || [],
+      };
+      const scored = scoreAndBucketNotices(allNotices.map(normaliseFromProcurementNotice), scanCtx);
+      return renderChaseNowPanel(scored, scanCtx);
+    })()}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
 
@@ -4528,6 +4569,19 @@ app.get("/", asyncRoute(async (_req, res) => {
   const signals = [...deskSignals.values()]
     .filter(s => s.notice_date)
     .sort((a, b) => new Date(b.notice_date!).getTime() - new Date(a.notice_date!).getTime());
+
+  // Build homepage teaser signals
+  const teaserSignals: HomepageTeaserSignal[] = signals.map(s => ({
+    category: s.category,
+    title: s.title,
+    buyer: s.buyer,
+    source: s.source,
+    notice_date: s.notice_date,
+    value_amount: s.value_amount,
+    status: s.status,
+    notice_url: s.source_url || null,
+  }));
+  const homepageTeaserHtml = renderHomepageTeaserSection(teaserSignals);
 
   // Hero: most recently published signal from current desks only
   const heroSignal = signals[0] || null;
@@ -4728,6 +4782,8 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto}.reveal{opacity:1;transform:none}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+${homepageTeaserCss()}
+${oppCardCss()}
 </style>
 </head>
 <body>
@@ -4811,6 +4867,7 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
     </div>
   </div>
 </section>
+${homepageTeaserHtml}
 <section class="product" id="product">
   <div class="wrap">
     <div>
@@ -5189,7 +5246,27 @@ app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
   res.json(scan.procurement_json);
 }));
 
-app.get("/scan", (_req, res) => {
+app.get("/scan", (req, res) => {
+  const deskParam = typeof req.query.desk === "string" ? req.query.desk.slice(0, 60) : "";
+  const noticeIdParam = typeof req.query.noticeId === "string" ? req.query.noticeId.slice(0, 80) : "";
+  const servicesParam = typeof req.query.services === "string" ? req.query.services.slice(0, 300) : "";
+  const buyerParam = typeof req.query.buyer === "string" ? req.query.buyer.slice(0, 120) : "";
+  const deskProfile = deskParam ? DESK_PROFILES.find(d => d.slug === deskParam) : null;
+
+  const contextBannerHtml = deskProfile
+    ? `<div style="background:#f0f5ff;border:1px solid #3a5bb844;padding:14px 18px;margin-bottom:28px;font-size:13.5px;line-height:1.6">
+        <strong style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#3a5bb8">From the ${escapeHtml(deskProfile.label)} desk</strong>
+        ${buyerParam ? `<br>Buyer context: <strong>${escapeHtml(buyerParam)}</strong>` : ""}
+        ${noticeIdParam ? `<br><span style="font-family:var(--mono);font-size:11px;color:var(--slate)">Notice ref: ${escapeHtml(noticeIdParam)}</span>` : ""}
+        <br><span style="font-size:12px;color:var(--slate)">Fill in your firm details below for a personalised fit check against this desk&rsquo;s opportunities.</span>
+       </div>`
+    : "";
+
+  const mainServicesValue = servicesParam ? escapeHtml(servicesParam) : "";
+  const mainServicesPlaceholder = deskProfile
+    ? `e.g. ${deskProfile.pinnedProfile.mainServices.split(" ").slice(0, 4).join(", ")}`
+    : "e.g. facilities management, reactive maintenance, cleaning";
+
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5246,7 +5323,10 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
     <h1>Tell us about your firm.</h1>
     <p class="sub">The more context you give, the sharper the signal. We scan Contracts Finder, Find a Tender and LA spend data, then return a sourced verdict on where the money is and how to reach it.</p>
   </div>
+  ${contextBannerHtml}
   <form method="POST" action="/form-submit" autocomplete="off" class="form-grid">
+    ${deskParam ? `<input type="hidden" name="_deskContext" value="${escapeHtml(deskParam)}">` : ""}
+    ${noticeIdParam ? `<input type="hidden" name="_noticeContext" value="${escapeHtml(noticeIdParam)}">` : ""}
 
     <div class="section-label">Your firm</div>
 
@@ -5271,7 +5351,7 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
 
     <div class="field">
       <label>Main services <span>*</span></label>
-      <textarea name="mainServices" required placeholder="e.g. facilities management, reactive maintenance, cleaning"></textarea>
+      <textarea name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
       <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
     </div>
     <div class="field">
@@ -5355,7 +5435,9 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
 </main>
 <script>
 window.addEventListener("pageshow", () => {
-  document.querySelectorAll("input, textarea").forEach(f => { f.value = ""; f.setAttribute("autocomplete","off"); });
+  document.querySelectorAll("input:not([type=hidden]), textarea").forEach(f => {
+    if (!f.value) f.setAttribute("autocomplete","off");
+  });
 });
 </script>
 </body>
@@ -5374,13 +5456,14 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
 }));
 
 app.get("/desks", asyncRoute(async (req, res) => {
+  const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
   const entries = await Promise.all(
     DESK_PROFILES.filter(d => d.live).map(async profile => ({
       profile,
       cached: await getDeskCache(profile.slug).catch(() => null),
     }))
   );
-  res.type("html").send(desksPage(entries));
+  res.type("html").send(desksPage(entries, page));
 }));
 
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
@@ -5693,36 +5776,30 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
        <p style="color:var(--slate);margin-top:16px;font-size:14px;line-height:1.7">${isCompiling ? "Demand data compiles on first request.<br>Refresh after ~90 seconds." : "This desk is coming soon."}</p>
        ${isCompiling ? `<span class="chip chip-amber" style="margin-top:16px;display:inline-block">Compiling &mdash; data within the hour</span>` : ""}`;
 
-  // Live signal panel
+  // Live opportunities panel — scored and bucketed
+  const deskOppContext: DeskOpportunityContext = {
+    type: "desk",
+    slug: profile.slug,
+    label: profile.label,
+    keywords: deskKeywords,
+  };
+  const deskScoredOpen = profile.live && !isCompiling && openNotices.length > 0
+    ? scoreAndBucketNotices(openNotices.map(normaliseFromProcurementNotice), deskOppContext)
+    : [];
   const liveHtml = `<div class="dp-head-row" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px">
       <span class="live-dot"></span>
-      <span class="dp-eyebrow">LIVE SIGNAL &ndash; CF + FIND A TENDER</span>
+      <span class="dp-eyebrow">LIVE OPPORTUNITIES IN THIS DESK</span>
     </div>
-    <a href="/desk/${profile.slug}/notices" class="dp-link-sm">View all notices &rarr;</a>
+    <a href="/desk/${profile.slug}/notices" class="dp-link-sm">Opportunity board &rarr;</a>
   </div>
   ${!profile.live || isCompiling
     ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
-    : openNotices.length
-      ? `<table class="ls-table">
-          <thead><tr>
-            <th>NOTICE</th><th class="ls-buyer">BUYER</th><th class="ls-val ls-th-r">VALUE</th><th class="ls-date ls-th-r">PUBLISHED</th>
-          </tr></thead>
-          <tbody>${openNotices.map(n => {
-            const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
-            const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
-            const ago = timeAgo(n.publishedDate || n.awardedDate);
-            return `<tr>
-              <td class="ls-title-cell"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
-              <td class="ls-buyer">${escapeHtml((n.buyer || "—").slice(0, 38))}</td>
-              <td class="ls-val">${escapeHtml(val)}</td>
-              <td class="ls-date">${escapeHtml(ago)}</td>
-            </tr>`;
-          }).join("")}</tbody>
-        </table>`
-      : `<p class="dp-caveat-sm">No open notices at last refresh. Check back after next compile.</p>`
+    : deskScoredOpen.length
+      ? deskScoredOpen.slice(0, 4).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("")
+      : `<p class="dp-caveat-sm">No open notices at last refresh. <a href="/desk/${profile.slug}/notices" class="dp-link-sm">Check the full board</a>.</p>`
   }
-  <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Updates every 15 minutes</p>`;
+  <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Public record only</p>`;
 
   // Buyer watchlist panel
   const watchlistHtml = `<div class="dp-head-row">
@@ -5958,6 +6035,8 @@ a{color:inherit;text-decoration:none}
   .dm-grid{grid-template-columns:1fr}
   .dp-stats{grid-template-columns:1fr}
 }
+${oppCardCss()}
+${deskOpportunityCss()}
 </style>
 </head>
 <body>
@@ -6457,7 +6536,7 @@ function pageShellFoot(): string {
 
 // ─── /desks ────────────────────────────────────────────────────────────────────
 
-function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: ProcurementData; cached_at: string } | null }>): string {
+function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: ProcurementData; cached_at: string } | null }>, page = 1): string {
   type DS = {
     profile: DeskProfile;
     openCount: number;
@@ -6484,6 +6563,10 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
   const totalBuyers = stats.reduce((s, d) => s + d.uniqueBuyers, 0);
   const liveCount = stats.filter(d => d.cachedAt !== null).length;
   const totalNotices = totalOpen + totalAwarded;
+  const PAGE_SIZE = 12;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const currentPage = Math.max(1, Math.min(page, totalPages));
+  const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const renderCard = (d: DS, rank: number): string => {
     const sharePct = grandTotal > 0 ? Math.round((d.totalValue / grandTotal) * 100) : 0;
@@ -6532,7 +6615,21 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
     </article>`;
   };
 
-  const cards = sorted.map((d, i) => renderCard(d, i)).join("");
+  const cards = paginated.map((d, i) => renderCard(d, (currentPage - 1) * PAGE_SIZE + i)).join("");
+
+  const pagerLinks = Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
+    if (totalPages > 7 && Math.abs(p - currentPage) > 2 && p !== 1 && p !== totalPages) {
+      return p === currentPage - 3 || p === currentPage + 3 ? `<span class="dl-pager-ellipsis">&hellip;</span>` : "";
+    }
+    return `<a href="/desks?page=${p}" class="dl-pager-btn${p === currentPage ? " dl-pager-active" : ""}">${p}</a>`;
+  }).filter(Boolean).join("");
+
+  const pagerNav = totalPages > 1 ? `
+    <nav class="dl-pager">
+      ${currentPage > 1 ? `<a href="/desks?page=${currentPage - 1}" class="dl-pager-btn dl-pager-arrow">&larr; Prev</a>` : `<span class="dl-pager-btn dl-pager-disabled">&larr; Prev</span>`}
+      ${pagerLinks}
+      ${currentPage < totalPages ? `<a href="/desks?page=${currentPage + 1}" class="dl-pager-btn dl-pager-arrow">Next &rarr;</a>` : `<span class="dl-pager-btn dl-pager-disabled">Next &rarr;</span>`}
+    </nav>` : "";
   const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
 
   return `<!DOCTYPE html>
@@ -6592,6 +6689,14 @@ ${pageShellCss()}
 .dl-meta-link{color:var(--accent)}
 @media(max-width:1100px){.dl-agg{grid-template-columns:repeat(3,1fr)}.dl-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.dl-hero-inner,.dl-body-inner{padding-left:16px;padding-right:16px}.dl-hero{padding:48px 0 40px}.dl-hero h1{font-size:34px}.dl-agg{grid-template-columns:1fr 1fr}.dl-agg-val{font-size:26px}.dl-sort-bar{flex-direction:column;gap:6px}.dl-grid{grid-template-columns:1fr;gap:16px}.dl-body{padding:36px 0 56px}}
+.dl-pager{display:flex;align-items:center;justify-content:center;gap:6px;padding:48px 0 0;flex-wrap:wrap}
+.dl-pager-btn{font-family:var(--mono);font-size:12px;letter-spacing:.07em;padding:8px 14px;border:1px solid var(--line-strong);border-radius:2px;color:var(--ink);transition:border-color .15s,background .15s}
+.dl-pager-btn:hover{border-color:var(--ink);background:var(--paper-2)}
+.dl-pager-active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.dl-pager-active:hover{background:var(--ink);color:var(--paper)}
+.dl-pager-disabled{font-family:var(--mono);font-size:12px;letter-spacing:.07em;padding:8px 14px;border:1px solid var(--line);border-radius:2px;color:var(--slate);cursor:default}
+.dl-pager-ellipsis{font-family:var(--mono);font-size:12px;color:var(--slate);padding:0 4px}
+.dl-pager-arrow{font-size:11px}
 </style>
 </head>
 <body>
@@ -6628,6 +6733,7 @@ ${pageShellCss()}
       <div class="dl-sort-meta">${DESK_PROFILES.length} desks &middot; ${totalNotices.toLocaleString()} notices indexed</div>
     </div>
     <div class="dl-grid">${cards}</div>
+    ${pagerNav}
   </div>
 </section>
 ${pageShellFoot()}
@@ -6640,7 +6746,7 @@ ${pageShellFoot()}
 function noticesPage(
   profile: DeskProfile,
   cached: { data: ProcurementData; cached_at: string } | null,
-  buyerFilter: string | null = null
+  _buyerFilter: string | null = null
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
@@ -6655,63 +6761,37 @@ function noticesPage(
   const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
   const uniqueBuyers = new Set([...allOpen, ...allAwarded].map(n => n.buyer).filter(Boolean)).size;
 
-  const renderRow = (n: ProcurementNotice, status: "open" | "awarded") => {
-    const rawVal = status === "open" ? (n.valueHigh ?? n.valueLow ?? n.awardedValue) : n.awardedValue;
-    const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
-    const date = status === "open" ? (n.publishedDate || n.awardedDate) : (n.awardedDate || n.publishedDate);
-    const dateStr = date ? new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-    const src = n.source === "Find a Tender" ? "FTS" : "CF";
-    return `<tr data-status="${status}" data-search="${escapeHtml((n.title + " " + (n.buyer || "")).toLowerCase())}">
-      <td class="nt-status"><span class="nt-chip nt-chip-${status}">${status === "open" ? "OPEN" : "AWARDED"}</span></td>
-      <td class="nt-title"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 100))}</a></td>
-      <td class="nt-buyer">${escapeHtml((n.buyer || "—").slice(0, 50))}</td>
-      <td class="nt-val">${escapeHtml(val)}</td>
-      <td class="nt-date">${escapeHtml(dateStr)}</td>
-      <td class="nt-src"><span class="nt-src-badge">${escapeHtml(src)}</span></td>
-    </tr>`;
+  const boardOppContext: DeskOpportunityContext = {
+    type: "desk",
+    slug: profile.slug,
+    label: profile.label,
+    keywords: profile.categories.flatMap(c => c.keywords),
   };
 
-  const openRows = allOpen.map(n => renderRow(n, "open")).join("");
-  const awardedRows = allAwarded.map(n => renderRow(n, "awarded")).join("");
+  const scoredOpen = allOpen.length > 0
+    ? scoreAndBucketNotices(allOpen.map(normaliseFromProcurementNotice), boardOppContext)
+    : [];
+  const scoredAwarded = allAwarded.length > 0
+    ? scoreAndBucketNotices(allAwarded.map(normaliseFromProcurementNotice), boardOppContext)
+    : [];
+
+  const boardContent = isCompiling
+    ? `<div class="opp-cold" style="padding:32px;text-align:center">
+        <strong>Compiling the public record.</strong> Run a scan while this desk warms up.
+        <br><br><a href="/scan" style="font-family:var(--mono);font-size:11px;color:var(--accent);text-decoration:underline">Run a fit check &rarr;</a>
+       </div>`
+    : renderOpportunityBoardContent(scoredOpen, profile.slug, scoredAwarded);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>All Notices &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<title>Opportunity Board &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
 <style>
 ${pageShellCss()}
-.nt-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:28px;flex-wrap:wrap}
-.nt-tabs{display:flex;border:1px solid var(--line-strong);overflow:hidden}
-.nt-tab{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;padding:9px 18px;cursor:pointer;background:var(--paper);color:var(--slate);border:none;border-right:1px solid var(--line-strong);transition:.15s}
-.nt-tab:last-child{border-right:none}
-.nt-tab.active,.nt-tab:hover{background:var(--ink);color:var(--paper)}
-.nt-search{flex:1;min-width:200px;max-width:360px;font-family:var(--mono);font-size:12px;padding:9px 14px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);outline:none}
-.nt-search:focus{border-color:var(--ink)}
-.nt-count{font-family:var(--mono);font-size:11px;color:var(--slate);margin-left:auto}
-.nt-table{width:100%;border-collapse:collapse;font-size:13.5px}
-.nt-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 10px 12px 0;border-bottom:2px solid var(--line-strong)}
-.nt-table td{padding:13px 10px 13px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.nt-table tr:hover td{background:#F7F4EE}
-.nt-table tr[style*="display:none"]{display:none!important}
-.nt-title{max-width:480px}
-.nt-title a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.nt-title a:hover{text-decoration-color:var(--accent)}
-.nt-buyer{color:var(--slate);font-size:12.5px;max-width:200px}
-.nt-val{font-family:var(--mono);font-size:12.5px;white-space:nowrap;text-align:right}
-.nt-date{font-family:var(--mono);font-size:12.5px;color:var(--slate);white-space:nowrap;text-align:right}
-.nt-src{text-align:right}
-.nt-src-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;padding:2px 6px;border:1px solid var(--line-strong);color:var(--slate);background:var(--paper-2)}
-.nt-status{white-space:nowrap}
-.nt-chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;padding:2px 7px;border-radius:2px;font-weight:500}
-.nt-chip-open{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
-.nt-chip-awarded{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
-@media(max-width:760px){
-  .nt-buyer,.nt-val,.nt-src{display:none}
-  .nt-title{max-width:none}
-  .nt-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
-}
+${oppCardCss()}
+${winBriefCss()}
 </style>
 </head>
 <body>
@@ -6720,19 +6800,20 @@ ${pageShellHeader(profile)}
 <section class="pg-mast">
   <div class="pg-mast-inner">
     <div class="pg-crumb">
-      <a href="/desk/${profile.slug}">${escapeHtml(profile.label)}</a>
+      <a href="/desk/${escapeHtml(profile.slug)}">${escapeHtml(profile.label)}</a>
       <span class="pg-crumb-sep">&rsaquo;</span>
-      <span class="pg-crumb-active">All Notices</span>
+      <span class="pg-crumb-active">Opportunity Board</span>
     </div>
-    <h1>ALL NOTICES</h1>
+    <h1>OPPORTUNITY BOARD &mdash; ${escapeHtml(profile.label.toUpperCase())}</h1>
+    <p style="font-size:14px;color:var(--slate);margin-top:8px">Contracts You Can Chase Now. Public notices scored against this desk profile.</p>
     <div class="pg-stats">
       <div class="pg-stat">
         <span class="pg-stat-val">${isCompiling ? "—" : String(allOpen.length)}</span>
-        <span class="pg-stat-label">Open opportunities</span>
+        <span class="pg-stat-label">Open notices</span>
       </div>
       <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : String(allAwarded.length)}</span>
-        <span class="pg-stat-label">Awarded contracts</span>
+        <span class="pg-stat-val">${isCompiling ? "—" : String(scoredOpen.filter(n => n.bucket === "chase_now").length)}</span>
+        <span class="pg-stat-label">Chase now</span>
       </div>
       <div class="pg-stat">
         <span class="pg-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue) : "—"}</span>
@@ -6748,62 +6829,8 @@ ${pageShellHeader(profile)}
 
 <section class="pg-body">
   <div class="pg-body-inner">
-    ${isCompiling
-      ? `<p class="pg-empty">Compiling &mdash; data ready within 90 seconds. Refresh to check.</p>`
-      : `<div class="nt-toolbar">
-          <div class="nt-tabs">
-            <button class="nt-tab active" data-filter="all">All (${allOpen.length + allAwarded.length})</button>
-            <button class="nt-tab" data-filter="open">Open (${allOpen.length})</button>
-            <button class="nt-tab" data-filter="awarded">Awarded (${allAwarded.length})</button>
-          </div>
-          <input class="nt-search" type="search" placeholder="Search notices or buyers…" id="nt-search"${buyerFilter ? ` value="${escapeHtml(buyerFilter)}"` : ""}>
-          <span class="nt-count" id="nt-count">${allOpen.length + allAwarded.length} notices</span>
-        </div>
-        <table class="nt-table" id="nt-table">
-          <thead><tr>
-            <th></th>
-            <th>Notice</th>
-            <th class="nt-buyer">Buyer</th>
-            <th class="nt-val" style="text-align:right">Value</th>
-            <th style="text-align:right">Date</th>
-            <th class="nt-src" style="text-align:right">Src</th>
-          </tr></thead>
-          <tbody id="nt-body">${openRows}${awardedRows}</tbody>
-        </table>
-        <script>
-        (function(){
-          var activeFilter='all';
-          var searchVal='';
-          function update(){
-            var rows=document.querySelectorAll('#nt-body tr');
-            var vis=0;
-            rows.forEach(function(r){
-              var statusOk=activeFilter==='all'||r.dataset.status===activeFilter;
-              var searchOk=!searchVal||r.dataset.search.includes(searchVal);
-              var show=statusOk&&searchOk;
-              r.style.display=show?'':'none';
-              if(show)vis++;
-            });
-            document.getElementById('nt-count').textContent=vis+' notices';
-          }
-          document.querySelectorAll('.nt-tab').forEach(function(btn){
-            btn.addEventListener('click',function(){
-              document.querySelectorAll('.nt-tab').forEach(function(b){b.classList.remove('active')});
-              btn.classList.add('active');
-              activeFilter=btn.dataset.filter;
-              update();
-            });
-          });
-          var t;
-          var inp=document.getElementById('nt-search');
-          inp.addEventListener('input',function(e){
-            clearTimeout(t);
-            t=setTimeout(function(){searchVal=e.target.value.toLowerCase().trim();update();},120);
-          });
-          if(inp.value){searchVal=inp.value.toLowerCase().trim();update();}
-        })();
-        </script>`
-    }
+    <p style="font-family:var(--mono);font-size:11px;color:var(--slate);margin-bottom:28px">Public record only &middot; No insider information &middot; Matched against the desk profile, not your specific firm &middot; Run a scan for a personalised fit check</p>
+    ${boardContent}
   </div>
 </section>
 
