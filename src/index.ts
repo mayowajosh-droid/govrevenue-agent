@@ -2908,12 +2908,10 @@ const SIGNAL_CATEGORIES: Array<{
   key: string;
   label: string;
   input: z.infer<typeof intakeSchema>;
-  cap: number;
 }> = [
   {
     key: "housing-maintenance",
     label: "Housing maintenance",
-    cap: 25,
     input: intakeSchema.parse({
       companyName: "GovRevenue Signal Fetch",
       mainServices: "housing maintenance void works repairs responsive maintenance",
@@ -2924,7 +2922,6 @@ const SIGNAL_CATEGORIES: Array<{
   {
     key: "cleaning-facilities",
     label: "Cleaning & facilities",
-    cap: 25,
     input: intakeSchema.parse({
       companyName: "GovRevenue Signal Fetch",
       mainServices: "cleaning facilities management janitorial services",
@@ -2935,7 +2932,6 @@ const SIGNAL_CATEGORIES: Array<{
   {
     key: "construction-pm",
     label: "Construction PM",
-    cap: 25,
     input: intakeSchema.parse({
       companyName: "GovRevenue Signal Fetch",
       mainServices: "construction project management site management capital works",
@@ -2946,7 +2942,6 @@ const SIGNAL_CATEGORIES: Array<{
   {
     key: "passenger-transport",
     label: "Passenger transport",
-    cap: 25,
     input: intakeSchema.parse({
       companyName: "GovRevenue Signal Fetch",
       mainServices: "passenger transport bus services community transport",
@@ -2957,7 +2952,6 @@ const SIGNAL_CATEGORIES: Array<{
   {
     key: "recruitment-staffing",
     label: "Recruitment & staffing",
-    cap: 10,
     input: intakeSchema.parse({
       companyName: "GovRevenue Signal Fetch",
       mainServices: "recruitment temporary staffing agency workers",
@@ -3339,7 +3333,7 @@ async function refreshHomepageSignals(): Promise<void> {
         ...data.contractsFinder.awarded,
         ...(data.findTender?.notices || [])
       ];
-      const deduped = dedupeNotices(allNotices).slice(0, cat.cap);
+      const deduped = dedupeNotices(allNotices);
       const now = nowIso();
       const signals: HomepageSignal[] = deduped.map(n => ({
         id: n.url || `${n.source}-${n.id}`,
