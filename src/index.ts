@@ -672,7 +672,7 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&#0*39;/g, "'")
     .replace(/&apos;/g, "'");
 }
 
@@ -5104,7 +5104,12 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const isCompiling = cached === null;
   const data = cached?.data;
 
-  const allOpen = (data?.contractsFinder.open || []).concat(data?.findTender?.notices || []);
+  const allOpen = (data?.contractsFinder.open || []).concat(data?.findTender?.notices || [])
+    .sort((a, b) => {
+      const da = new Date(a.publishedDate || a.awardedDate || 0).getTime();
+      const db = new Date(b.publishedDate || b.awardedDate || 0).getTime();
+      return db - da;
+    });
   const openNotices = allOpen.slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
@@ -5241,7 +5246,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         return `<div class="bw-row">
           <div class="bw-avatar">${escapeHtml(initials)}</div>
           <div class="bw-info">
-            <div class="bw-name">${escapeHtml(buyer.slice(0, 44))}</div>
+            <div class="bw-name">${escapeHtml(buyer.slice(0, 55))}</div>
             ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
             <div class="bw-meta">
               <span class="bw-spend">${escapeHtml(spend)}</span>
