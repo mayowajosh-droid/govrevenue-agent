@@ -5156,6 +5156,12 @@ app.delete("/api/scans/:id", requireAdmin, asyncRoute(async (req, res) => {
   res.json({ ok: true, deleted: req.params.id });
 }));
 
+app.post("/admin/signals/rebuild", requireAdmin, asyncRoute(async (_req, res) => {
+  if (pool) await pool.query("TRUNCATE TABLE homepage_signals");
+  refreshHomepageSignals().catch(err => console.error("[signals] rebuild failed", err));
+  res.json({ ok: true, message: "Signals table cleared. Rebuild started in background." });
+}));
+
 app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) => {
   await deleteScan(req.params.id);
   const token = String(req.query.token || "");
