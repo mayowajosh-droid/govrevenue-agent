@@ -1084,7 +1084,7 @@ async function queryDeskSignals(categories: string[]): Promise<Map<string, Homep
   if (pool) {
     const r = await pool.query<HomepageSignal>(
       `SELECT DISTINCT ON (category) id, category, title, buyer, source, source_url, notice_date, value_amount, status, fetched_at
-       FROM homepage_signals WHERE category = ANY($1) ORDER BY category, fetched_at DESC`,
+       FROM homepage_signals WHERE category = ANY($1) ORDER BY category, notice_date DESC NULLS LAST`,
       [categories]
     );
     for (const row of r.rows) out.set(row.category, row);
@@ -3295,8 +3295,17 @@ async function refreshHomepageSignals(): Promise<void> {
         ...(data.findTender?.notices || [])
       ];
       const deduped = dedupeNotices(allNotices);
+      const deskProfile = DESK_PROFILES.find(d => d.slug === cat.key);
+      const deskKw = deskProfile ? deskProfile.categories.flatMap(c => c.keywords) : [];
+      const relevant = deskKw.length > 0
+        ? deduped.filter(n => {
+            const t = (n.title + " " + (n.description || "")).toLowerCase();
+            return deskKw.some(kw => t.includes(kw));
+          })
+        : deduped;
+      const signalPool = relevant.length > 0 ? relevant : deduped;
       const now = nowIso();
-      const signals: HomepageSignal[] = deduped.map(n => ({
+      const signals: HomepageSignal[] = signalPool.map(n => ({
         id: n.url || `${n.source}-${n.id}`,
         category: cat.key,
         title: n.title.slice(0, 200),
@@ -6387,9 +6396,9 @@ a{color:inherit;text-decoration:none}
 }`;
 }
 
-function pageShellHeader(profile: DeskProfile): string {
+function pageShellHeader(profile: DeskProfile | null): string {
   const navLinks = DESK_PROFILES.map(d =>
-    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
+    `<a href="/desk/${d.slug}"${profile && d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
   ).join("");
   return `<header class="gh">
   <div class="gh-inner">
