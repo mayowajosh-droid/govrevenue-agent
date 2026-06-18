@@ -1527,7 +1527,23 @@ const SECTOR_CPV: Record<string, string[]> = {
   "creative":          ["79342200", "79952000"],               // promotional, events
   "photography":       ["79962000"],
   "energy":            ["71314000", "50710000"],               // energy services, heating/ventilation maintenance
-  "health":            ["85100000", "85110000", "85140000", "85120000"],  // health services, hospital, misc health, medical practice
+  "health":            ["85100000", "85110000", "85140000", "85120000"],
+  "digital":          ["72000000", "48000000", "72212000"],   // IT services, software, programming
+  "social-care":      ["85311000", "85312000", "85320000"],   // social work with/without accommodation, social services
+  "childrens":        ["85312000", "85311200", "85321000"],   // social work without accommodation, child day care, admin social services
+  "waste":            ["90500000", "90511000", "90600000"],   // waste collection, street cleaning
+  "security":         ["79710000", "79711000", "79715000"],   // security services, alarm monitoring, patrol
+  "catering":         ["55500000", "55520000", "55523000"],   // canteen/catering, catering outside premises, catering for schools
+  "legal":            ["79100000", "79200000", "79212000"],   // legal services, accountancy, auditing
+  "housing-support":  ["85311000", "70220000"],               // social work, commercial property letting (supported housing)
+  "finance":          ["79200000", "66100000", "79212000"],   // accountancy, banking, auditing
+  "comms":            ["79340000", "79341000", "79960000"],   // advertising, general advertising, photography services
+  "leisure":          ["92000000", "92600000", "92610000"],   // recreational, sporting, sports grounds
+  "planning":         ["71400000", "71410000", "71420000"],   // urban planning, regional planning, landscape
+  "justice":          ["75231200", "75231210", "79997000"],   // rehabilitation, community service, business travel arrangements
+  "emergency":        ["75250000", "75252000", "35110000"],   // fire/rescue, ambulance, firefighting equipment
+  "research":         ["73100000", "73200000", "72316000"],   // R&D, business consultancy, data analysis
+  "consulting":       ["73200000", "72224000", "72220000"],   // business consultancy, project management consulting, systems/tech consulting
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise<ProcurementData> {
@@ -1885,6 +1901,145 @@ function resolveSector(text: string): SectorResult {
       key: "energy",
       label: "Energy / retrofit / built-environment decarbonisation",
       terms: ["energy", "retrofit", "solar", "decarbonisation", "net zero", "energy efficiency", "low carbon", "sustainability"]
+    };
+  }
+
+  if (t.includes("it services") || t.includes("software") || t.includes("digital") ||
+      t.includes("cloud") || t.includes("cyber") || t.includes("g-cloud") ||
+      t.includes("data analytics") || t.includes("it infrastructure") || t.includes("saas")) {
+    return {
+      key: "digital",
+      label: "Digital, IT & technology",
+      terms: ["IT services", "software", "digital transformation", "cloud", "cyber security", "G-Cloud", "data analytics", "infrastructure", "SaaS", "ICT"]
+    };
+  }
+
+  if (t.includes("adult social care") || t.includes("domiciliary") ||
+      t.includes("residential care") || t.includes("care services") ||
+      t.includes("reablement") || t.includes("learning disability") || t.includes("care home")) {
+    return {
+      key: "social-care",
+      label: "Adult social care",
+      terms: ["adult social care", "domiciliary care", "residential care", "learning disability", "reablement", "supported living", "nursing home", "care services"]
+    };
+  }
+
+  if (t.includes("children") || t.includes("fostering") || t.includes("camhs") ||
+      t.includes("early years") || t.includes("looked after") || t.includes("youth services") ||
+      t.includes("young people") || t.includes("adoption")) {
+    return {
+      key: "childrens",
+      label: "Children's services",
+      terms: ["children's services", "fostering", "adoption", "CAMHS", "early years", "looked after children", "youth services", "safeguarding", "short breaks"]
+    };
+  }
+
+  if (t.includes("waste management") || t.includes("refuse") || t.includes("recycling") ||
+      t.includes("street cleansing") || t.includes("grounds maintenance") || t.includes("waste collection")) {
+    return {
+      key: "waste",
+      label: "Waste, environment & grounds",
+      terms: ["waste management", "refuse collection", "recycling", "street cleansing", "grounds maintenance", "composting", "environmental monitoring"]
+    };
+  }
+
+  if (t.includes("security guard") || t.includes("manned guarding") || t.includes("cctv") ||
+      t.includes("access control") || t.includes("event security") || t.includes("lone worker")) {
+    return {
+      key: "security",
+      label: "Security services",
+      terms: ["security guarding", "manned guarding", "CCTV", "access control", "event security", "lone worker", "key holding", "patrol services"]
+    };
+  }
+
+  if (t.includes("catering") || t.includes("school meals") || t.includes("food services") ||
+      t.includes("vending") || t.includes("hospital catering") || t.includes("meals on wheels")) {
+    return {
+      key: "catering",
+      label: "Catering & food services",
+      terms: ["catering services", "school meals", "hospital catering", "meals on wheels", "vending", "food services", "kitchen management"]
+    };
+  }
+
+  if (t.includes("legal services") || t.includes("solicitor") || t.includes("legal advice") ||
+      t.includes("litigation") || t.includes("barrister") || t.includes("legal counsel")) {
+    return {
+      key: "legal",
+      label: "Legal & professional services",
+      terms: ["legal services", "solicitor", "barrister", "litigation", "procurement advisory", "HR advisory", "management consultancy"]
+    };
+  }
+
+  if (t.includes("homelessness") || t.includes("housing support") || t.includes("rough sleeping") ||
+      t.includes("supported housing") || t.includes("refuge") || t.includes("temporary accommodation")) {
+    return {
+      key: "housing-support",
+      label: "Housing & homelessness support",
+      terms: ["homelessness prevention", "rough sleeping", "supported housing", "temporary accommodation", "refuge", "floating support", "housing advice"]
+    };
+  }
+
+  if (t.includes("external audit") || t.includes("internal audit") || t.includes("treasury") ||
+      t.includes("payroll") || t.includes("insurance services") || t.includes("council tax collection")) {
+    return {
+      key: "finance",
+      label: "Finance, audit & insurance",
+      terms: ["external audit", "internal audit", "treasury management", "payroll", "insurance", "banking", "debt recovery", "financial systems"]
+    };
+  }
+
+  if (t.includes("leisure management") || t.includes("leisure centre") || t.includes("library") ||
+      t.includes("arts services") || t.includes("museum") || t.includes("parks management") || t.includes("sports development")) {
+    return {
+      key: "leisure",
+      label: "Leisure, culture & parks",
+      terms: ["leisure management", "libraries", "arts & culture", "museums", "parks management", "sports development", "heritage"]
+    };
+  }
+
+  if (t.includes("planning consultancy") || t.includes("urban regeneration") || t.includes("economic development") ||
+      t.includes("masterplan") || t.includes("heritage conservation") || t.includes("transport planning")) {
+    return {
+      key: "planning",
+      label: "Planning, regeneration & economic development",
+      terms: ["planning consultancy", "urban regeneration", "economic development", "masterplanning", "heritage", "transport planning", "land development"]
+    };
+  }
+
+  if (t.includes("probation") || t.includes("prison") || t.includes("custody") ||
+      t.includes("youth justice") || t.includes("community safety") || t.includes("rehabilitation")) {
+    return {
+      key: "justice",
+      label: "Justice, probation & community safety",
+      terms: ["probation", "prison services", "custody", "youth justice", "community safety", "rehabilitation", "electronic monitoring"]
+    };
+  }
+
+  if (t.includes("police") || t.includes("fire service") || t.includes("ambulance") ||
+      t.includes("emergency planning") || t.includes("fire rescue") || t.includes("paramedic")) {
+    return {
+      key: "emergency",
+      label: "Emergency services",
+      terms: ["police", "fire & rescue", "ambulance", "paramedic", "emergency planning", "control room", "PPE emergency services"]
+    };
+  }
+
+  if (t.includes("policy evaluation") || t.includes("social research") || t.includes("research evaluation") ||
+      t.includes("public health research") || t.includes("epidemiology") || t.includes("deliberative")) {
+    return {
+      key: "research",
+      label: "Research, evaluation & data",
+      terms: ["social research", "policy evaluation", "public health research", "epidemiology", "data analytics", "consultation research", "market research"]
+    };
+  }
+
+  if (t.includes("management consulting") || t.includes("transformation consultancy") ||
+      t.includes("programme delivery") || t.includes("operating model") || t.includes("business case") ||
+      t.includes("central government") || t.includes("cabinet office")) {
+    return {
+      key: "consulting",
+      label: "Central government consulting & transformation",
+      terms: ["management consulting", "digital transformation", "programme delivery", "policy development", "operating model", "commercial advisory"]
     };
   }
 
@@ -6220,6 +6375,20 @@ initDb()
     if (RUN_WEB) {
       app.listen(PORT, () => {
         console.log(`[server] GovRevenue Agent running on port ${PORT}`);
+        // Warm up all live desk caches on startup — compile any that are cold or stale
+        for (const desk of DESK_PROFILES.filter(d => d.live)) {
+          getDeskCache(desk.slug)
+            .then(cached => {
+              const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+              if (isStale) {
+                console.log(`[desk] warm-up: compiling ${desk.slug}`);
+                compileDeskInBackground(desk).catch(err => captureError(err, { desk: { slug: desk.slug } }));
+              }
+            })
+            .catch(() => {
+              compileDeskInBackground(desk).catch(err => captureError(err, { desk: { slug: desk.slug } }));
+            });
+        }
       });
     } else {
       console.log("[server] web disabled by RUN_WEB=false");
