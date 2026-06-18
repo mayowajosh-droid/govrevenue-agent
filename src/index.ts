@@ -2980,7 +2980,7 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Hard FM",             keywords: ["hard fm", "mechanical", "electrical", "boiler", "heating", "hvac", "lift"],                    subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
       { label: "Soft FM",             keywords: ["soft fm", "cleaning", "catering", "security", "portering", "reception", "waste"],              subcategories: ["Cleaning","Catering","Security","Portering","Reception","Waste management","Mail room"] },
       { label: "Managed Services",    keywords: ["managed service", "total fm", "integrated", "outsourced", "facilities management"],            subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
-      { label: "Energy Management",   keywords: ["energy", "utilities", "metering", "sustainability", "carbon"],                                 subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
+      { label: "Energy Management",   keywords: ["energy management", "energy efficiency", "energy services", "utilities", "metering", "sustainability", "carbon"],   subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
       { label: "Compliance & Safety", keywords: ["compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing"],      subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
     ]
   },
