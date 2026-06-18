@@ -214,7 +214,9 @@ const intakeSchema = z.object({
   regionsToScan: z.string().optional().default(""),
   mainGoal: z.string().optional().default(""),
   biggestConcern: z.string().optional().default(""),
-  preferredOutput: z.string().optional().default("")
+  preferredOutput: z.string().optional().default(""),
+  frameworkStatus: z.string().optional().default(""),
+  lastPublicContract: z.string().optional().default("")
 });
 
 function nowIso() {
@@ -355,7 +357,9 @@ function buildKeywords(input: z.infer<typeof intakeSchema>): string[] {
     input.secondaryServices,
     input.idealBuyers,
     input.mainGoal,
-    input.preferredOutput
+    input.preferredOutput,
+    input.lastPublicContract,
+    input.frameworkStatus
   ]
     .join(" ")
     .toLowerCase();
@@ -653,11 +657,18 @@ function buildRegion(input: z.infer<typeof intakeSchema>) {
   const raw = `${input.regionsToScan} ${input.areasServed} ${input.location}`.toLowerCase();
   const regions: string[] = [];
 
-  if (raw.includes("west midlands") || raw.includes("birmingham")) regions.push("West Midlands");
-  if (raw.includes("london")) regions.push("London");
-  if (raw.includes("north west") || raw.includes("manchester")) regions.push("North West");
-  if (raw.includes("east midlands")) regions.push("East Midlands");
-  if (raw.includes("south east")) regions.push("South East");
+  if (raw.includes("west midlands") || raw.includes("birmingham") || raw.includes("coventry") || raw.includes("wolverhampton") || raw.includes("walsall") || raw.includes("sandwell")) regions.push("West Midlands");
+  if (raw.includes("london") || raw.includes("greater london")) regions.push("London");
+  if (raw.includes("north west") || raw.includes("manchester") || raw.includes("liverpool") || raw.includes("lancashire") || raw.includes("cheshire") || raw.includes("cumbria")) regions.push("North West");
+  if (raw.includes("east midlands") || raw.includes("nottingham") || raw.includes("leicester") || raw.includes("derby") || raw.includes("northampton") || raw.includes("lincoln")) regions.push("East Midlands");
+  if (raw.includes("south east") || raw.includes("kent") || raw.includes("surrey") || raw.includes("sussex") || raw.includes("hampshire") || raw.includes("oxford") || raw.includes("reading") || raw.includes("brighton")) regions.push("South East");
+  if (raw.includes("yorkshire") || raw.includes("sheffield") || raw.includes("leeds") || raw.includes("bradford") || raw.includes("hull") || raw.includes("york") || raw.includes("rotherham") || raw.includes("doncaster") || raw.includes("barnsley") || raw.includes("wakefield")) regions.push("Yorkshire and The Humber");
+  if (raw.includes("north east") || raw.includes("newcastle") || raw.includes("sunderland") || raw.includes("durham") || raw.includes("tyne") || raw.includes("gateshead") || raw.includes("middlesbrough") || raw.includes("stockton")) regions.push("North East");
+  if (raw.includes("east of england") || raw.includes("norfolk") || raw.includes("suffolk") || raw.includes("essex") || raw.includes("cambridge") || raw.includes("hertfordshire") || raw.includes("bedfordshire") || raw.includes("norwich") || raw.includes("ipswich")) regions.push("East of England");
+  if (raw.includes("south west") || raw.includes("bristol") || raw.includes("plymouth") || raw.includes("exeter") || raw.includes("devon") || raw.includes("cornwall") || raw.includes("somerset") || raw.includes("gloucester") || raw.includes("swindon") || raw.includes("dorset") || raw.includes("wiltshire")) regions.push("South West");
+  if (raw.includes("wales") || raw.includes("cardiff") || raw.includes("swansea") || raw.includes("newport") || raw.includes("welsh") || raw.includes("wrexham") || raw.includes("rhondda")) regions.push("Wales");
+  if (raw.includes("scotland") || raw.includes("edinburgh") || raw.includes("glasgow") || raw.includes("aberdeen") || raw.includes("dundee") || raw.includes("scottish") || raw.includes("highland") || raw.includes("stirling")) regions.push("Scotland");
+  if (raw.includes("northern ireland") || raw.includes("belfast") || raw.includes("ni council") || raw.includes("derry") || raw.includes("antrim") || raw.includes("armagh")) regions.push("Northern Ireland");
 
   return regions.length ? Array.from(new Set(regions)).join(",") : "";
 }
@@ -1508,7 +1519,9 @@ Company: ${input.companyName}
 Main services: ${input.mainServices}
 Secondary services: ${input.secondaryServices || "none"}
 Ideal buyers: ${input.idealBuyers || "public sector"}
-Main goal: ${input.mainGoal || "win public sector contracts"}`;
+Main goal: ${input.mainGoal || "win public sector contracts"}
+Framework access: ${input.frameworkStatus || "none stated"}
+Last public contract: ${input.lastPublicContract || "none stated"}`;
 
   const kwController = new AbortController();
   const kwTimer = setTimeout(() => kwController.abort(), 90_000);
@@ -1846,15 +1859,28 @@ function parseMoneyCap(input: any) {
 
 type SectorResult = { key: string; label: string; terms: string[] };
 
-// Single canonical sector resolver. Check order matters: social-housing and cleaning
-// must win before facilities/built-environment to prevent false reclassification.
+// Single canonical sector resolver. Check order matters: social-care and social-housing
+// must win before health/facilities to prevent ICB-buyer false reclassification.
 function resolveSector(text: string): SectorResult {
   const t = text.toLowerCase();
 
-  if (t.includes("nhs") || t.includes("integrated care") || t.includes("clinical commissioning") ||
-      t.includes("health trust") || t.includes("icb") || t.includes("mental health service") ||
-      t.includes("community health") || t.includes("primary care") || t.includes("public health commissioning") ||
-      t.includes("gp service") || t.includes("healthcare commissioning") || t.includes("nhs england")) {
+  if (t.includes("adult social care") || t.includes("domiciliary") || t.includes("domiciliary care") ||
+      t.includes("residential care") || t.includes("care services") || t.includes("personal care") ||
+      t.includes("home care") || t.includes("homecare") || t.includes("care provider") ||
+      t.includes("reablement") || t.includes("learning disability") || t.includes("care home") ||
+      t.includes("supported living") || t.includes("community care") || t.includes("care worker")) {
+    return {
+      key: "social-care",
+      label: "Adult social care",
+      terms: ["adult social care", "domiciliary care", "residential care", "learning disability", "reablement", "supported living", "nursing home", "care services", "personal care", "home care", "care provider"]
+    };
+  }
+
+  if (t.includes("nhs") || t.includes("integrated care board") || t.includes("integrated care system") ||
+      t.includes("clinical commissioning") || t.includes("health trust") || t.includes("icb") ||
+      t.includes("mental health service") || t.includes("community health") || t.includes("primary care") ||
+      t.includes("public health commissioning") || t.includes("gp service") ||
+      t.includes("healthcare commissioning") || t.includes("nhs england")) {
     return {
       key: "health",
       label: "Health & NHS commissioning",
@@ -1935,16 +1961,6 @@ function resolveSector(text: string): SectorResult {
       key: "digital",
       label: "Digital, IT & technology",
       terms: ["IT services", "software", "digital transformation", "cloud", "cyber security", "G-Cloud", "data analytics", "infrastructure", "SaaS", "ICT"]
-    };
-  }
-
-  if (t.includes("adult social care") || t.includes("domiciliary") ||
-      t.includes("residential care") || t.includes("care services") ||
-      t.includes("reablement") || t.includes("learning disability") || t.includes("care home")) {
-    return {
-      key: "social-care",
-      label: "Adult social care",
-      terms: ["adult social care", "domiciliary care", "residential care", "learning disability", "reablement", "supported living", "nursing home", "care services"]
     };
   }
 
@@ -2077,7 +2093,8 @@ function resolveSector(text: string): SectorResult {
 function resolveSectorFromInput(input: any): SectorResult {
   const text = [
     input?.companyName, input?.mainServices, input?.secondaryServices,
-    input?.mainGoal, input?.preferredOutput, input?.idealBuyers
+    input?.mainGoal, input?.preferredOutput, input?.idealBuyers,
+    input?.frameworkStatus, input?.lastPublicContract
   ].filter(Boolean).join(" ");
   return resolveSector(text);
 }
@@ -2087,6 +2104,7 @@ function resolveSectorFromScan(scan: any): SectorResult {
   const text = [
     input.companyName, input.mainServices, input.secondaryServices,
     input.idealBuyers, input.mainGoal, input.preferredOutput,
+    input.frameworkStatus, input.lastPublicContract,
     scan.company_name, scan.sector, scan.industry,
     scan.services, scan.main_services,
   ].filter(Boolean).join(" ");
@@ -2569,13 +2587,15 @@ Rules:
 
 ## 6. Buyer Watchlist
 Create a table:
-Buyer | Buyer type | Why they matter | Likely buying route | Evidence strength | Fit score | Next action
+Buyer | Buyer type | Current incumbent | Why they matter | Likely buying route | Evidence strength | Fit score | Next action
 
 Rules:
 - Verified buyers must come from pulled records or verified sources.
 - Strategic buyers are allowed only when labelled [Strategic target].
 - Do not invent named buyers.
 - For weak evidence reports, use cautious language such as monitor, validate or qualify.
+- The "Current incumbent" column must name the current holder where the pulled data includes an "Awarded supplier" field. Use the format "Incumbent: [name]" or "Not stated" if unknown. This is critical intelligence — do not leave it blank if an awarded supplier is in the data.
+- Where an incumbent appears in multiple awarded records, note the repeat win: "Incumbent: [name] (×3 awards)".
 
 ## 7. Bid Readiness Score
 Give:
@@ -3368,29 +3388,8 @@ function calcPremiumScores(scan: ScanRecord) {
     input.mainGoal
   ].join(" ").toLowerCase();
 
-  const construction = hasAny(serviceText, [
-    "construction",
-    "quantity surveying",
-    "cost management",
-    "project management",
-    "building surveying",
-    "estate",
-    "employer",
-    "contract administration",
-    "asset management"
-  ]);
-
-  const creative = hasAny(serviceText, [
-    "photography",
-    "creative",
-    "media",
-    "event",
-    "portrait",
-    "graduation",
-    "wedding",
-    "campaign",
-    "content"
-  ]);
+  const resolvedSector = resolveSectorFromScan(scan);
+  const hasSectorFocus = resolvedSector.key !== "general";
 
   const experience = lowerText(input.publicSectorExperience);
   const caseStudies = lowerText(input.caseStudies);
@@ -3406,8 +3405,7 @@ function calcPremiumScores(scan: ScanRecord) {
     48 +
       (openCount * 2.2) +
       (awardCount * 1.4) +
-      (construction ? 12 : 0) +
-      (creative ? 6 : 0)
+      (hasSectorFocus ? 12 : 0)
   );
 
   const evidenceStrength = clampScore(
@@ -3430,8 +3428,7 @@ function calcPremiumScores(scan: ScanRecord) {
     36 +
       (openCount * 2.4) +
       (awardCount * 1.8) +
-      (construction ? 15 : 0) +
-      (creative ? 7 : 0)
+      (hasSectorFocus ? 15 : 0)
   );
 
   const dataConfidence = clampScore(
@@ -3439,7 +3436,7 @@ function calcPremiumScores(scan: ScanRecord) {
       (openCount > 0 ? 22 : 0) +
       (awardCount > 0 ? 22 : 0) -
       (errorCount * 8) +
-      (construction || creative ? 12 : 0)
+      (hasSectorFocus ? 12 : 0)
   );
 
   const route =
@@ -3449,10 +3446,7 @@ function calcPremiumScores(scan: ScanRecord) {
         ? "Targeted bid + partner route"
         : "Partner/subcontract first";
 
-  const sector =
-    construction ? escapeHtml(resolveSectorFromScan(scan).label) :
-    creative ? "Creative, media and visual services" :
-    "Professional services";
+  const sector = escapeHtml(resolvedSector.label);
 
   return {
     sector,
@@ -5293,12 +5287,22 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
       <input name="publicSectorExperience" placeholder="e.g. 3 years, 6 active public contracts">
     </div>
     <div class="field">
+      <label>Last public contract won</label>
+      <textarea name="lastPublicContract" placeholder="e.g. 2yr cleaning contract, Birmingham City Council, £180k/yr, ended 2024"></textarea>
+      <div class="hint">Most recent win &mdash; buyer name, value, and date if known. Helps us assess your evidence grade.</div>
+    </div>
+    <div class="field">
       <label>Case studies or proof</label>
-      <textarea name="caseStudies" placeholder="e.g. 2yr cleaning contract with Birmingham City Council (2022&ndash;24), £180k/yr"></textarea>
+      <textarea name="caseStudies" placeholder="e.g. Delivered responsive repairs for housing association 2022&ndash;24, 94% satisfaction score"></textarea>
     </div>
     <div class="field">
       <label>Certifications / accreditations</label>
       <textarea name="certifications" placeholder="e.g. ISO 9001, Constructionline Gold, Living Wage employer"></textarea>
+    </div>
+    <div class="field">
+      <label>Framework access</label>
+      <textarea name="frameworkStatus" placeholder="e.g. On Crown Commercial Service RM6187, YPO cleaning framework — or none yet"></textarea>
+      <div class="hint">Framework memberships unlock fast-track contract routes. List any you hold or are applying for.</div>
     </div>
 
     <div class="section-label">Goals &amp; context</div>
@@ -5308,12 +5312,13 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
       <textarea name="mainGoal" placeholder="e.g. Win first NHS contract within 12 months"></textarea>
     </div>
     <div class="field">
-      <label>Biggest concern</label>
-      <textarea name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
-    </div>
-    <div class="field">
       <label>Preferred output</label>
       <textarea name="preferredOutput" placeholder="e.g. Focus on frameworks we can get on now, not long tender processes"></textarea>
+      <div class="hint">Tell us what kind of results matter most &mdash; this shapes the report focus.</div>
+    </div>
+    <div class="field">
+      <label>Biggest concern</label>
+      <textarea name="biggestConcern" placeholder="e.g. We keep losing to incumbents on price"></textarea>
     </div>
 
     <div class="submit-row">
@@ -5441,6 +5446,26 @@ function buyerInitials(buyer: string): string {
   return words.slice(0, 3).map(w => w[0].toUpperCase()).join("") || buyer.slice(0, 2).toUpperCase();
 }
 
+const AGGREGATOR_FRAGMENTS = [
+  "bip solutions", "palladium group", "palladium international",
+  "chic consortium", " ypo", "en procure", "enact procurement",
+  "the association of north east councils", "anec ",
+  "eastern shires purchasing", " espo",
+  "procurement hub", "pagabo",
+  "scape group", "scape procure",
+  "crescent purchasing", "crescent group",
+  "laser (kent)", "laser purchasing",
+  "pro-quote", "proactis",
+  "national procurement service",
+  "nhs supply chain",
+  "crown commercial service"
+];
+
+function isAggregatorBuyer(buyer: string): boolean {
+  const b = ` ${buyer.toLowerCase()} `;
+  return AGGREGATOR_FRAGMENTS.some(f => b.includes(f));
+}
+
 function fmtMoney(v: number): string {
   if (v >= 1_000_000_000) return `£${(v / 1_000_000_000).toFixed(2)}bn`;
   if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`;
@@ -5500,10 +5525,13 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       const db = new Date(b.publishedDate || b.awardedDate || 0).getTime();
       return db - da;
     });
+  const deskKeywords = profile.categories.flatMap(c => c.keywords);
   const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
   const openNotices = allOpen.filter(n => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
-    return t > cutoff365;
+    if (t <= cutoff365) return false;
+    const text = (n.title + " " + (n.description || "")).toLowerCase();
+    return deskKeywords.some(kw => text.includes(kw));
   }).slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
@@ -5531,6 +5559,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     buyerMap.set(n.buyer, e);
   }
   const topBuyers = [...buyerMap.entries()]
+    .filter(([buyer]) => !isAggregatorBuyer(buyer))
     .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
     .slice(0, 5);
 
@@ -5945,9 +5974,14 @@ function subPage(
     return allKw.some(kw => text.includes(kw));
   };
 
+  const matchTitle = (n: ProcurementNotice): boolean => {
+    const title = n.title.toLowerCase();
+    return allKw.some(kw => title.includes(kw));
+  };
+
   const allOpen = (data?.contractsFinder.open || [])
     .concat(data?.findTender?.notices || [])
-    .filter(matchNotice)
+    .filter(matchTitle)
     .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const allAwarded = (data?.contractsFinder.awarded || []).filter(matchNotice)
@@ -5962,6 +5996,7 @@ function subPage(
     buyerMap.set(n.buyer, e);
   }
   const topBuyers = [...buyerMap.entries()]
+    .filter(([buyer]) => !isAggregatorBuyer(buyer))
     .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
     .slice(0, 10);
 
@@ -6559,6 +6594,7 @@ function buyersPage(
   }
 
   const buyers = [...buyerMap.values()]
+    .filter(b => !isAggregatorBuyer(b.name))
     .sort((a, b) => b.totalSpend - a.totalSpend || b.awardedCount - a.awardedCount);
 
   const totalSpend = buyers.reduce((s, b) => s + b.totalSpend, 0);
