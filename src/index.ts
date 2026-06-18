@@ -5531,7 +5531,9 @@ const AGGREGATOR_FRAGMENTS = [
   // NEUPC / JISC / HEPCW (higher ed consortia)
   "neupc", "jisc procurement", "hepcw",
   // OJEU aggregators
-  "ojeu ltd"
+  "ojeu ltd",
+  // Cirrus Purchasing — procurement intermediary for social housing/FM
+  "cirrus purchasing"
 ];
 
 function isAggregatorBuyer(buyer: string): boolean {
