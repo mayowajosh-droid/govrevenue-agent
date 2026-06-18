@@ -5447,18 +5447,55 @@ function buyerInitials(buyer: string): string {
 }
 
 const AGGREGATOR_FRAGMENTS = [
-  "bip solutions", "palladium group", "palladium international",
-  "chic consortium", " ypo", "en procure", "enact procurement",
-  "the association of north east councils", "anec ",
-  "eastern shires purchasing", " espo",
+  // BIP / procurement portals
+  "bip solutions",
+  // Palladium
+  "palladium group", "palladium international", "palladium international limited",
+  // CHIC — Communities and Housing Investment Consortium
+  "chic consortium", "housing investment consortium",
+  // YPO
+  " ypo ", "yorkshire purchasing organisation",
+  // EN Procure / North East councils
+  "en procure", "enact procurement",
+  "the association of north east councils", "north east procurement",
+  // ESPO — Eastern Shires
+  "eastern shires purchasing", " espo ",
+  // Procurement Hub / Pagabo
   "procurement hub", "pagabo",
-  "scape group", "scape procure",
+  // Scape
+  "scape group", "scape procure", "scape framework",
+  // Crescent
   "crescent purchasing", "crescent group",
+  // Laser (Kent)
   "laser (kent)", "laser purchasing",
+  // Pro-quote / Proactis
   "pro-quote", "proactis",
+  // NHS Supply Chain (legal name: Supply Chain Coordination Limited)
+  "nhs supply chain", "supply chain coordination",
+  // NHS SBS
+  "nhs shared business services", "n h s shared business services",
+  // Crown Commercial Service
+  "crown commercial service",
+  // National Procurement Service
   "national procurement service",
-  "nhs supply chain",
-  "crown commercial service"
+  // Fusion21
+  "fusion21",
+  // LHC (London Housing Consortium)
+  "london housing consortium", " lhc group",
+  // NEPO (North East Procurement Organisation)
+  "north east procurement organisation", " nepo ",
+  // Advantage South West
+  "advantage south west",
+  // Procurement for Housing
+  "procurement for housing",
+  // Pro5 / Pro4 frameworks
+  " pro5 ", " pro4 ",
+  // Westworks / Pretium
+  "westworks procurement", "pretium frameworks",
+  // NEUPC / JISC / HEPCW (higher ed consortia)
+  "neupc", "jisc procurement", "hepcw",
+  // OJEU aggregators
+  "ojeu ltd"
 ];
 
 function isAggregatorBuyer(buyer: string): boolean {
