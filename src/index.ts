@@ -841,8 +841,13 @@ async function findTenderSearch(keywords: string[]): Promise<{ notices: Procurem
       if (notice) scored.push({ notice, score: matchCount });
     }
 
-    // highest keyword-match-count first so dedupe cap keeps the most relevant
-    scored.sort((a, b) => b.score - a.score);
+    // primary: most keyword matches; secondary: most recent date
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const da = new Date(a.notice.publishedDate || a.notice.awardedDate || 0).getTime();
+      const db = new Date(b.notice.publishedDate || b.notice.awardedDate || 0).getTime();
+      return db - da;
+    });
     const notices = scored.map(s => s.notice);
 
     return { notices: dedupeNotices(notices).map(notice => enrichNoticeQuality(notice, keywords)), errors };
@@ -899,7 +904,7 @@ function dedupeNotices(notices: ProcurementNotice[]) {
     output.push(notice);
   }
 
-  return output.slice(0, 60);
+  return output.slice(0, 300);
 }
 
 
@@ -1083,7 +1088,7 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
   return { points: [], illustrative: true };
 }
 
-const DESK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const DESK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 async function getDeskCache(slug: string): Promise<{ data: ProcurementData; cached_at: string } | null> {
   if (pool) {
@@ -1560,6 +1565,12 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
   const awarded: ProcurementNotice[] = [];
   const errors: string[] = [];
 
+  const now = new Date();
+  // Open notices: only pull from last 90 days so live signal stays fresh
+  const openPublishedFrom = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Awarded notices: last 18 months for meaningful buyer/value history
+  const awardedDateFrom = new Date(now.getTime() - 548 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const staticCriteria = {
     keyword: null as string | null,
     queryString: null,
@@ -1590,7 +1601,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     try {
       open.push(
         ...(await contractsFinderSearch(
-          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Open"] }, size: 10 },
+          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom }, size: 20 },
           keyword
         ))
       );
@@ -1602,7 +1613,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     try {
       awarded.push(
         ...(await contractsFinderSearch(
-          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Awarded"] }, size: 10 },
+          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom }, size: 20 },
           keyword
         ))
       );
@@ -1618,7 +1629,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     const cpvBase = { ...staticCriteria, cpvCodes };
     try {
       open.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"] }, size: 10 },
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom }, size: 20 },
         "cpv"
       )));
     } catch (error: any) {
@@ -1626,7 +1637,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     }
     try {
       awarded.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"] }, size: 10 },
+        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom }, size: 20 },
         "cpv"
       )));
     } catch (error: any) {
