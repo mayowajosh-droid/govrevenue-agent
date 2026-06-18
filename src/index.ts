@@ -1527,6 +1527,7 @@ const SECTOR_CPV: Record<string, string[]> = {
   "creative":          ["79342200", "79952000"],               // promotional, events
   "photography":       ["79962000"],
   "energy":            ["71314000", "50710000"],               // energy services, heating/ventilation maintenance
+  "health":            ["85100000", "85110000", "85140000", "85120000"],  // health services, hospital, misc health, medical practice
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise<ProcurementData> {
@@ -1809,6 +1810,17 @@ type SectorResult = { key: string; label: string; terms: string[] };
 // must win before facilities/built-environment to prevent false reclassification.
 function resolveSector(text: string): SectorResult {
   const t = text.toLowerCase();
+
+  if (t.includes("nhs") || t.includes("integrated care") || t.includes("clinical commissioning") ||
+      t.includes("health trust") || t.includes("icb") || t.includes("mental health service") ||
+      t.includes("community health") || t.includes("primary care") || t.includes("public health commissioning") ||
+      t.includes("gp service") || t.includes("healthcare commissioning") || t.includes("nhs england")) {
+    return {
+      key: "health",
+      label: "Health & NHS commissioning",
+      terms: ["NHS", "integrated care board", "clinical commissioning", "mental health", "community health", "primary care", "public health", "GP services", "healthcare", "NHS trust", "ICB", "health commissioning"]
+    };
+  }
 
   if (t.includes("social housing") || t.includes("housing maintenance") ||
       t.includes("responsive repairs") || t.includes("void") ||
@@ -2919,6 +2931,26 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "ict", "g-cloud", "digital outcomes"], subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
       { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "purchase order"],          subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
       { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market"],                                   subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
+    ]
+  },
+  {
+    slug: "health",
+    label: "Health & NHS",
+    standfirst: "NHS trusts, integrated care boards, community health, mental health, and public health commissioning across England.",
+    live: true,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "GovRevenue Desk",
+      mainServices: "NHS healthcare services integrated care clinical commissioning mental health community health public health primary care GP services",
+      idealBuyers: "NHS trusts integrated care boards ICBs NHS England clinical commissioning groups public health teams",
+      mainGoal: "find NHS and health commissioning contracts"
+    }),
+    categories: [
+      { label: "Acute & Hospital Services",         keywords: ["hospital", "acute trust", "secondary care", "nhs trust", "surgical", "diagnostics", "pathology"],         subcategories: ["Surgical services","Diagnostic imaging","Pathology","Outpatient services","Pharmacy supplies","Medical equipment","Hospital cleaning","Patient transport","Catering (acute)","Sterile services","Ward supplies","Prosthetics","Physiotherapy (acute)","Occupational therapy","Speech & language therapy"] },
+      { label: "Mental Health & Talking Therapies",  keywords: ["mental health", "talking therapies", "iapt", "counselling", "psychological", "wellbeing", "mhst"],        subcategories: ["IAPT/talking therapies","Crisis services","Community mental health teams","Child & adolescent mental health (CAMHS)","Eating disorders","Perinatal mental health","Forensic mental health","Mental health workforce","Supported accommodation (MH)","Recovery & employment support","Advocacy services"] },
+      { label: "Community & Primary Care",           keywords: ["primary care", "community health", "gp", "pcn", "primary care network", "district nursing", "health visiting"], subcategories: ["GP services","District nursing","Health visiting","Community physiotherapy","Community podiatry","Community cardiology","Primary care IT systems","Remote monitoring","Care navigation","Pharmacy (community)","Immunisation programmes","Cervical screening"] },
+      { label: "Public Health Commissioning",        keywords: ["public health", "health improvement", "prevention", "sexual health", "substance misuse", "tobacco", "obesity", "smoking cessation"], subcategories: ["Sexual health services","Stop smoking","Drug & alcohol services","Obesity & weight management","Health improvement programmes","Screening programmes","Epidemiology & surveillance","Healthy start schemes","Falls prevention","Social prescribing","Health inequalities"] },
+      { label: "Health Technology & Digital",        keywords: ["health technology", "nhs digital", "electronic patient record", "epr", "clinical system", "health informatics", "patient management"], subcategories: ["Electronic patient records (EPR)","Clinical decision support","Patient flow systems","NHS app integration","Wearables & remote monitoring","Health data analytics","Cyber security (NHS)","Clinical coding","Workforce management systems","Telemedicine","AI diagnostics"] },
+      { label: "Care Commissioning & Social Care",   keywords: ["care home", "residential care", "domiciliary", "supported living", "adult social care", "reablement", "extra care"], subcategories: ["Domiciliary care","Residential care homes","Nursing homes","Supported living","Extra care housing","Reablement services","Learning disability services","Autistic spectrum (residential)","Discharge-to-assess","Personal assistants","Direct payments support","Carer support services"] },
     ]
   }
 ];
@@ -5016,6 +5048,29 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
   res.type("html").send(deskPage(profile, cached));
 }));
 
+app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
+  if (!profile) { res.status(404).send("Desk not found"); return; }
+
+  let matchCat: DeskCategory | null = null;
+  let matchSub: string | null = null;
+  for (const cat of profile.categories) {
+    for (const s of cat.subcategories) {
+      if (slugify(s) === req.params.sub) { matchCat = cat; matchSub = s; break; }
+    }
+    if (matchCat) break;
+  }
+  if (!matchCat || !matchSub) { res.status(404).send("Subcategory not found"); return; }
+
+  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) {
+    compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+  }
+
+  res.type("html").send(subPage(profile, matchCat, matchSub, cached));
+}));
+
 app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || scan.status !== "completed") {
@@ -5062,6 +5117,10 @@ function fmtMoney(v: number): string {
   if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`;
   if (v >= 1_000) return `£${Math.round(v / 1_000)}k`;
   return `£${Math.round(v)}`;
+}
+
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function getCategoryIcon(label: string): string {
@@ -5265,7 +5324,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     const count = inferred?.count ?? 0;
     const more = cat.subcategories.length - 7;
     const subsHtml = cat.subcategories.map((s, i) =>
-      `<li${i >= 7 ? ' class="dm-sub-x" style="display:none"' : ""}>${escapeHtml(s)}</li>`
+      `<li${i >= 7 ? ' class="dm-sub-x" style="display:none"' : ""}><a href="/desk/${profile.slug}/sub/${slugify(s)}">${escapeHtml(s)}</a></li>`
     ).join("");
     const toggleHtml = more > 0
       ? `<button class="dm-more-btn" data-open="0" data-more="${more}" onclick="var x=this.closest('.dm-card').querySelectorAll('.dm-sub-x');var o=this.dataset.open==='1';x.forEach(e=>e.style.display=o?'none':'list-item');this.textContent=o?'+ '+this.dataset.more+' more':'Show less';this.dataset.open=o?'0':'1'">+ ${more} more</button>`
@@ -5407,6 +5466,8 @@ a{color:inherit;text-decoration:none}
 .dm-count{font-family:var(--mono);font-size:10.5px;color:var(--slate);font-weight:400;margin-top:3px;display:block}
 .dm-subs{list-style:none;font-size:12px;color:var(--slate);line-height:1.9;margin-top:4px}
 .dm-subs li{padding-left:0}
+.dm-subs a{color:var(--slate);text-decoration:none;border-bottom:1px solid var(--line-strong);transition:color .12s,border-color .12s}
+.dm-subs a:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .dm-more-btn{font-family:var(--mono);font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:6px 0 0;text-decoration:underline;text-decoration-color:var(--accent)44;display:block}
 .dm-more-btn:hover{text-decoration-color:var(--accent)}
 /* Sources bar */
@@ -5501,6 +5562,310 @@ a{color:inherit;text-decoration:none}
       <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener">Find a Tender &#8599;</a>
       <a class="dm-src-link" href="https://www.localspend.co.uk" target="_blank" rel="noopener">Local Authority Transparency &#8599;</a>
       <a class="dm-src-link" href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener">Companies House &#8599;</a>
+    </div>
+    <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
+  </div>
+</div>
+<div class="dm-foot-copy">&copy; GovRevenue</div>
+
+</body>
+</html>`;
+}
+
+function subPage(
+  profile: DeskProfile,
+  cat: DeskCategory,
+  subLabel: string,
+  cached: { data: ProcurementData; cached_at: string } | null
+): string {
+  const data = cached?.data;
+  const isCompiling = cached === null;
+
+  const stopWords = new Set(["and","&","the","a","of","for","in","to","with"]);
+  const subWords = subLabel.toLowerCase().split(/[\s&,\/\-]+/).filter(w => w.length > 2 && !stopWords.has(w));
+  const allKw = [...new Set([...subWords, ...cat.keywords])];
+
+  const matchNotice = (n: ProcurementNotice): boolean => {
+    const text = `${n.title} ${n.description || ""}`.toLowerCase();
+    return allKw.some(kw => text.includes(kw));
+  };
+
+  const allOpen = (data?.contractsFinder.open || [])
+    .concat(data?.findTender?.notices || [])
+    .filter(matchNotice)
+    .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
+
+  const allAwarded = (data?.contractsFinder.awarded || []).filter(matchNotice)
+    .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
+
+  const buyerMap = new Map<string, { awardedValue: number; count: number }>();
+  for (const n of (allAwarded as ProcurementNotice[]).concat(allOpen)) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, count: 0 };
+    e.count++;
+    e.awardedValue += n.awardedValue ?? 0;
+    buyerMap.set(n.buyer, e);
+  }
+  const topBuyers = [...buyerMap.entries()]
+    .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
+    .slice(0, 10);
+
+  const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+
+  const navLinks = DESK_PROFILES.map(d =>
+    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
+  ).join("");
+
+  const openRowsHtml = allOpen.slice(0, 30).map(n => {
+    const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
+    const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
+    return `<tr>
+      <td class="ls-title-cell"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
+      <td class="ls-buyer">${escapeHtml((n.buyer || "—").slice(0, 45))}</td>
+      <td class="ls-val">${escapeHtml(val)}</td>
+      <td class="ls-date">${escapeHtml(timeAgo(n.publishedDate || n.awardedDate))}</td>
+    </tr>`;
+  }).join("");
+
+  const awardedRowsHtml = allAwarded.slice(0, 25).map(n => {
+    const val = n.awardedValue && n.awardedValue > 0 ? fmtMoney(n.awardedValue) : "Not public";
+    return `<tr>
+      <td class="ls-title-cell"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
+      <td class="ls-buyer">${escapeHtml((n.buyer || "—").slice(0, 45))}</td>
+      <td class="ls-val">${escapeHtml(val)}</td>
+      <td class="ls-date">${escapeHtml(timeAgo(n.awardedDate || n.publishedDate))}</td>
+    </tr>`;
+  }).join("");
+
+  const buyerRowsHtml = topBuyers.map(([buyer, info]) => {
+    const orgType = buyerOrgType(buyer);
+    const tagClass = orgType === "HEALTH" ? "bw-tag-health" : orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : orgType === "CENTRAL GOV" ? "bw-tag-gov" : orgType === "HOUSING" ? "bw-tag-housing" : orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
+    const spend = info.awardedValue > 0 ? fmtMoney(info.awardedValue) : "—";
+    return `<div class="bw-row">
+      <div class="bw-avatar">${escapeHtml(buyerInitials(buyer))}</div>
+      <div class="bw-info">
+        <div class="bw-name">${escapeHtml(buyer.slice(0, 55))}</div>
+        ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
+        <div class="bw-meta"><span class="bw-spend">${escapeHtml(spend)}</span><span class="bw-meta-label"> awarded (12m)</span></div>
+        <div class="bw-meta"><span class="bw-meta-label">${info.count} ${info.count === 1 ? "notice" : "notices"}</span></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${escapeHtml(subLabel)} &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
+<style>
+:root{
+  --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
+  --accent:#9B2C2C;--slate:#5A6B7B;
+  --line:#1f262e1a;--line-strong:#0F141926;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.gh{background:var(--ink);color:var(--paper)}
+.gh-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
+.gh-logo b{color:#d97070}
+.gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
+.gh-nav{display:flex;overflow-x:auto;scrollbar-width:none}
+.gh-nav::-webkit-scrollbar{display:none}
+.gh-nav a{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;padding:0 16px;height:52px;display:flex;align-items:center;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.gh-nav a:hover{color:var(--paper)}
+.gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
+.gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
+.gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+.sub-mast{padding:52px 0 44px;border-bottom:1px solid var(--line-strong)}
+.sub-mast-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.sub-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sub-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
+.sub-crumb a:hover{color:var(--accent)}
+.sub-crumb-sep{color:var(--line-strong)}
+.sub-crumb-active{color:var(--ink)}
+.sub-mast h1{font-family:var(--serif);font-size:52px;line-height:1.0;letter-spacing:-.01em;text-transform:uppercase;margin-bottom:16px}
+.sub-lede{font-size:16px;color:var(--slate);line-height:1.65;margin-bottom:32px}
+.sub-lede strong{color:var(--ink)}
+.sub-stats{display:grid;grid-template-columns:repeat(3,1fr);max-width:540px;border:1px solid var(--line-strong)}
+.sub-stat{padding:20px 24px}
+.sub-stat:not(:last-child){border-right:1px solid var(--line-strong)}
+.sub-stat-val{display:block;font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.sub-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:6px}
+.sub-body{padding:56px 0}
+.sub-body-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.sub-two-col{display:grid;grid-template-columns:1fr 320px;gap:48px;margin-bottom:56px}
+.sub-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line-strong)}
+.sub-sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:6px}
+.sub-sec-count{font-family:var(--mono);font-size:11px;color:var(--slate)}
+.sub-awarded-sec{margin-bottom:56px}
+.sub-empty{font-size:14px;color:var(--slate);padding:28px 0;font-family:var(--mono)}
+.sub-cta-row{display:flex;align-items:center;gap:28px;padding:36px;border:1px solid var(--line-strong);background:var(--paper-2)}
+.sub-cta-text{font-family:var(--serif);font-size:17px;line-height:1.5;flex:1}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0}
+.ls-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+.ls-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 12px 0;border-bottom:1px solid var(--line-strong)}
+.ls-table td{padding:13px 8px 13px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.ls-title-cell{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ls-table a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
+.ls-table a:hover{text-decoration-color:var(--accent)}
+.ls-buyer{color:var(--slate);font-size:12.5px}
+.ls-val{font-family:var(--mono);font-size:12.5px;white-space:nowrap;text-align:right}
+.ls-date{font-family:var(--mono);font-size:12.5px;color:var(--slate);white-space:nowrap;text-align:right}
+.ls-th-r{text-align:right}
+.ls-foot{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:14px}
+.bw-row{display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--line)}
+.bw-row:last-of-type{border-bottom:none}
+.bw-avatar{width:40px;height:40px;border-radius:4px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:10px;display:flex;align-items:center;justify-content:center;letter-spacing:.04em;flex-shrink:0;margin-top:1px}
+.bw-info{flex:1;min-width:0}
+.bw-name{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block;margin-bottom:5px}
+.bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
+.bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
+.bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
+.bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
+.bw-tag-edu{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
+.bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.bw-meta{font-family:var(--mono);font-size:11px;color:var(--slate);line-height:1.65}
+.bw-spend{font-size:14px;color:var(--ink);font-family:var(--serif);font-weight:600;margin-right:2px}
+.bw-meta-label{font-size:11px;color:var(--slate)}
+.btn-cta{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:15px 24px;transition:.18s;flex-shrink:0}
+.btn-cta:hover{background:var(--accent)}
+.dm-sources-bar{background:var(--paper-2);border-top:1px solid var(--line-strong)}
+.dm-sources-inner{max-width:1280px;margin:0 auto;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.dm-sources-left{font-size:12.5px;color:var(--slate)}
+.dm-sources-right{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.dm-src-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-right:6px}
+.dm-src-link{font-family:var(--mono);font-size:11px;color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong);padding:0 6px}
+.dm-src-link:hover{color:var(--ink)}
+.dm-foot-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:12px 0 16px;border-top:1px solid var(--line)}
+@media(max-width:1100px){.sub-two-col{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .gh-tag,.gh-badge{display:none}
+  .sub-mast h1{font-size:36px}
+  .sub-stats{grid-template-columns:1fr 1fr}
+  .ls-val,.ls-date,.ls-buyer{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="gh">
+  <div class="gh-inner">
+    <div class="gh-brand">
+      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <span class="gh-tag">Public-sector revenue intelligence</span>
+    </div>
+    <nav class="gh-nav">${navLinks}</nav>
+    <div class="gh-badge">
+      <span>CF &middot; public record</span>
+      <span>Built for public trust</span>
+    </div>
+  </div>
+</header>
+
+<section class="sub-mast">
+  <div class="sub-mast-inner">
+    <div class="sub-crumb">
+      <a href="/desk/${profile.slug}">${escapeHtml(profile.label)}</a>
+      <span class="sub-crumb-sep">&rsaquo;</span>
+      <span>${escapeHtml(cat.label)}</span>
+      <span class="sub-crumb-sep">&rsaquo;</span>
+      <span class="sub-crumb-active">${escapeHtml(subLabel)}</span>
+    </div>
+    <h1>${escapeHtml(subLabel.toUpperCase())}</h1>
+    <p class="sub-lede">Public procurement activity for <strong>${escapeHtml(subLabel)}</strong> across the UK public sector.</p>
+    <div class="sub-stats">
+      <div class="sub-stat">
+        <span class="sub-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue) : "—"}</span>
+        <span class="sub-stat-label">Awarded value</span>
+      </div>
+      <div class="sub-stat">
+        <span class="sub-stat-val">${isCompiling ? "—" : String(allOpen.length)}</span>
+        <span class="sub-stat-label">Open opportunities</span>
+      </div>
+      <div class="sub-stat">
+        <span class="sub-stat-val">${isCompiling ? "—" : String(buyerMap.size)}</span>
+        <span class="sub-stat-label">Unique buyers</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sub-body">
+  <div class="sub-body-inner">
+    <div class="sub-two-col">
+      <div class="sub-col-main">
+        <div class="sub-sec-head">
+          <span class="sub-sec-eyebrow"><span class="live-dot"></span>&nbsp;Live Signal</span>
+          <span class="sub-sec-count">${isCompiling ? "compiling…" : `${allOpen.length} open`}</span>
+        </div>
+        ${isCompiling
+          ? `<p class="sub-empty">Compiling &mdash; check back in 90 seconds.</p>`
+          : allOpen.length > 0
+            ? `<table class="ls-table">
+                <thead><tr>
+                  <th>Notice</th><th>Buyer</th>
+                  <th class="ls-th-r">Value</th>
+                  <th class="ls-th-r">Posted</th>
+                </tr></thead>
+                <tbody>${openRowsHtml}</tbody>
+              </table>
+              ${allOpen.length > 30 ? `<p class="ls-foot">Showing 30 of ${allOpen.length} matched notices.</p>` : ""}`
+            : `<p class="sub-empty">No open opportunities found matching this subcategory. Data refreshes every 24 hours.</p>`
+        }
+      </div>
+      <div class="sub-col-side">
+        <div class="sub-sec-head">
+          <span class="sub-sec-eyebrow">Buyer Watchlist</span>
+          <span class="sub-sec-count">${isCompiling ? "&mdash;" : `${buyerMap.size} buyers`}</span>
+        </div>
+        ${isCompiling
+          ? `<p class="sub-empty">Compiling&hellip;</p>`
+          : topBuyers.length > 0
+            ? buyerRowsHtml
+            : `<p class="sub-empty">No buyers found yet.</p>`
+        }
+      </div>
+    </div>
+
+    ${!isCompiling && allAwarded.length > 0 ? `
+    <div class="sub-awarded-sec">
+      <div class="sub-sec-head">
+        <span class="sub-sec-eyebrow">Awarded Contracts</span>
+        <span class="sub-sec-count">${allAwarded.length} awarded</span>
+      </div>
+      <table class="ls-table">
+        <thead><tr>
+          <th>Notice</th><th>Buyer</th>
+          <th class="ls-th-r">Value</th>
+          <th class="ls-th-r">Awarded</th>
+        </tr></thead>
+        <tbody>${awardedRowsHtml}</tbody>
+      </table>
+      ${allAwarded.length > 25 ? `<p class="ls-foot">Showing 25 of ${allAwarded.length} matched awarded contracts.</p>` : ""}
+    </div>` : ""}
+
+    <div class="sub-cta-row">
+      <p class="sub-cta-text">Run a scan targeting <strong>${escapeHtml(subLabel)}</strong> to get a full commercial intelligence report and bid opportunities for your firm.</p>
+      <a class="btn-cta" href="/scan">RUN A SCAN &nbsp;&rarr;</a>
+    </div>
+  </div>
+</section>
+
+<div class="dm-sources-bar">
+  <div class="dm-sources-inner">
+    <span class="dm-sources-left">Public record. No insider information. Always verify on the source.</span>
+    <div class="dm-sources-right">
+      <span class="dm-src-label">SOURCES</span>
+      <a class="dm-src-link" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener">Contracts Finder &#8599;</a>
+      <a class="dm-src-link" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener">Find a Tender &#8599;</a>
     </div>
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
