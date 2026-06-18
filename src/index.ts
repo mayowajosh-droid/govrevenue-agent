@@ -3299,11 +3299,11 @@ async function refreshHomepageSignals(): Promise<void> {
       const deskKw = deskProfile ? deskProfile.categories.flatMap(c => c.keywords) : [];
       const relevant = deskKw.length > 0
         ? deduped.filter(n => {
-            const t = (n.title + " " + (n.description || "")).toLowerCase();
-            return deskKw.some(kw => t.includes(kw));
+            const title = n.title.toLowerCase();
+            return deskKw.some(kw => title.includes(kw));
           })
         : deduped;
-      const signalPool = relevant.length > 0 ? relevant : deduped;
+      const signalPool = relevant;
       const now = nowIso();
       const signals: HomepageSignal[] = signalPool.map(n => ({
         id: n.url || `${n.source}-${n.id}`,
