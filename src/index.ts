@@ -857,40 +857,60 @@ async function findTenderSearch(keywords: string[]): Promise<{ notices: Procurem
 }
 
 
-async function contractsFinderSearch(params: any, keyword: string) {
-  const endpoints = [
-    "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices/json",
-    "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices/JSON",
-    "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices"
-  ];
+const CF_ENDPOINTS = [
+  "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices/json",
+  "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices/JSON",
+  "https://www.contractsfinder.service.gov.uk/api/rest/2/search_notices"
+];
 
+async function contractsFinderPage(
+  searchCriteria: any,
+  keyword: string,
+  from: number,
+  size: number
+): Promise<{ notices: ProcurementNotice[]; total: number }> {
   let lastError = "";
-
-  for (const url of endpoints) {
+  for (const url of CF_ENDPOINTS) {
     try {
-      const response = await fetch(url, {
+      const resp = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json"
-        },
-        body: JSON.stringify(params)
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ searchCriteria, size, from })
       });
-
-      if (!response.ok) {
-        lastError = `${response.status} ${response.statusText}`;
-        continue;
-      }
-
-      const data = await response.json();
+      if (!resp.ok) { lastError = `${resp.status} ${resp.statusText}`; continue; }
+      const data = await resp.json();
       const list = Array.isArray(data.noticeList) ? data.noticeList : [];
-      return list.map((entry: any) => normaliseNotice(entry, keyword)).filter(Boolean) as ProcurementNotice[];
-    } catch (error: any) {
-      lastError = error?.message || String(error);
+      // CF returns maxResults = total matching notices in the full result set
+      const total: number = typeof data.maxResults === "number" ? data.maxResults : list.length + from;
+      const notices = list.map((e: any) => normaliseNotice(e, keyword)).filter(Boolean) as ProcurementNotice[];
+      return { notices, total };
+    } catch (err: any) {
+      lastError = err?.message || String(err);
     }
   }
-
   throw new Error(lastError || "Contracts Finder search failed");
+}
+
+// Paginates through CF until either all results within the date window are collected
+// or maxNotices is reached. Uses page size 100 (CF maximum).
+async function contractsFinderSearchAll(
+  searchCriteria: any,
+  keyword: string,
+  maxNotices = 500
+): Promise<ProcurementNotice[]> {
+  const PAGE_SIZE = 100;
+  const all: ProcurementNotice[] = [];
+  let from = 0;
+
+  while (all.length < maxNotices) {
+    const { notices, total } = await contractsFinderPage(searchCriteria, keyword, from, PAGE_SIZE);
+    all.push(...notices);
+    // Stop when: last page returned fewer than PAGE_SIZE, we've seen all results, or hit cap
+    if (notices.length < PAGE_SIZE || all.length >= total) break;
+    from += PAGE_SIZE;
+  }
+
+  return all.slice(0, maxNotices);
 }
 
 function dedupeNotices(notices: ProcurementNotice[]) {
@@ -1599,24 +1619,20 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     const base = { ...staticCriteria, keyword };
 
     try {
-      open.push(
-        ...(await contractsFinderSearch(
-          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom }, size: 20 },
-          keyword
-        ))
-      );
+      open.push(...(await contractsFinderSearchAll(
+        { ...base, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom },
+        keyword
+      )));
     } catch (error: any) {
       captureError(error, { dataPull: { source: "contracts_finder", status: "open", keyword } });
       errors.push(`Open search failed for "${keyword}": ${error?.message || error}`);
     }
 
     try {
-      awarded.push(
-        ...(await contractsFinderSearch(
-          { searchCriteria: { ...base, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom }, size: 20 },
-          keyword
-        ))
-      );
+      awarded.push(...(await contractsFinderSearchAll(
+        { ...base, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom },
+        keyword
+      )));
     } catch (error: any) {
       captureError(error, { dataPull: { source: "contracts_finder", status: "awarded", keyword } });
       errors.push(`Awarded search failed for "${keyword}": ${error?.message || error}`);
@@ -1628,16 +1644,16 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
   if (cpvCodes) {
     const cpvBase = { ...staticCriteria, cpvCodes };
     try {
-      open.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom }, size: 20 },
+      open.push(...(await contractsFinderSearchAll(
+        { ...cpvBase, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom },
         "cpv"
       )));
     } catch (error: any) {
       errors.push(`CPV open search failed: ${error?.message || error}`);
     }
     try {
-      awarded.push(...(await contractsFinderSearch(
-        { searchCriteria: { ...cpvBase, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom }, size: 20 },
+      awarded.push(...(await contractsFinderSearchAll(
+        { ...cpvBase, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom },
         "cpv"
       )));
     } catch (error: any) {
