@@ -3085,9 +3085,9 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Cloud & Hosting", keywords: ["cloud", "hosting", "g-cloud", "saas", "iaas", "paas", "azure", "aws"], subcategories: ["Cloud hosting","SaaS licensing","IaaS platforms","Azure / AWS","Disaster recovery","Managed cloud","Backup & storage","CDN services","Virtual desktop","Data centre colocation","Cloud migration","Hybrid cloud"] },
       { label: "Software & Licensing", keywords: ["software", "licence", "crm", "erp", "mis", "application", "platform"], subcategories: ["ERP systems","CRM platforms","MIS systems","HR software","Finance systems","Document management","Case management","GIS systems","Asset management software","Email & productivity","Planning software","Workforce management"] },
       { label: "Cyber Security", keywords: ["cyber", "security operations", "soc", "penetration", "vulnerability", "endpoint", "siem"], subcategories: ["Penetration testing","SOC services","Endpoint protection","Vulnerability assessment","SIEM platforms","GDPR compliance","Identity & access","Phishing simulation","Data loss prevention","Incident response","Threat intelligence","Security awareness training"] },
-      { label: "Networks & Infrastructure", keywords: ["network", "infrastructure", "broadband", "wifi", "connectivity", "fibre", "telecoms"], subcategories: ["Network infrastructure","Wi-Fi deployment","Connectivity services","Fibre installation","Telecoms","WAN/LAN","SD-WAN","Unified communications","Telephony systems","Public Wi-Fi","Smart city connectivity","MPLS"] },
+      { label: "Networks & Infrastructure", keywords: ["network", "it infrastructure", "ict infrastructure", "digital infrastructure", "broadband", "wifi", "connectivity", "fibre", "telecoms"], subcategories: ["Network infrastructure","Wi-Fi deployment","Connectivity services","Fibre installation","Telecoms","WAN/LAN","SD-WAN","Unified communications","Telephony systems","Public Wi-Fi","Smart city connectivity","MPLS"] },
       { label: "IT Support & Managed Services", keywords: ["it support", "managed service", "service desk", "helpdesk", "desktop support", "device"], subcategories: ["Service desk","Desktop support","Device procurement","Print management","ITSM platforms","IT outsourcing","Field support","Asset lifecycle","Patch management","IT training","Mobile device management","Field engineering"] },
-      { label: "Digital Transformation", keywords: ["digital transformation", "agile", "user research", "ux", "discovery", "data strategy"], subcategories: ["Digital strategy","User research","UX/UI design","Service design","Data strategy","Analytics platforms","Business intelligence","AI & automation","RPA","Open data","API development","Accessibility compliance"] },
+      { label: "Digital Transformation", keywords: ["digital transformation", "agile", "user research", "ux design", "discovery", "data strategy"], subcategories: ["Digital strategy","User research","UX/UI design","Service design","Data strategy","Analytics platforms","Business intelligence","AI & automation","RPA","Open data","API development","Accessibility compliance"] },
     ]
   },
   { slug: "social-care", label: "Adult Social Care", standfirst: "Domiciliary care, residential placements, learning disability, reablement, and carer support commissioned by councils and ICBs.", live: true,
@@ -5535,7 +5535,9 @@ const AGGREGATOR_FRAGMENTS = [
   // Cirrus Purchasing — procurement intermediary for social housing/FM
   "cirrus purchasing",
   // PROSPER — housing association procurement consortium (framework aggregator)
-  " prosper "
+  " prosper ",
+  // IN-TEND — e-tendering portal provider, appears as buyer on notices it manages
+  "in-tend limited", "intend limited"
 ];
 
 function isAggregatorBuyer(buyer: string): boolean {
