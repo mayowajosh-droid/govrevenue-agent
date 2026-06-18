@@ -2831,7 +2831,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "facilities",
     label: "Facilities",
     standfirst: "Hard and soft FM, mechanical and electrical maintenance, and managed services across the public estate.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "facilities management hard FM soft FM mechanical electrical maintenance managed services",
@@ -2850,7 +2850,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "education",
     label: "Education & Skills",
     standfirst: "Schools, further education, skills and training procurement across local authorities, academy trusts, DfE and colleges.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "school refurbishment education technology learning management training skills courses further education academy",
@@ -2869,7 +2869,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "transport",
     label: "Transport & SEND",
     standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "passenger transport SEND home to school transport community transport special educational needs",
@@ -2887,7 +2887,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "recruitment",
     label: "Recruitment",
     standfirst: "Temporary and permanent staffing frameworks across the NHS, councils, and central government.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "recruitment temporary staffing agency workers permanent placement managed service provider",
@@ -2906,7 +2906,7 @@ const DESK_PROFILES: DeskProfile[] = [
     slug: "frameworks",
     label: "Frameworks",
     standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
-    live: false,
+    live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
       mainServices: "framework agreement dynamic purchasing system DPS call-off contract multi-provider",
@@ -5208,10 +5208,10 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
           </tr></thead>
           <tbody>${openNotices.map(n => {
             const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
-            const val = rawVal != null ? fmtMoney(rawVal) : "—";
+            const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
             const ago = timeAgo(n.publishedDate || n.awardedDate);
             return `<tr>
-              <td><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 72))}</a></td>
+              <td class="ls-title-cell"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 90))}</a></td>
               <td class="ls-buyer">${escapeHtml((n.buyer || "—").slice(0, 38))}</td>
               <td class="ls-val">${escapeHtml(val)}</td>
               <td class="ls-date">${escapeHtml(ago)}</td>
@@ -5327,57 +5327,58 @@ a{color:inherit;text-decoration:none}
 /* Three panels */
 .dp-panels{border-bottom:1px solid var(--line-strong)}
 .dp-panels-inner{max-width:1220px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:5fr 4fr 3fr;border-left:1px solid var(--line-strong)}
-.dp-panel{padding:32px 28px;border-right:1px solid var(--line-strong)}
-.dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.dp-panel{padding:44px 40px;border-right:1px solid var(--line-strong)}
+.dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .dp-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--slate)}
 .dp-info{font-size:13px;color:var(--slate);cursor:help;margin-left:4px}
-.dp-caveat-sm{font-size:13px;color:var(--slate);line-height:1.65;margin-bottom:14px}
-.dp-caveat-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.dp-caveat-sm{font-size:13px;color:var(--slate);line-height:1.7;margin-bottom:18px}
+.dp-caveat-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}
 .dp-link-sm{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
 .dp-link-sm:hover{text-decoration-color:var(--accent)}
-.dp-bars-head{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);margin:20px 0 12px}
+.dp-bars-head{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);margin:28px 0 18px}
 .dp-bars-sub{text-transform:none;letter-spacing:0;font-size:10.5px}
-.dp-map-link{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--accent);margin-top:12px;text-decoration:underline;text-decoration-color:var(--accent)44}
+.dp-map-link{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--accent);margin-top:16px;text-decoration:underline;text-decoration-color:var(--accent)44}
 .dp-map-link:hover{text-decoration-color:var(--accent)}
 /* Demand stats */
-.dp-stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line-strong);margin:14px 0 4px}
-.dp-stat{padding:14px 12px}
+.dp-stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line-strong);margin:18px 0 6px}
+.dp-stat{padding:20px 16px}
 .dp-stat:not(:last-child){border-right:1px solid var(--line-strong)}
-.dp-val{display:block;font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
-.dp-stat-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:4px}
+.dp-val{display:block;font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.dp-stat-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:7px}
 /* Bar rows */
-.dp-bar-row{display:grid;grid-template-columns:1fr 80px 60px;gap:8px;align-items:center;margin-bottom:9px}
-.dp-bar-label{font-size:12px;color:var(--ink)}
+.dp-bar-row{display:grid;grid-template-columns:1fr 80px 64px;gap:10px;align-items:center;margin-bottom:13px}
+.dp-bar-label{font-size:12.5px;color:var(--ink)}
 .dp-bar-track{height:4px;background:var(--line-strong);border-radius:2px}
 .dp-bar-fill{height:4px;background:var(--accent);border-radius:2px}
-.dp-bar-val{font-family:var(--mono);font-size:11px;color:var(--slate);text-align:right}
+.dp-bar-val{font-family:var(--mono);font-size:11.5px;color:var(--slate);text-align:right}
 /* Live signal */
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;margin-right:2px}
-.ls-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
-.ls-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 6px 8px 0;border-bottom:1px solid var(--line-strong)}
-.ls-table td{padding:9px 6px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.ls-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.ls-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 10px 0;border-bottom:1px solid var(--line-strong)}
+.ls-table td{padding:12px 8px 12px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.ls-title-cell{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ls-table a{color:var(--accent);text-decoration:underline;text-decoration-color:var(--accent)44}
 .ls-table a:hover{text-decoration-color:var(--accent)}
-.ls-buyer{color:var(--slate);font-size:11.5px}
-.ls-val{font-family:var(--mono);font-size:11.5px;white-space:nowrap;text-align:right}
-.ls-date{font-family:var(--mono);font-size:11.5px;color:var(--slate);white-space:nowrap;text-align:right}
+.ls-buyer{color:var(--slate);font-size:12px}
+.ls-val{font-family:var(--mono);font-size:12px;white-space:nowrap;text-align:right}
+.ls-date{font-family:var(--mono);font-size:12px;color:var(--slate);white-space:nowrap;text-align:right}
 .ls-th-r{text-align:right}
-.ls-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:12px}
+.ls-foot{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:16px}
 /* Buyer watchlist */
-.bw-row{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.bw-row{display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--line)}
 .bw-row:last-of-type{border-bottom:none}
-.bw-avatar{width:34px;height:34px;border-radius:3px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9.5px;font-weight:500;display:flex;align-items:center;justify-content:center;letter-spacing:.04em;flex-shrink:0;margin-top:1px}
+.bw-avatar{width:38px;height:38px;border-radius:3px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9.5px;font-weight:500;display:flex;align-items:center;justify-content:center;letter-spacing:.04em;flex-shrink:0;margin-top:1px}
 .bw-info{flex:1;min-width:0}
-.bw-name{font-size:12.5px;font-weight:500;line-height:1.3;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bw-tag{font-family:var(--mono);font-size:9px;letter-spacing:.05em;padding:2px 5px;border-radius:2px;display:inline-block;margin-bottom:4px}
+.bw-name{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-tag{font-family:var(--mono);font-size:9px;letter-spacing:.05em;padding:2px 6px;border-radius:2px;display:inline-block;margin-bottom:5px}
 .bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
 .bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
 .bw-tag-gov{background:#f3efe8;color:#6b4f1d;border:1px solid #6b4f1d33}
 .bw-tag-housing{background:#f0eef7;color:#5b21b6;border:1px solid #5b21b633}
 .bw-tag-edu{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
 .bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
-.bw-meta{font-family:var(--mono);font-size:10.5px;color:var(--slate);line-height:1.5}
-.bw-spend{font-size:13px;color:var(--ink);font-family:var(--serif);font-weight:600;margin-right:2px}
+.bw-meta{font-family:var(--mono);font-size:11px;color:var(--slate);line-height:1.6}
+.bw-spend{font-size:14px;color:var(--ink);font-family:var(--serif);font-weight:600;margin-right:2px}
 .bw-meta-label{font-size:10.5px;color:var(--slate)}
 .bw-sample{font-weight:400;opacity:.55;letter-spacing:.03em}
 /* Demand map */
