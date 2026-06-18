@@ -5697,7 +5697,7 @@ a{color:inherit;text-decoration:none}
 .chip-amber{border-color:#a9793244;color:#a97932}
 /* Global header */
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
@@ -5710,8 +5710,8 @@ a{color:inherit;text-decoration:none}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
 /* Masthead */
-.dm-mast{padding:64px 0 60px;border-bottom:1px solid var(--line-strong)}
-.dm-mast-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:1fr 360px;gap:72px;align-items:start}
+.dm-mast{padding:80px 0 72px;border-bottom:1px solid var(--line-strong)}
+.dm-mast-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:1fr 360px;gap:72px;align-items:start}
 .dm-mast-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
 .dm-mast h1{font-family:var(--serif);font-size:64px;line-height:1.0;letter-spacing:-.01em;text-transform:uppercase;margin-bottom:20px}
 .dm-mast-lede{font-size:17px;color:var(--slate);line-height:1.7;margin-bottom:20px}
@@ -5722,8 +5722,8 @@ a{color:inherit;text-decoration:none}
 .btn-cta:hover{background:var(--accent)}
 /* Three panels */
 .dp-panels{border-bottom:1px solid var(--line-strong)}
-.dp-panels-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:5fr 4fr 3fr;border-left:1px solid var(--line-strong)}
-.dp-panel{padding:52px 48px;border-right:1px solid var(--line-strong)}
+.dp-panels-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:5fr 4fr 3fr;border-left:1px solid var(--line-strong)}
+.dp-panel{padding:64px 60px;border-right:1px solid var(--line-strong)}
 .dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate)}
 .dp-info{font-size:13px;color:var(--slate);cursor:help;margin-left:4px}
@@ -5737,7 +5737,7 @@ a{color:inherit;text-decoration:none}
 .dp-map-link:hover{text-decoration-color:var(--accent)}
 /* Demand stats */
 .dp-stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line-strong);margin:22px 0 8px}
-.dp-stat{padding:24px 20px}
+.dp-stat{padding:28px 24px}
 .dp-stat:not(:last-child){border-right:1px solid var(--line-strong)}
 .dp-val{display:block;font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1.05}
 .dp-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:8px}
@@ -5779,15 +5779,15 @@ a{color:inherit;text-decoration:none}
 .bw-sample{font-weight:400;opacity:.55;letter-spacing:.03em}
 /* Demand map */
 .dm-section{padding:64px 0;border-bottom:1px solid var(--line-strong)}
-.dm-section-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.dm-section-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .dm-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .dm-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
 .dm-title-info{font-size:13px;color:var(--slate);cursor:help;margin-left:5px}
 .dm-sub{font-size:13px;color:var(--slate);margin-bottom:28px}
 .dm-open-all{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--slate);border:1px solid var(--line-strong);padding:6px 14px;cursor:pointer;background:var(--paper);transition:.15s}
 .dm-open-all:hover{border-color:var(--ink);color:var(--ink)}
-.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
-.dm-card{border:1px solid var(--line-strong);padding:24px 22px 20px;background:var(--paper-2);transition:border-color .15s,background .15s;cursor:default}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+.dm-card{border:1px solid var(--line-strong);padding:28px 26px 24px;background:var(--paper-2);transition:border-color .15s,background .15s;cursor:default}
 .dm-card:hover{border-color:#0B0F1440;background:#F0ECE2}
 .dm-card-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
 .dm-icon-wrap{flex-shrink:0;width:36px;height:36px;background:var(--paper);border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;padding:7px;color:var(--slate)}
@@ -5803,7 +5803,7 @@ a{color:inherit;text-decoration:none}
 .dm-more-btn:hover{text-decoration-color:var(--accent)}
 /* Sources bar */
 .dm-sources-bar{background:var(--paper-2);border-top:1px solid var(--line-strong)}
-.dm-sources-inner{max-width:1280px;margin:0 auto;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.dm-sources-inner{max-width:1440px;margin:0 auto;padding:16px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .dm-sources-left{font-size:12.5px;color:var(--slate)}
 .dm-sources-right{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .dm-src-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-right:6px}
@@ -5833,7 +5833,7 @@ a{color:inherit;text-decoration:none}
 <header class="gh">
   <div class="gh-inner">
     <div class="gh-brand">
-      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
       <span class="gh-tag">Public-sector revenue intelligence</span>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
@@ -6007,7 +6007,7 @@ function subPage(
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
@@ -6020,7 +6020,7 @@ a{color:inherit;text-decoration:none}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
 .sub-mast{padding:52px 0 44px;border-bottom:1px solid var(--line-strong)}
-.sub-mast-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.sub-mast-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .sub-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sub-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
 .sub-crumb a:hover{color:var(--accent)}
@@ -6035,7 +6035,7 @@ a{color:inherit;text-decoration:none}
 .sub-stat-val{display:block;font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .sub-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:6px}
 .sub-body{padding:56px 0}
-.sub-body-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.sub-body-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .sub-two-col{display:grid;grid-template-columns:1fr 320px;gap:48px;margin-bottom:56px}
 .sub-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line-strong)}
 .sub-sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:6px}
@@ -6074,7 +6074,7 @@ a{color:inherit;text-decoration:none}
 .btn-cta{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:15px 24px;transition:.18s;flex-shrink:0}
 .btn-cta:hover{background:var(--accent)}
 .dm-sources-bar{background:var(--paper-2);border-top:1px solid var(--line-strong)}
-.dm-sources-inner{max-width:1280px;margin:0 auto;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.dm-sources-inner{max-width:1440px;margin:0 auto;padding:16px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .dm-sources-left{font-size:12.5px;color:var(--slate)}
 .dm-sources-right{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .dm-src-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);margin-right:6px}
@@ -6095,7 +6095,7 @@ a{color:inherit;text-decoration:none}
 <header class="gh">
   <div class="gh-inner">
     <div class="gh-brand">
-      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
       <span class="gh-tag">Public-sector revenue intelligence</span>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
@@ -6221,7 +6221,7 @@ function pageShellCss(): string {
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1280px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
+.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
 .gh-logo b{color:#d97070}
@@ -6234,7 +6234,7 @@ a{color:inherit;text-decoration:none}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
 .pg-mast{padding:48px 0 40px;border-bottom:1px solid var(--line-strong)}
-.pg-mast-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.pg-mast-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .pg-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pg-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
 .pg-crumb a:hover{color:var(--accent)}
@@ -6247,7 +6247,7 @@ a{color:inherit;text-decoration:none}
 .pg-stat-val{display:block;font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .pg-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:5px}
 .pg-body{padding:48px 0 64px}
-.pg-body-inner{max-width:1280px;margin:0 auto;padding:0 40px}
+.pg-body-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block}
 .bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
 .bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
@@ -6257,7 +6257,7 @@ a{color:inherit;text-decoration:none}
 .bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
 .pg-empty{font-family:var(--mono);font-size:13px;color:var(--slate);padding:40px 0}
 .pg-foot{background:var(--paper-2);border-top:1px solid var(--line-strong)}
-.pg-foot-inner{max-width:1280px;margin:0 auto;padding:14px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
+.pg-foot-inner{max-width:1440px;margin:0 auto;padding:14px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
 .pg-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:10px 0 14px;border-top:1px solid var(--line)}
 @media(max-width:760px){.gh-tag,.gh-badge{display:none}.pg-mast h1{font-size:32px}.pg-stats{width:100%}}`;
 }
@@ -6269,7 +6269,7 @@ function pageShellHeader(profile: DeskProfile): string {
   return `<header class="gh">
   <div class="gh-inner">
     <div class="gh-brand">
-      <span class="gh-logo">Gov<b>Revenue</b></span>
+      <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
       <span class="gh-tag">Public-sector revenue intelligence</span>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
