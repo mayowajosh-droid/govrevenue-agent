@@ -2904,74 +2904,7 @@ function startAlertWorker() {
 }
 
 
-const SIGNAL_CATEGORIES: Array<{
-  key: string;
-  label: string;
-  input: z.infer<typeof intakeSchema>;
-}> = [
-  {
-    key: "housing-maintenance",
-    label: "Housing maintenance",
-    input: intakeSchema.parse({
-      companyName: "GovRevenue Signal Fetch",
-      mainServices: "housing maintenance void works repairs responsive maintenance",
-      idealBuyers: "local councils housing associations",
-      mainGoal: "find housing maintenance contracts"
-    })
-  },
-  {
-    key: "cleaning-facilities",
-    label: "Cleaning & facilities",
-    input: intakeSchema.parse({
-      companyName: "GovRevenue Signal Fetch",
-      mainServices: "cleaning facilities management janitorial services",
-      idealBuyers: "councils NHS trusts schools",
-      mainGoal: "find cleaning contracts"
-    })
-  },
-  {
-    key: "construction-pm",
-    label: "Construction PM",
-    input: intakeSchema.parse({
-      companyName: "GovRevenue Signal Fetch",
-      mainServices: "construction project management site management capital works",
-      idealBuyers: "local authorities housing associations",
-      mainGoal: "find construction management contracts"
-    })
-  },
-  {
-    key: "passenger-transport",
-    label: "Passenger transport",
-    input: intakeSchema.parse({
-      companyName: "GovRevenue Signal Fetch",
-      mainServices: "passenger transport bus services community transport",
-      idealBuyers: "councils transport authorities",
-      mainGoal: "find transport contracts"
-    })
-  },
-  {
-    key: "recruitment-staffing",
-    label: "Recruitment & staffing",
-    input: intakeSchema.parse({
-      companyName: "GovRevenue Signal Fetch",
-      mainServices: "recruitment temporary staffing agency workers",
-      idealBuyers: "public sector NHS councils",
-      mainGoal: "find recruitment contracts"
-    })
-  }
-];
-
-const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  SIGNAL_CATEGORIES.map(c => [c.key, c.label])
-);
-
-const DESK_MAPPING: Array<{ tag: string; category: string }> = [
-  { tag: "Government", category: "housing-maintenance" },
-  { tag: "Finance",    category: "recruitment-staffing" },
-  { tag: "Business",   category: "cleaning-facilities" },
-  { tag: "Economics",  category: "construction-pm" },
-  { tag: "Technology", category: "passenger-transport" },
-];
+// SIGNAL_CATEGORIES and CATEGORY_LABELS are defined after DESK_PROFILES below
 
 type DeskCategory = {
   label: string;
@@ -3313,6 +3246,14 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   }
 ];
+
+const SIGNAL_CATEGORIES: Array<{ key: string; label: string; input: z.infer<typeof intakeSchema> }> =
+  DESK_PROFILES.filter(d => d.live).map(d => ({ key: d.slug, label: d.label, input: d.pinnedProfile }));
+
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  SIGNAL_CATEGORIES.map(c => [c.key, c.label])
+);
+
 
 function renderDeskCard(sig: HomepageSignal, tag: string): string {
   const dateStr = sig.notice_date
@@ -4577,7 +4518,7 @@ app.get("/", asyncRoute(async (_req, res) => {
     queryLatestSignals(12).catch(() => [] as HomepageSignal[]),
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
-    queryDeskSignals(DESK_MAPPING.map(d => d.category)).catch(() => new Map<string, HomepageSignal>()),
+    queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
     queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true }))
   ]);
 
@@ -4840,13 +4781,12 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   <div class="wrap">
     <div class="section-head"><h2>The desks</h2><a href="/desk/construction">All desks &rarr;</a></div>
     <div class="desk-grid">
-      ${DESK_MAPPING.map(d => {
-        const sig = deskSignals.get(d.category);
+      ${DESK_PROFILES.filter(d => d.live).map(d => {
+        const sig = deskSignals.get(d.slug);
         return sig
-          ? renderDeskCard(sig, d.tag)
-          : `<article class="desk reveal"><div class="tag"><em>${escapeHtml(d.tag)}</em><time>—</time></div><h3>${escapeHtml(CATEGORY_LABELS[d.category] || d.category)} — scanning</h3><p>Data loads on next hourly refresh.</p><div class="src">Source: Contracts Finder &middot; FTS</div></article>`;
+          ? renderDeskCard(sig, d.label)
+          : `<article class="desk reveal"><div class="tag"><em>${escapeHtml(d.label)}</em><time>—</time></div><h3>${escapeHtml(d.label)} — scanning</h3><p>Signals load on first hourly refresh.</p><div class="src">Source: Contracts Finder &middot; FTS</div></article>`;
       }).join("")}
-      <article class="desk reveal"><div class="tag"><em>AI</em><time>Jun 2026</time></div><h3>Why a procurement agent must show its sources or stay quiet</h3><p>Confident paragraphs over weak public data are a liability, not intelligence. Inside the red-team layer that strips overclaiming.</p><div class="src">Source: GovRevenue architecture</div></article>
     </div>
   </div>
 </section>
