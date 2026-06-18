@@ -5752,7 +5752,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
             ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
             <div class="bw-meta">
               <span class="bw-spend">${escapeHtml(spend)}</span>
-              <span class="bw-meta-label"> Est. spend (12m)</span>
+              <span class="bw-meta-label"> Est. annual spend</span>
             </div>
             <div class="bw-meta"><span class="bw-meta-label">Active notices: ${activeCount}</span></div>
           </div>
@@ -6121,7 +6121,7 @@ function subPage(
       <div class="bw-info">
         <div class="bw-name">${escapeHtml(buyer.slice(0, 55))}</div>
         ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
-        <div class="bw-meta"><span class="bw-spend">${escapeHtml(spend)}</span><span class="bw-meta-label"> awarded (12m)</span></div>
+        <div class="bw-meta"><span class="bw-spend">${escapeHtml(spend)}</span><span class="bw-meta-label"> awarded past year</span></div>
         <div class="bw-meta"><span class="bw-meta-label">${info.count} ${info.count === 1 ? "notice" : "notices"}</span></div>
       </div>
     </div>`;
