@@ -4530,7 +4530,10 @@ app.get("/", asyncRoute(async (_req, res) => {
     : "<span><b>FTS</b> Illustrative signal &middot; data loads on first refresh</span>".repeat(6);
 
   // Hero card values
-  const heroCategory = isLive ? (CATEGORY_LABELS[heroSignal!.category] || heroSignal!.category) : "Housing maintenance";
+  const heroCategory = isLive
+    ? (CATEGORY_LABELS[heroSignal!.category] ||
+       heroSignal!.category.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
+    : "Housing maintenance";
   const heroTitle = isLive ? heroSignal!.title.slice(0, 80) : "Responsive maintenance framework — West Midlands";
   const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Local Authority Buyer";
   const heroSource = isLive ? heroSignal!.source : "CF";
