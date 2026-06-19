@@ -5206,6 +5206,29 @@ app.post("/admin/scans/:id/delete", requireAdmin, asyncRoute(async (req, res) =>
   res.redirect(`/admin/scans?token=${encodeURIComponent(token)}`);
 }));
 
+app.post("/admin/scans/bulk-delete", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token || req.body?.token || "");
+  const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  await Promise.all(ids.map(id => deleteScan(id).catch(() => {})));
+  res.redirect(`/admin/scans?token=${encodeURIComponent(token)}`);
+}));
+
+app.post("/admin/scans/bulk-rerun", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token || req.body?.token || "");
+  const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const results: string[] = [];
+  for (const id of ids) {
+    const existing = await getScan(id).catch(() => null);
+    if (!existing?.input_json) continue;
+    const parsed = intakeSchema.safeParse(existing.input_json);
+    if (!parsed.success) continue;
+    const newScan = await createScan(parsed.data);
+    await enqueueScan(newScan.id, parsed.data);
+    results.push(newScan.id);
+  }
+  res.redirect(`/admin/scans?token=${encodeURIComponent(token)}&reran=${results.length}`);
+}));
+
 
 app.get("/api/scans/:id/relevance.json", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
@@ -7380,31 +7403,100 @@ app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
 app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const scans = await listScans();
   const token = String(req.query.token || "");
+  const reran = req.query.reran ? `<p style="color:#1d6b4f;font-family:monospace;font-size:13px">${escapeHtml(String(req.query.reran))} scan(s) re-queued.</p>` : "";
 
   res.type("html").send(`<!doctype html>
 <html lang="en">
-<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
-<h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">GovRevenue Scans</h1>
-<table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1120px">
-<tr><th>Created</th><th>Company</th><th>Status</th><th>Open</th><th>Data</th><th>Delete</th></tr>
-${scans
-  .map(
-    s =>
-      `<tr>
-        <td>${escapeHtml(formatDate(s.created_at))}</td>
-        <td>${escapeHtml(s.company_name)}</td>
-        <td>${escapeHtml(s.status)}</td>
-        <td><a href="/scan/${s.id}">Open</a></td>
-        <td><a href="/api/scans/${s.id}/data.json">Data</a></td>
-        <td>
-          <form method="POST" action="/admin/scans/${s.id}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this scan permanently?');">
-            <button style="background:#9b2d20;color:#fff;border:0;padding:7px 10px;cursor:pointer">Delete</button>
-          </form>
-        </td>
-      </tr>`
-  )
-  .join("")}
+<head>
+<meta charset="UTF-8">
+<title>Admin — GovRevenue Scans</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px}
+h1{font-family:'Spectral','Iowan Old Style',Georgia,serif;font-size:28px;margin-bottom:20px}
+#action-bar{display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:36px}
+#sel-count{font-size:13px;font-family:monospace;color:#5A6B7B}
+.btn{font-family:monospace;font-size:12px;letter-spacing:.04em;padding:8px 16px;border:0;cursor:pointer;display:none}
+.btn-delete{background:#9b2d20;color:#fff}
+.btn-rerun{background:#1d6b4f;color:#fff}
+.btn.visible{display:inline-block}
+table{border-collapse:collapse;width:100%;max-width:1200px;background:#fff}
+th,td{padding:10px 12px;border:1px solid #ddd;font-size:13px;text-align:left;vertical-align:middle}
+th{background:#f3efe8;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5A6B7B}
+tr:hover td{background:#faf8f3}
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#9B2C2C}
+.status-completed{color:#1d6b4f;font-weight:600}
+.status-failed{color:#9b2d20;font-weight:600}
+.status-running,.status-pending{color:#b45309}
+a{color:#9B2C2C;text-decoration:underline;text-underline-offset:2px}
+</style>
+</head>
+<body>
+<h1>GovRevenue — Scans</h1>
+${reran}
+<div id="action-bar">
+  <span id="sel-count">0 selected</span>
+  <button class="btn btn-rerun" id="btn-rerun" onclick="bulkAction('rerun')">Re-run selected</button>
+  <button class="btn btn-delete" id="btn-delete" onclick="bulkAction('delete')">Delete selected</button>
+</div>
+<form id="bulk-form" method="POST" style="display:none">
+  <input type="hidden" name="token" value="${escapeHtml(token)}">
+  <div id="bulk-ids"></div>
+</form>
+<table>
+<thead><tr>
+  <th><input type="checkbox" id="chk-all" title="Select all"></th>
+  <th>Created</th><th>Company</th><th>Status</th><th>Open</th><th>Data</th><th>Delete</th>
+</tr></thead>
+<tbody>
+${scans.map(s => `<tr>
+  <td><input type="checkbox" class="row-chk" value="${escapeHtml(s.id)}"></td>
+  <td>${escapeHtml(formatDate(s.created_at))}</td>
+  <td>${escapeHtml(s.company_name)}</td>
+  <td class="status-${escapeHtml(s.status)}">${escapeHtml(s.status)}</td>
+  <td><a href="/scan/${escapeHtml(s.id)}" target="_blank">Open</a></td>
+  <td><a href="/api/scans/${escapeHtml(s.id)}/data.json" target="_blank">Data</a></td>
+  <td><form method="POST" action="/admin/scans/${escapeHtml(s.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this scan?')"><button style="background:#9b2d20;color:#fff;border:0;padding:6px 10px;cursor:pointer;font-size:12px">Delete</button></form></td>
+</tr>`).join("")}
+</tbody>
 </table>
+<script>
+const chkAll = document.getElementById('chk-all');
+const selCount = document.getElementById('sel-count');
+const btnRerun = document.getElementById('btn-rerun');
+const btnDelete = document.getElementById('btn-delete');
+
+function getChecked(){ return [...document.querySelectorAll('.row-chk:checked')].map(c=>c.value); }
+
+function updateBar(){
+  const n = getChecked().length;
+  selCount.textContent = n + ' selected';
+  btnRerun.classList.toggle('visible', n > 0);
+  btnDelete.classList.toggle('visible', n > 0);
+}
+
+chkAll.addEventListener('change', function(){
+  document.querySelectorAll('.row-chk').forEach(c=>{ c.checked = this.checked; });
+  updateBar();
+});
+
+document.querySelectorAll('.row-chk').forEach(c => c.addEventListener('change', function(){
+  chkAll.checked = document.querySelectorAll('.row-chk:not(:checked)').length === 0;
+  updateBar();
+}));
+
+function bulkAction(action){
+  const ids = getChecked();
+  if (!ids.length) return;
+  if (action === 'delete' && !confirm('Delete ' + ids.length + ' scan(s) permanently?')) return;
+  if (action === 'rerun' && !confirm('Re-run ' + ids.length + ' scan(s)?')) return;
+  const form = document.getElementById('bulk-form');
+  form.action = '/admin/scans/bulk-' + action + '?token=${escapeHtml(token)}';
+  const container = document.getElementById('bulk-ids');
+  container.innerHTML = ids.map(id => '<input type="hidden" name="ids[]" value="' + id + '">').join('');
+  form.submit();
+}
+</script>
 </body>
 </html>`);
 }));
