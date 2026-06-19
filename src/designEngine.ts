@@ -74,8 +74,8 @@ function chartSvg(option: any, width = 760, height = 330) {
     backgroundColor: "transparent",
     animation: false,
     textStyle: {
-      fontFamily: "Arial",
-      color: "#24140F"
+      fontFamily: '"Inter","Helvetica Neue",Arial,sans-serif',
+      color: "#0B0F14"
     },
     ...option
   });
@@ -108,7 +108,7 @@ function trustFunnelChart(trust: TrustLayer) {
       data: ["Pulled", "Relevant", "Verified", "Inferred", "Strategic", "Excluded noise"],
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: "#24140F", fontWeight: 700 }
+      axisLabel: { color: "#0B0F14", fontWeight: 700 }
     },
     series: [
       {
@@ -125,7 +125,7 @@ function trustFunnelChart(trust: TrustLayer) {
           show: true,
           position: "right",
           formatter: "{c}",
-          color: "#24140F",
+          color: "#0B0F14",
           fontWeight: 700
         },
         itemStyle: {
@@ -164,7 +164,7 @@ function valueLensChart(trust: TrustLayer) {
       data: ["Pulled value", "Relevant value", "Addressable signal", "Capacity cap"],
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: "#24140F", fontWeight: 700 }
+      axisLabel: { color: "#0B0F14", fontWeight: 700 }
     },
     series: [
       {
@@ -179,12 +179,12 @@ function valueLensChart(trust: TrustLayer) {
           show: true,
           position: "right",
           formatter: (params: any) => moneyFmt(params.value),
-          color: "#24140F",
+          color: "#0B0F14",
           fontWeight: 700
         },
         itemStyle: {
           borderRadius: [0, 8, 8, 0],
-          color: "#24140F"
+          color: "#0B0F14"
         },
         barWidth: 22
       }
@@ -211,7 +211,7 @@ function trustCompositionChart(trust: TrustLayer) {
         label: {
           formatter: "{b}: {c}",
           fontSize: 12,
-          color: "#24140F"
+          color: "#0B0F14"
         },
         itemStyle: {
           borderColor: "#FFF9EF",
@@ -281,7 +281,7 @@ function premiumCss() {
     <style>
       .apple-report-system {
         margin: 30px 0;
-        color: #24140F;
+        color: #0B0F14;
       }
 
       .apple-hero {
@@ -318,7 +318,7 @@ function premiumCss() {
 
       .apple-hero h2 {
         max-width: 720px;
-        font-family: Georgia, serif;
+        font-family: "Spectral","Iowan Old Style",Georgia,serif;
         font-size: 46px;
         line-height: .98;
         margin: 0 0 16px;
@@ -363,7 +363,7 @@ function premiumCss() {
 
       .apple-metric strong {
         display: block;
-        font-family: Georgia, serif;
+        font-family: "Spectral","Iowan Old Style",Georgia,serif;
         font-size: 25px;
         line-height: 1.05;
         margin-bottom: 8px;
@@ -406,10 +406,10 @@ function premiumCss() {
       }
 
       .apple-context-card {
-        background: #24140F;
+        background: #0B0F14;
         color: #FFF9EF;
         padding: 20px;
-        border: 1px solid #24140F;
+        border: 1px solid #0B0F14;
       }
 
       .apple-context-card p {
@@ -430,7 +430,7 @@ function premiumCss() {
       }
 
       .apple-section-head h3 {
-        font-family: Georgia, serif;
+        font-family: "Spectral","Iowan Old Style",Georgia,serif;
         font-size: 22px;
         line-height: 1.12;
         margin: 0 0 14px;
@@ -461,7 +461,7 @@ function premiumCss() {
       }
 
       .apple-source-table th {
-        background: #24140F;
+        background: #0B0F14;
         color: #FFF9EF;
         text-align: left;
       }
@@ -471,7 +471,7 @@ function premiumCss() {
         padding: 4px 8px;
         border-radius: 999px;
         background: #F0E2C7;
-        color: #24140F;
+        color: #0B0F14;
         font-size: 10px;
         font-weight: 900;
         white-space: nowrap;

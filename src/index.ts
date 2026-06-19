@@ -4180,7 +4180,7 @@ function reportPage(scan: ScanRecord) {
 
     .score-card {
       border:1px solid var(--line);
-      background:#fffaf3;
+      background:var(--paper);
       padding:14px;
       min-height:132px;
     }
@@ -4385,7 +4385,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .marketing-close p {
-      color:#f3eadc;
+      color:var(--cream);
       font-size:15px;
     }
 
@@ -4404,7 +4404,7 @@ function reportPage(scan: ScanRecord) {
 
     .close-grid b {
       display:block;
-      color:#d2b88f;
+      color:var(--line);
       font-size:12px;
       text-transform:uppercase;
       letter-spacing:.08em;
@@ -4834,7 +4834,7 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .chartband{background:var(--paper);border-bottom:1px solid var(--line-strong);padding:74px 0}
 .chartband .wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
 .chartband h2{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.015em;margin:14px 0 16px;line-height:1.1}
-.chartband p{color:#3a444d;font-size:16px;max-width:30em;margin-bottom:18px}
+.chartband p{color:var(--slate);font-size:16px;max-width:30em;margin-bottom:18px}
 .chartband ul{list-style:none;font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;color:var(--slate)}
 .chartband li{padding:8px 0;border-bottom:1px dashed var(--line)}
 .chartband li b{color:var(--ink)}
@@ -4882,7 +4882,7 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .subscribe{padding:80px 0;text-align:center;background:var(--paper-2)}
 .subscribe .eyebrow{margin-bottom:14px}
 .subscribe h2{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.015em;margin-bottom:14px}
-.subscribe p{color:#3a444d;max-width:34em;margin:0 auto 28px;font-size:16.5px}
+.subscribe p{color:var(--slate);max-width:34em;margin:0 auto 28px;font-size:16.5px}
 .subform{display:flex;max-width:460px;margin:0 auto;border:1px solid var(--ink)}
 .subform input{flex:1;border:0;padding:15px 16px;font-family:var(--mono);font-size:14px;background:#fff}
 .subform input:focus{outline:2px solid var(--accent);outline-offset:-2px}
@@ -5310,16 +5310,7 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
   const scan = await createScan(parsed.data);
   await enqueueScan(scan.id, parsed.data);
 
-  res.type("html").send(`
-    <body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
-      <div style="max-width:760px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:28px">
-        <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">Scan started</h1>
-        <p>ID: <code>${scan.id}</code></p>
-        <p><a href="/scan/${scan.id}">Open scan status page</a></p>
-        <p>Refresh the page in 1-3 minutes.</p>
-      </div>
-    </body>
-  `);
+  res.redirect(302, `/scan/${scan.id}`);
 }));
 
 app.post("/api/scans", asyncRoute(async (req, res) => {
@@ -5395,8 +5386,8 @@ app.get("/scan", (req, res) => {
   const deskProfile = deskParam ? DESK_PROFILES.find(d => d.slug === deskParam) : null;
 
   const contextBannerHtml = deskProfile
-    ? `<div style="background:#f0f5ff;border:1px solid #3a5bb844;padding:14px 18px;margin-bottom:28px;font-size:13.5px;line-height:1.6">
-        <strong style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#3a5bb8">From the ${escapeHtml(deskProfile.label)} desk</strong>
+    ? `<div style="background:var(--paper-2);border:1px solid var(--line-strong);padding:14px 18px;margin-bottom:28px;font-size:13.5px;line-height:1.6">
+        <strong style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">From the ${escapeHtml(deskProfile.label)} desk</strong>
         ${buyerParam ? `<br>Buyer context: <strong>${escapeHtml(buyerParam)}</strong>` : ""}
         ${noticeIdParam ? `<br><span style="font-family:var(--mono);font-size:11px;color:var(--slate)">Notice ref: ${escapeHtml(noticeIdParam)}</span>` : ""}
         <br><span style="font-size:12px;color:var(--slate)">Fill in your firm details below for a personalised fit check against this desk&rsquo;s opportunities.</span>
@@ -5433,7 +5424,7 @@ header{border-bottom:1px solid var(--line-strong);padding:0 32px}
 .page-head{margin-bottom:40px;border-bottom:1px solid var(--line-strong);padding-bottom:28px}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
 h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:12px}
-.sub{color:#3a444d;font-size:16px;line-height:1.5}
+.sub{color:var(--slate);font-size:16px;line-height:1.5}
 .form-grid{display:grid;gap:0}
 .field{padding:18px 0;border-bottom:1px solid var(--line-strong)}
 .field:last-of-type{border-bottom:0}
@@ -6407,7 +6398,8 @@ a{color:inherit;text-decoration:none}
 .sub-empty{font-size:14px;color:var(--slate);padding:28px 0;font-family:var(--mono)}
 .sub-cta-row{display:flex;align-items:center;gap:28px;padding:36px;border:1px solid var(--line-strong);background:var(--paper-2)}
 .sub-cta-text{font-family:var(--serif);font-size:17px;line-height:1.5;flex:1}
-.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;animation:ldpulse 2.4s ease-in-out infinite}
+@keyframes ldpulse{0%{box-shadow:0 0 0 0 #1d6b4f55}70%{box-shadow:0 0 0 6px #1d6b4f00}100%{box-shadow:0 0 0 0 #1d6b4f00}}
 .ls-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
 .ls-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 12px 0;border-bottom:1px solid var(--line-strong)}
 .ls-table td{padding:13px 8px 13px 0;border-bottom:1px solid var(--line);vertical-align:top}
@@ -7431,7 +7423,7 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
       }
 
       body {
-        background: #f3eadc !important;
+        background: var(--cream) !important;
       }
 
       main {
