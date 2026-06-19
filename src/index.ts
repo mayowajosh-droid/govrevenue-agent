@@ -5224,7 +5224,7 @@ app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
     res.status(404).json({ error: "Procurement data not found or not ready yet." });
     return;
   }
-  res.json(scan.procurement_json);
+  res.json({ input: scan.input_json ?? null, ...scan.procurement_json });
 }));
 
 app.get("/scan", (req, res) => {
