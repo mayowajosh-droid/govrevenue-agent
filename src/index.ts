@@ -1201,22 +1201,39 @@ async function queryChaseableStats(): Promise<ChaseStats> {
 }
 
 type ChartDataPoint = { month: string; total_m: number };
-async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean }> {
+async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrative: boolean; topDesk: string | null }> {
   if (pool) {
-    const r = await pool.query<ChartDataPoint>(
-      `SELECT to_char(date_trunc('month', notice_date), 'Mon') AS month,
-              ROUND(SUM(COALESCE(value_amount, 0)) / 1e6::numeric, 2)::float AS total_m
-       FROM homepage_signals
-       WHERE notice_date > NOW() - INTERVAL '12 months'
-         AND notice_date <= NOW()
-         AND value_amount IS NOT NULL
-         AND value_amount > 0
-       GROUP BY date_trunc('month', notice_date)
-       ORDER BY date_trunc('month', notice_date)`
-    );
-    return { points: r.rows, illustrative: r.rows.length < 3 };
+    const [r, topR] = await Promise.all([
+      pool.query<ChartDataPoint>(
+        `SELECT to_char(date_trunc('month', notice_date), 'Mon') AS month,
+                ROUND(SUM(COALESCE(value_amount, 0)) / 1e6::numeric, 2)::float AS total_m
+         FROM homepage_signals
+         WHERE notice_date > NOW() - INTERVAL '12 months'
+           AND notice_date <= NOW()
+           AND value_amount IS NOT NULL
+           AND value_amount > 0
+         GROUP BY date_trunc('month', notice_date)
+         ORDER BY date_trunc('month', notice_date)`
+      ),
+      pool.query<{ category: string }>(
+        `SELECT category
+         FROM homepage_signals
+         WHERE notice_date > NOW() - INTERVAL '12 months'
+           AND notice_date <= NOW()
+           AND value_amount IS NOT NULL
+           AND value_amount > 0
+         GROUP BY category
+         ORDER BY SUM(value_amount) DESC
+         LIMIT 1`
+      ),
+    ]);
+    return {
+      points: r.rows,
+      illustrative: r.rows.length < 3,
+      topDesk: topR.rows[0]?.category ?? null,
+    };
   }
-  return { points: [], illustrative: true };
+  return { points: [], illustrative: true, topDesk: null };
 }
 
 const DESK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -4625,7 +4642,7 @@ app.get("/", asyncRoute(async (_req, res) => {
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
     queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
-    queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true })),
+    queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true, topDesk: null })),
     queryChaseableSignals(6).catch(() => [] as HomepageSignal[]),
     queryChaseableStats().catch(() => ({ totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] }) as ChaseStats),
   ]);
@@ -4695,19 +4712,32 @@ app.get("/", asyncRoute(async (_req, res) => {
   const chartMaxVal = chartResult.illustrative
     ? 4.6
     : parseFloat((Math.max(...chartPoints) * 1.15).toFixed(2));
-  const chartTrendPct = chartPoints.length >= 2 && chartPoints[0] > 0
-    ? Math.round(((chartFinalVal - chartPoints[0]) / chartPoints[0]) * 100)
+  // Compare 3-month trailing average vs 3-month opening average for a stable trend signal.
+  const first3Avg = chartPoints.length >= 3
+    ? chartPoints.slice(0, 3).reduce((a, b) => a + b, 0) / 3
+    : chartPoints[0] ?? 0;
+  const last3Avg = chartPoints.length >= 3
+    ? chartPoints.slice(-3).reduce((a, b) => a + b, 0) / 3
+    : chartFinalVal;
+  const chartTrendPct = first3Avg > 0
+    ? Math.round(((last3Avg - first3Avg) / first3Avg) * 100)
     : 34;
   const chartStep = parseFloat((Math.max(chartFinalVal / 35, 0.01)).toFixed(3));
   const chartTick1 = parseFloat((chartMinVal + (chartMaxVal - chartMinVal) / 3).toFixed(1));
   const chartTick2 = parseFloat((chartMinVal + 2 * (chartMaxVal - chartMinVal) / 3).toFixed(1));
+  const trendLabel = chartResult.illustrative
+    ? 'illustrative'
+    : `${chartTrendPct >= 0 ? '+' : ''}${chartTrendPct}% · 3-month avg vs 12mo ago`;
+  const topDeskLabel = chartResult.topDesk
+    ? `Led by <b>${escapeHtml(chartResult.topDesk)}</b> this period`
+    : 'Across all 24 active desks';
   const chartBullets = chartResult.illustrative
     ? `<li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
         <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
         <li><b>Entry window</b> &middot; illustrative 18-month renewal window</li>`
-    : `<li><b>Aggregate spend</b> &middot; live trend ${chartTrendPct >= 0 ? '+' : ''}${chartTrendPct}% / ${chartPoints.length}mo</li>
-        <li><b>Re-let signal</b> &middot; framework expiry clusters tracked</li>
-        <li><b>Entry window</b> &middot; 18-month renewal windows monitored</li>`;
+    : `<li><b>Awarded spend</b> &middot; ${trendLabel}</li>
+        <li>${topDeskLabel}</li>
+        <li><b>Re-let signal</b> &middot; framework expiry clusters tracked</li>`;
 
   const sampleLink = samplePdfUrl
     ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
@@ -4933,16 +4963,17 @@ ${oppCardCss()}
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
-      <div class="eyebrow">Category signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
+      <div class="eyebrow">All-desk spend signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
       <h2>Watch the money move before the tender does.</h2>
       <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
       <ul>
         ${chartBullets}
       </ul>
+      ${!chartResult.illustrative ? `<a href="/desks" style="display:inline-block;margin-top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid currentColor;padding-bottom:2px">Browse all desks &rarr;</a>` : ''}
     </div>
     <div class="chartwrap">
       <div class="ch-head">
-        <span class="lab">Recurring category spend &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
+        <span class="lab">UK public-sector awarded &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
         <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
