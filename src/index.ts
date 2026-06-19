@@ -948,6 +948,30 @@ function dedupeNotices(notices: ProcurementNotice[]) {
   return output;
 }
 
+// Second-pass dedup: collapse framework lots that share the exact same title+buyer.
+// Sorts by deadline (earliest first) so the most urgent lot is kept.
+// Also deduplicates by URL for cross-source (CF + FTS) overlaps.
+function dedupeNoticesSoft(notices: ProcurementNotice[]): ProcurementNotice[] {
+  const byDeadline = [...notices].sort((a, b) => {
+    const da = a.deadlineDate ? new Date(a.deadlineDate).getTime() : Infinity;
+    const db = b.deadlineDate ? new Date(b.deadlineDate).getTime() : Infinity;
+    return da - db;
+  });
+  const seenUrl = new Set<string>();
+  const seenTitleBuyer = new Set<string>();
+  const out: ProcurementNotice[] = [];
+  for (const n of byDeadline) {
+    const urlKey = n.url || "";
+    if (urlKey && seenUrl.has(urlKey)) continue;
+    if (urlKey) seenUrl.add(urlKey);
+    const tbKey = `${n.title.trim().toLowerCase()}|||${(n.buyer || "").trim().toLowerCase()}`;
+    if (seenTitleBuyer.has(tbKey)) continue;
+    seenTitleBuyer.add(tbKey);
+    out.push(n);
+  }
+  return out;
+}
+
 
 
 
@@ -5764,14 +5788,15 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const isCompiling = cached === null;
   const data = cached?.data;
 
-  const allOpen = (data?.contractsFinder.open || []).concat(data?.findTender?.notices || [])
-    .sort((a, b) => {
-      const da = new Date(a.publishedDate || a.awardedDate || 0).getTime();
-      const db = new Date(b.publishedDate || b.awardedDate || 0).getTime();
-      return db - da;
-    });
   const deskKeywords = profile.categories.flatMap(c => c.keywords);
   const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
+  const allOpen = dedupeNoticesSoft(
+    (data?.contractsFinder.open || []).concat(data?.findTender?.notices || [])
+  ).sort((a, b) => {
+    const da = new Date(a.publishedDate || a.awardedDate || 0).getTime();
+    const db = new Date(b.publishedDate || b.awardedDate || 0).getTime();
+    return db - da;
+  });
   const allMatchingOpen = allOpen.filter(n => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
     if (t <= cutoff365) return false;
@@ -6514,10 +6539,11 @@ function subPage(
     return cat.keywords.some(kw => title.includes(kw));
   };
 
-  const allOpen = (data?.contractsFinder.open || [])
-    .concat(data?.findTender?.notices || [])
-    .filter(matchTitle)
-    .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
+  const allOpen = dedupeNoticesSoft(
+    (data?.contractsFinder.open || [])
+      .concat(data?.findTender?.notices || [])
+      .filter(matchTitle)
+  ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const allAwarded = (data?.contractsFinder.awarded || []).filter(matchNotice)
     .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
@@ -7151,10 +7177,11 @@ function noticesPage(
   const isCompiling = cached === null;
 
   const boardKw = profile.categories.flatMap(c => c.keywords);
-  const allOpen = (data?.contractsFinder.open || [])
-    .concat(data?.findTender?.notices || [])
-    .filter(n => !isAggregatorBuyer(n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
-    .sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
+  const allOpen = dedupeNoticesSoft(
+    (data?.contractsFinder.open || [])
+      .concat(data?.findTender?.notices || [])
+      .filter(n => !isAggregatorBuyer(n.buyer || "") && boardKw.some(kw => n.title.toLowerCase().includes(kw)))
+  ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
 
   const allAwarded = (data?.contractsFinder.awarded || [])
     .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
@@ -7393,7 +7420,7 @@ function buyersPage(
   const data = cached?.data;
   const isCompiling = cached === null;
 
-  const allOpen  = (data?.contractsFinder.open  || []).concat(data?.findTender?.notices || []);
+  const allOpen  = dedupeNoticesSoft((data?.contractsFinder.open || []).concat(data?.findTender?.notices || []));
   const allAwarded = data?.contractsFinder.awarded || [];
   const allNotices = [...allAwarded, ...allOpen];
 
