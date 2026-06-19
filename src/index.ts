@@ -1260,12 +1260,12 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
   return { points: [], illustrative: true, topDesk: null };
 }
 
-const DESK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const DESK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 async function getDeskCache(slug: string): Promise<{ data: ProcurementData; cached_at: string } | null> {
   if (pool) {
     const r = await pool.query<{ data: ProcurementData; cached_at: string }>(
-      `SELECT data, cached_at::text FROM desk_cache WHERE slug = $1 AND cached_at > NOW() - INTERVAL '6 hours'`,
+      `SELECT data, cached_at::text FROM desk_cache WHERE slug = $1 AND cached_at > NOW() - INTERVAL '24 hours'`,
       [slug]
     );
     return r.rows[0] || null;
@@ -8199,19 +8199,27 @@ initDb()
     if (RUN_WEB) {
       app.listen(PORT, () => {
         console.log(`[server] GovRevenue Agent running on port ${PORT}`);
-        // Warm up all live desk caches on startup — compile any that are cold or stale
-        for (const desk of DESK_PROFILES.filter(d => d.live)) {
-          getDeskCache(desk.slug)
-            .then(cached => {
-              const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
-              if (isStale) {
-                console.log(`[desk] warm-up: compiling ${desk.slug}`);
+        // Warm up live desk caches on startup — staggered to avoid hammering Contracts Finder.
+        // Compiles one desk every 8s; 24 desks ≈ 3min total, well within rate limits.
+        const liveDesks = DESK_PROFILES.filter(d => d.live);
+        let delay = 0;
+        for (const desk of liveDesks) {
+          setTimeout(() => {
+            getDeskCache(desk.slug)
+              .then(cached => {
+                const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+                if (isStale) {
+                  console.log(`[desk] warm-up: compiling ${desk.slug}`);
+                  compileDeskInBackground(desk).catch(err => captureError(err, { desk: { slug: desk.slug } }));
+                } else {
+                  console.log(`[desk] warm-up: ${desk.slug} is fresh, skipping`);
+                }
+              })
+              .catch(() => {
                 compileDeskInBackground(desk).catch(err => captureError(err, { desk: { slug: desk.slug } }));
-              }
-            })
-            .catch(() => {
-              compileDeskInBackground(desk).catch(err => captureError(err, { desk: { slug: desk.slug } }));
-            });
+              });
+          }, delay);
+          delay += 8_000;
         }
       });
     } else {
