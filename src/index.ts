@@ -1813,9 +1813,9 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
 }
 
 function procurementDataMarkdown(data: ProcurementData) {
-  const open = data.contractsFinder.open.slice(0, 14);
-  const awarded = data.contractsFinder.awarded.slice(0, 14);
-  const findTender = (data.findTender?.notices || []).slice(0, 14);
+  const open = data.contractsFinder.open.slice(0, 20);
+  const awarded = data.contractsFinder.awarded.slice(0, 20);
+  const findTender = (data.findTender?.notices || []).slice(0, 20);
   const companiesHouse = data.companiesHouse?.matches || [];
   const allErrors = [
     ...(data.contractsFinder.errors || []).map(error => `Contracts Finder: ${error}`),
@@ -6764,7 +6764,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>All Intelligence Desks — GovRevenue</title>
 <meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.length} industry desks. Live data from Contracts Finder and Find a Tender.">
