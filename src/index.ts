@@ -4129,15 +4129,6 @@ function reportPage(scan: ScanRecord) {
       text-align-last:left;
     }
 
-    .premium-dashboard {
-      margin-top:26px;
-      background:#fff;
-      border:1px solid var(--line);
-      padding:30px;
-      break-inside:avoid;
-      page-break-inside:avoid;
-    }
-
     .section-kicker,
     .close-kicker {
       font-size:12px;
@@ -4464,7 +4455,6 @@ function reportPage(scan: ScanRecord) {
       }
 
       .cover,
-      .premium-dashboard,
       .report,
       .marketing-close {
         box-shadow:none;
@@ -4475,7 +4465,6 @@ function reportPage(scan: ScanRecord) {
         break-after:page;
       }
 
-      .premium-dashboard,
       .report,
       .marketing-close {
         padding:8mm;
@@ -4516,7 +4505,7 @@ function reportPage(scan: ScanRecord) {
       <div class="brand">GovRevenue Agent</div>
       <div class="actions">
         <a class="btn" href="/api/scans/${scan.id}/report.pdf">Download PDF</a>
-        <button class="btn secondary" onclick="window.print()">Browser Print</button>
+        <button type="button" class="btn secondary" onclick="window.print()">Browser Print</button>
         <a class="btn secondary" href="/api/scans/${scan.id}/report.md">Download Markdown</a>
         <a class="btn secondary" href="/api/scans/${scan.id}/data.json">View Data</a>
         <a class="btn secondary" href="/scan/${scan.id}/compare" title="Compare with a previous scan">Compare &uarr;</a>
@@ -4582,7 +4571,7 @@ function reportPage(scan: ScanRecord) {
       <h3 style="margin-top:0;font-family:var(--serif);color:var(--ink)">Get weekly opportunity alerts</h3>
       <p style="color:var(--muted);margin-bottom:16px">We'll re-scan Contracts Finder every 7 days and email you when new tenders match your profile.</p>
       <form id="alert-form" style="display:flex;gap:10px;flex-wrap:wrap">
-        <input type="email" id="alert-email" placeholder="your@email.com" required
+        <input type="email" id="alert-email" placeholder="your@email.com" aria-label="Email address for weekly alerts" required
           style="flex:1;min-width:220px;padding:10px 14px;border:1px solid var(--line);font-size:15px;background:#fff" />
         <button type="submit"
           style="padding:10px 20px;background:var(--green);color:#fff;border:0;font-size:15px;cursor:pointer;white-space:nowrap">
@@ -4604,12 +4593,12 @@ function reportPage(scan: ScanRecord) {
             const data = await r.json();
             msg.style.display = "block";
             msg.textContent = r.ok ? "Subscribed. We'll email you when new opportunities appear." : (data.error || "Subscription failed.");
-            msg.style.color = r.ok ? "#1d6b4f" : "#9b2d20";
+            msg.style.color = r.ok ? "var(--green)" : "var(--red)";
             if (r.ok) document.getElementById("alert-form").style.display = "none";
           } catch {
             msg.style.display = "block";
             msg.textContent = "Subscription failed. Please try again.";
-            msg.style.color = "#9b2d20";
+            msg.style.color = "var(--red)";
           }
         });
       </script>
@@ -6227,7 +6216,7 @@ ${deskOpportunityCss()}
         <span class="dm-title">DEMAND MAP &ndash; ${escapeHtml(profile.label.toUpperCase())}</span>
         <span class="dm-title-info" title="All major categories and sub-categories this desk scans for">ⓘ</span>
       </div>
-      <button class="dm-open-all" data-open="0" onclick="var o=this.dataset.open==='1';this.closest('section').querySelectorAll('.dm-sub-x').forEach(e=>e.style.display=o?'none':'list-item');this.closest('section').querySelectorAll('.dm-more-btn').forEach(b=>{b.textContent=o?('+ '+b.dataset.more+' more'):'Show less';b.dataset.open=o?'0':'1'});this.textContent=o?'Open all':'Close all';this.dataset.open=o?'0':'1'">Open all</button>
+      <button type="button" class="dm-open-all" data-open="0" onclick="var o=this.dataset.open==='1';this.closest('section').querySelectorAll('.dm-sub-x').forEach(e=>e.style.display=o?'none':'list-item');this.closest('section').querySelectorAll('.dm-more-btn').forEach(b=>{b.textContent=o?('+ '+b.dataset.more+' more'):'Show less';b.dataset.open=o?'0':'1'});this.textContent=o?'Open all':'Close all';this.dataset.open=o?'0':'1'">Open all</button>
     </div>
     <p class="dm-sub">All major categories and sub-categories this desk scans for.</p>
     <div class="dm-grid">${dmGridHtml}</div>
