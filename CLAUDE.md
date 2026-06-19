@@ -108,6 +108,8 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 | `RUN_WORKER` | No | Defaults to true |
 | `RESEND_API_KEY` | No | Email notifications |
 | `FROM_EMAIL` | No | Sender address for emails |
+| `SLACK_WEBHOOK_URL` | No | Opportunity bot — pushes newly-discovered signals to a Slack/Discord incoming webhook each hourly refresh |
+| `SAMPLE_PDF_URL` | No | Public sample PDF shown on homepage; never serves real customer PDFs |
 | `BASE_URL` | No | Base URL for scan links in emails |
 
 PDF storage (all optional, enables S3 upload):

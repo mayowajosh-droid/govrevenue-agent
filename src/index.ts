@@ -161,6 +161,9 @@ const RUN_WEB = process.env.RUN_WEB !== "false";
 const RUN_WORKER = process.env.RUN_WORKER !== "false";
 const SENTRY_DSN = process.env.SENTRY_DSN || "";
 const SENTRY_ENABLED = Boolean(SENTRY_DSN);
+// Opportunity bot: when set, newly-discovered signals are pushed to this Slack
+// (or Discord-compatible) incoming webhook during the hourly refresh.
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
 
 if (SENTRY_ENABLED) {
   Sentry.init({
@@ -1038,25 +1041,35 @@ async function initDb() {
   console.log("[db] ready");
 }
 
-async function upsertSignals(signals: HomepageSignal[]): Promise<void> {
-  if (signals.length === 0) return;
+// Returns the signals that were genuinely new (inserted, not updated) so the
+// opportunity bot can announce only fresh notices. Postgres `xmax = 0` is true
+// only for a freshly-inserted row, false when ON CONFLICT performed an UPDATE.
+async function upsertSignals(signals: HomepageSignal[]): Promise<HomepageSignal[]> {
+  if (signals.length === 0) return [];
+  const inserted: HomepageSignal[] = [];
   if (pool) {
     for (const s of signals) {
-      await pool.query(
+      const r = await pool.query<{ inserted: boolean }>(
         `INSERT INTO homepage_signals (id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT (id) DO UPDATE SET
            deadline_date = EXCLUDED.deadline_date,
            value_amount  = EXCLUDED.value_amount,
            status        = EXCLUDED.status,
-           fetched_at    = EXCLUDED.fetched_at`,
+           fetched_at    = EXCLUDED.fetched_at
+         RETURNING (xmax = 0) AS inserted`,
         [s.id, s.category, s.title, s.buyer, s.source, s.source_url,
          s.notice_date, s.deadline_date ?? null, s.value_amount, s.status, s.fetched_at]
       );
+      if (r.rows[0]?.inserted) inserted.push(s);
     }
   } else {
-    for (const s of signals) sigMemStore.set(s.id, s);
+    for (const s of signals) {
+      if (!sigMemStore.has(s.id)) inserted.push(s);
+      sigMemStore.set(s.id, s);
+    }
   }
+  return inserted;
 }
 
 async function queryLatestSignals(limit: number): Promise<HomepageSignal[]> {
@@ -3554,8 +3567,48 @@ function renderDeskCard(sig: HomepageSignal, tag: string, slug: string): string 
 </a>`;
 }
 
+async function postOpportunitiesToSlack(newSignals: HomepageSignal[]): Promise<void> {
+  if (!SLACK_WEBHOOK_URL || newSignals.length === 0) return;
+  const fmtVal = (v: number | null) =>
+    v && v > 0
+      ? v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : `£${Math.round(v / 1_000)}k`
+      : "value n/a";
+  const top = [...newSignals]
+    .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
+    .slice(0, 8);
+  const lines = top.map(s => {
+    const label = CATEGORY_LABELS[s.category] || s.category;
+    const buyer = s.buyer || "Buyer not stated";
+    // Slack mrkdwn link text must not contain < > &
+    const title = (s.title || "Untitled").replace(/[<>&]/g, "").slice(0, 140);
+    return `• <${s.source_url}|${title}> — ${buyer} · ${fmtVal(s.value_amount)} · ${label} (${s.source})`;
+  });
+  const overflow = newSignals.length > top.length ? `\n_…and ${newSignals.length - top.length} more_` : "";
+  const text = `*🔔 ${newSignals.length} new public-sector ${newSignals.length === 1 ? "opportunity" : "opportunities"}*\n\n${lines.join("\n")}${overflow}`;
+  try {
+    const res = await fetch(SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) console.error(`[slack] webhook returned ${res.status}`);
+  } catch (err) {
+    console.error("[slack] post failed", err);
+  }
+}
+
 async function refreshHomepageSignals(): Promise<void> {
   console.log("[signals] refresh started");
+  // On a cold table every signal is "new" — that's a seed, not deal-flow, so we
+  // suppress the Slack post for the first populating run.
+  let hadExistingSignals = false;
+  if (pool) {
+    const r = await pool.query<{ n: string }>(`SELECT COUNT(*) AS n FROM homepage_signals`);
+    hadExistingSignals = parseInt(r.rows[0]?.n || "0", 10) > 0;
+  } else {
+    hadExistingSignals = sigMemStore.size > 0;
+  }
+  const allNew: HomepageSignal[] = [];
   for (const cat of SIGNAL_CATEGORIES) {
     try {
       const data = await pullProcurementData(cat.input);
@@ -3588,12 +3641,18 @@ async function refreshHomepageSignals(): Promise<void> {
         status: n.status || "unknown",
         fetched_at: now
       })).filter(s => s.id && s.title);
-      await upsertSignals(signals);
-      console.log(`[signals] ${cat.key}: upserted ${signals.length}`);
+      const newOnes = await upsertSignals(signals);
+      allNew.push(...newOnes);
+      console.log(`[signals] ${cat.key}: upserted ${signals.length} (${newOnes.length} new)`);
     } catch (err: any) {
       console.error(`[signals] ${cat.key} refresh failed: ${err?.message}`);
       captureError(err, { signalRefresh: { category: cat.key } });
     }
+  }
+  if (hadExistingSignals) {
+    await postOpportunitiesToSlack(allNew);
+  } else if (allNew.length > 0) {
+    console.log(`[signals] cold start — suppressing Slack post for ${allNew.length} seeded signals`);
   }
   console.log("[signals] refresh complete");
 }
@@ -4533,6 +4592,7 @@ app.get("/health", (_req, res) => {
     runWorker: RUN_WORKER,
     sentry: SENTRY_ENABLED ? "enabled" : "disabled",
     email: isEmailConfigured() ? "enabled" : "disabled",
+    opportunityBot: SLACK_WEBHOOK_URL ? "enabled" : "disabled",
     reportProvider: anthropic ? "anthropic" : "openai",
     reportModel: anthropic ? ANTHROPIC_MODEL : OPENAI_MODEL,
     model: OPENAI_MODEL
