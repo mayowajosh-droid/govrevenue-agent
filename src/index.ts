@@ -6905,37 +6905,6 @@ function noticesPage(
     return days >= 0 && days <= 7;
   }).length;
 
-  const sidebarBuckets: Array<{ key: string; label: string; color: string }> = [
-    { key: "all",            label: "All notices",     color: "#0B0F14" },
-    { key: "chase_now",      label: "Strong Fit",       color: "#22c55e" },
-    { key: "worth_checking", label: "Possible Fit",     color: "#3b82f6" },
-    { key: "prepare_first",  label: "Prepare First",    color: "#f59e0b" },
-    { key: "partner_route",  label: "Partner Route",    color: "#a855f7" },
-    { key: "watchlist",      label: "Watchlist",        color: "#6b7280" },
-    { key: "low_confidence", label: "Low Confidence",   color: "#9ca3af" },
-  ];
-
-  const sidebarHtml = isCompiling ? "" : `
-    <div class="nb-sb-label">Filter by fit</div>
-    ${sidebarBuckets.map((b, i) => {
-      const count = b.key === "all" ? scoredOpen.length : (bucketCounts.get(b.key) || 0);
-      const isHot = b.key === "chase_now" && count > 0;
-      return `<button class="nb-sb-item${i === 0 ? " nb-sb-active" : ""}" data-filter="${escapeHtml(b.key)}">
-        <span class="nb-sb-dot" style="background:${b.color}"></span>
-        <span class="nb-sb-name">${escapeHtml(b.label)}</span>
-        <span class="nb-sb-badge${isHot ? " nb-sb-badge--hot" : ""}">${count}</span>
-      </button>`;
-    }).join("")}
-    <div class="nb-sb-divider"></div>
-    <div class="nb-sb-label">Actions</div>
-    <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-sb-item">
-      <span style="font-size:12px;flex-shrink:0">&#128269;</span>
-      <span class="nb-sb-name" style="color:var(--slate)">Run Fit Check</span>
-    </a>
-    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="nb-sb-item">
-      <span style="font-size:12px;flex-shrink:0">&#127963;</span>
-      <span class="nb-sb-name" style="color:var(--slate)">Buyer Intelligence</span>
-    </a>`;
 
   const boardContent = isCompiling
     ? `<div class="nb-empty" style="padding:40px 32px;text-align:center">
@@ -7009,27 +6978,27 @@ ${pageShellHeader(profile)}
   </div>
 </section>
 
-<div class="nb-layout">
-  <aside class="nb-sidebar">${sidebarHtml}</aside>
-  <main class="nb-main">
-    <div class="nb-filter-bar">
-      <span class="nb-filter-label">Source:</span>
-      <button class="nb-filter-btn nb-active" data-src="all">All</button>
-      <button class="nb-filter-btn" data-src="CF">Contracts Finder</button>
-      <button class="nb-filter-btn" data-src="FTS">Find a Tender</button>
-      <span class="nb-filter-sep"></span>
-      <span class="nb-filter-label">Sort by:</span>
-      <select class="nb-sort-select" id="nb-sort">
-        <option value="default">Best match</option>
-        <option value="deadline">Deadline (soonest)</option>
-        <option value="value">Value (highest)</option>
-        <option value="published">Published (newest)</option>
-      </select>
-      <span id="nb-count-label" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--slate)"></span>
-    </div>
-    <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the desk profile &middot; Run a scan for a personalised fit check</p>
-    ${boardContent}
-  </main>
+<div class="nb-board-wrap">
+  <div class="nb-filter-bar">
+    <span class="nb-filter-label">Source:</span>
+    <button class="nb-filter-btn nb-active" data-src="all">All</button>
+    <button class="nb-filter-btn" data-src="CF">Contracts Finder</button>
+    <button class="nb-filter-btn" data-src="FTS">Find a Tender</button>
+    <span class="nb-filter-sep"></span>
+    <span class="nb-filter-label">Sort by:</span>
+    <select class="nb-sort-select" id="nb-sort">
+      <option value="default">Best match</option>
+      <option value="deadline">Deadline (soonest)</option>
+      <option value="value">Value (highest)</option>
+      <option value="published">Published (newest)</option>
+    </select>
+    <span id="nb-count-label" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--slate)"></span>
+    <span class="nb-filter-sep"></span>
+    <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-action-btn">&#128269;&nbsp;Run Fit Check</a>
+    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="nb-action-btn">&#127963;&nbsp;Buyer Intel</a>
+  </div>
+  <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the desk profile &middot; Run a scan for a personalised fit check</p>
+  ${boardContent}
 </div>
 
 ${pageShellFoot()}
@@ -7038,7 +7007,6 @@ ${pageShellFoot()}
   var PAGE_SIZE=12;
   var page=1;
   var activeSrc='all';
-  var activeBucket='all';
   var activeSort='default';
   var grid=document.getElementById('nb-grid');
   var paginationEl=document.getElementById('nb-pagination');
@@ -7051,9 +7019,7 @@ ${pageShellFoot()}
 
   function getVisible(){
     return allCards.filter(function(c){
-      var srcOk=activeSrc==='all'||c.getAttribute('data-src')===activeSrc;
-      var bucketOk=activeBucket==='all'||c.getAttribute('data-bucket')===activeBucket;
-      return srcOk&&bucketOk;
+      return activeSrc==='all'||c.getAttribute('data-src')===activeSrc;
     });
   }
 
@@ -7126,16 +7092,6 @@ ${pageShellFoot()}
   // Sort select
   var sortSel=document.getElementById('nb-sort');
   if(sortSel)sortSel.addEventListener('change',function(){activeSort=sortSel.value;page=1;render();});
-
-  // Sidebar bucket filter
-  document.querySelectorAll('.nb-sb-item[data-filter]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      document.querySelectorAll('.nb-sb-item[data-filter]').forEach(function(b){b.classList.remove('nb-sb-active');});
-      btn.classList.add('nb-sb-active');
-      activeBucket=btn.getAttribute('data-filter')||'all';
-      page=1;render();
-    });
-  });
 
   render();
 })();
