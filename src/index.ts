@@ -834,7 +834,7 @@ function normaliseFindTenderRelease(release: any, keyword: string): ProcurementN
   };
 }
 
-async function findTenderSearch(keywords: string[]): Promise<{ notices: ProcurementNotice[]; errors: string[] }> {
+async function findTenderSearch(keywords: string[], signal?: AbortSignal): Promise<{ notices: ProcurementNotice[]; errors: string[] }> {
   const errors: string[] = [];
   const notices: ProcurementNotice[] = [];
   const keywordSet = keywords.map(k => k.toLowerCase()).filter(Boolean);
@@ -848,7 +848,7 @@ async function findTenderSearch(keywords: string[]): Promise<{ notices: Procurem
     url.searchParams.set("updatedFrom", from.toISOString().slice(0, 19));
     url.searchParams.set("updatedTo", to.toISOString().slice(0, 19));
 
-    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    const response = await fetch(url, { headers: { Accept: "application/json" }, signal });
 
     if (!response.ok) {
       return { notices: [], errors: [`Find a Tender OCDS search failed: ${response.status} ${response.statusText}`] };
@@ -900,7 +900,8 @@ async function contractsFinderPage(
   searchCriteria: any,
   keyword: string,
   from: number,
-  size: number
+  size: number,
+  signal?: AbortSignal
 ): Promise<{ notices: ProcurementNotice[]; total: number }> {
   let lastError = "";
   for (const url of CF_ENDPOINTS) {
@@ -908,7 +909,8 @@ async function contractsFinderPage(
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ searchCriteria, size, from })
+        body: JSON.stringify({ searchCriteria, size, from }),
+        signal
       });
       if (!resp.ok) { lastError = `${resp.status} ${resp.statusText}`; continue; }
       const data = await resp.json();
@@ -927,14 +929,15 @@ async function contractsFinderPage(
 // Paginates through CF exhaustively — stops only when CF has no more results.
 async function contractsFinderSearchAll(
   searchCriteria: any,
-  keyword: string
+  keyword: string,
+  signal?: AbortSignal
 ): Promise<ProcurementNotice[]> {
   const PAGE_SIZE = 100;
   const all: ProcurementNotice[] = [];
   let from = 0;
 
   while (true) {
-    const { notices, total } = await contractsFinderPage(searchCriteria, keyword, from, PAGE_SIZE);
+    const { notices, total } = await contractsFinderPage(searchCriteria, keyword, from, PAGE_SIZE, signal);
     all.push(...notices);
     if (notices.length < PAGE_SIZE || all.length >= total) break;
     from += PAGE_SIZE;
@@ -1686,7 +1689,7 @@ const SECTOR_CPV: Record<string, string[]> = {
   "consulting":       ["73200000", "72224000", "72220000"],   // business consultancy, project management consulting, systems/tech consulting
 };
 
-async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise<ProcurementData> {
+async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal): Promise<ProcurementData> {
   let keywords: string[];
   try {
     keywords = await generateSearchKeywords(input);
@@ -1736,9 +1739,11 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     try {
       open.push(...(await contractsFinderSearchAll(
         { ...base, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom },
-        keyword
+        keyword,
+        signal
       )));
     } catch (error: any) {
+      if ((error as any)?.name === "AbortError") throw error;
       captureError(error, { dataPull: { source: "contracts_finder", status: "open", keyword } });
       errors.push(`Open search failed for "${keyword}": ${error?.message || error}`);
     }
@@ -1746,9 +1751,11 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     try {
       awarded.push(...(await contractsFinderSearchAll(
         { ...base, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom },
-        keyword
+        keyword,
+        signal
       )));
     } catch (error: any) {
+      if ((error as any)?.name === "AbortError") throw error;
       captureError(error, { dataPull: { source: "contracts_finder", status: "awarded", keyword } });
       errors.push(`Awarded search failed for "${keyword}": ${error?.message || error}`);
     }
@@ -1761,17 +1768,21 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     try {
       open.push(...(await contractsFinderSearchAll(
         { ...cpvBase, types: ["Contract"], statuses: ["Open"], publishedFrom: openPublishedFrom },
-        "cpv"
+        "cpv",
+        signal
       )));
     } catch (error: any) {
+      if ((error as any)?.name === "AbortError") throw error;
       errors.push(`CPV open search failed: ${error?.message || error}`);
     }
     try {
       awarded.push(...(await contractsFinderSearchAll(
         { ...cpvBase, types: ["Contract"], statuses: ["Awarded"], awardedFrom: awardedDateFrom },
-        "cpv"
+        "cpv",
+        signal
       )));
     } catch (error: any) {
+      if ((error as any)?.name === "AbortError") throw error;
       errors.push(`CPV awarded search failed: ${error?.message || error}`);
     }
   }
@@ -1783,7 +1794,7 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>): Promise
     }
   }
 
-  const findTender = await findTenderSearch(keywords);
+  const findTender = await findTenderSearch(keywords, signal);
   if (findTender.errors.length) {
     for (const error of findTender.errors) {
       errors.push(`Find a Tender: ${error}`);
@@ -2806,12 +2817,18 @@ async function callLlmReport(prompt: string): Promise<string> {
   });
 }
 
+const SCAN_FETCH_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
+
 async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
   await updateScan(id, { status: "running", error_message: null });
   await emitScanStage(id, "fetching");
 
+  const fetchController = new AbortController();
+  const fetchTimeout = setTimeout(() => fetchController.abort(), SCAN_FETCH_TIMEOUT_MS);
+
   try {
-    const data = await pullProcurementData(input);
+    const data = await pullProcurementData(input, fetchController.signal);
+    clearTimeout(fetchTimeout);
     await emitScanStage(id, "scoring");
 
     const prompt = buildPrompt(input, data);
@@ -2839,20 +2856,23 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
 
     console.log(`[scan] completed ${id}`);
   } catch (err: any) {
-    console.error(`[scan] failed ${id}`, err);
-    captureError(err, { scan: { id, companyName: input.companyName, status: "failed" } });
+    clearTimeout(fetchTimeout);
+    const isTimeout = err?.name === "AbortError";
+    const message = isTimeout
+      ? "Scan timed out during data fetch (8 min limit). Too many results from Contracts Finder — please try again."
+      : (err?.message || String(err));
 
-    await updateScan(id, {
-      status: "failed",
-      error_message: err?.message || String(err)
-    });
+    console.error(`[scan] failed ${id}`, err);
+    if (!isTimeout) captureError(err, { scan: { id, companyName: input.companyName, status: "failed" } });
+
+    await updateScan(id, { status: "failed", error_message: message });
     await emitScanStage(id, "failed");
 
     await notifyScanFailed({
       scanId: id,
       companyName: input.companyName,
       status: "failed",
-      errorSummary: err?.message || String(err)
+      errorSummary: message
     });
   }
 }
