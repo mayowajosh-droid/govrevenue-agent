@@ -3875,22 +3875,29 @@ function waitingPage(scan: ScanRecord): string {
 <title>${escapeHtml(scan.company_name)} &mdash; Scanning &mdash; GovRevenue</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f3eadc;color:#24140f;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
-.card{max-width:560px;width:100%;background:#fffaf3;border:1px solid #d2b88f;padding:40px 44px}
-.brand{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a6f5a;margin-bottom:28px}
-h1{font-family:Georgia,serif;font-size:24px;font-weight:600;line-height:1.25;margin-bottom:28px}
-h1 b{color:#24140f}
+:root{
+  --ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;
+  --accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
+body{background:var(--paper-2);color:var(--ink);font-family:var(--sans);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;-webkit-font-smoothing:antialiased}
+.card{max-width:560px;width:100%;background:var(--paper);border:1px solid var(--line-strong);padding:40px 44px}
+.brand{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--slate);margin-bottom:28px}
+h1{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.25;margin-bottom:28px}
+h1 b{color:var(--ink)}
 .stage-list{list-style:none;margin-bottom:28px}
-.stage{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #e8d9c4;font-size:14px;color:#6f5b50;transition:color .3s}
+.stage{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line-strong);font-size:14px;color:var(--slate);transition:color .3s}
 .stage:last-child{border-bottom:0}
-.dot{width:10px;height:10px;border-radius:50%;background:#d2b88f;flex-shrink:0;transition:background .3s}
-.stage.active{color:#24140f}
-.stage.active .dot{background:#a97932;box-shadow:0 0 0 4px #a9793230}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line-strong);flex-shrink:0;transition:background .3s}
+.stage.active{color:var(--ink)}
+.stage.active .dot{background:var(--accent);box-shadow:0 0 0 4px #9B2C2C22}
 .stage.done{color:#1d6b4f}
 .stage.done .dot{background:#1d6b4f}
 .stage.fail{color:#9b2d20}
 .stage.fail .dot{background:#9b2d20}
-.eta{font-size:13px;color:#8a6f5a;font-family:monospace}
+.eta{font-size:13px;color:var(--slate);font-family:var(--mono)}
 .err{margin-top:20px;padding:14px;background:#fdf0ee;border:1px solid #e0a090;font-size:13px;color:#9b2d20}
 </style>
 </head>
@@ -3992,7 +3999,7 @@ function reportPage(scan: ScanRecord) {
       margin:0;
       background:var(--cream);
       color:var(--ink);
-      font-family:Arial, sans-serif;
+      font-family:"Inter","Helvetica Neue",Arial,sans-serif;
       -webkit-font-smoothing:antialiased;
     }
 
@@ -4051,7 +4058,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .cover h1 {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:52px;
       line-height:1;
       margin:0 0 14px;
@@ -4091,7 +4098,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .metric span {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:25px;
       font-weight:800;
     }
@@ -4147,7 +4154,7 @@ function reportPage(scan: ScanRecord) {
 
     .dash-head h2,
     .marketing-close h2 {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       margin:0 0 8px;
       font-size:30px;
       letter-spacing:-.02em;
@@ -4160,16 +4167,6 @@ function reportPage(scan: ScanRecord) {
       line-height:1.65;
       text-align:justify;
       text-align-last:left;
-    }
-
-    .route-pill {
-      background:var(--ink);
-      color:#fff;
-      padding:12px 14px;
-      font-weight:900;
-      font-size:13px;
-      max-width:230px;
-      text-align:center;
     }
 
     .score-grid {
@@ -4203,7 +4200,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .score-top strong {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:30px;
     }
 
@@ -4244,7 +4241,7 @@ function reportPage(scan: ScanRecord) {
     .chart-card h3 {
       margin:0 0 14px;
       font-size:18px;
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
     }
 
     .mini-bar-row {
@@ -4274,7 +4271,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .mini-bar-row b {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:18px;
       text-align:right;
     }
@@ -4287,7 +4284,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .report h1 {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:34px;
       margin:0 0 14px;
       padding-bottom:16px;
@@ -4296,7 +4293,7 @@ function reportPage(scan: ScanRecord) {
     }
 
     .report h2 {
-      font-family:Georgia, serif;
+      font-family:"Spectral","Iowan Old Style",Georgia,serif;
       font-size:25px;
       margin:36px 0 14px;
       color:var(--ink);
@@ -4729,7 +4726,7 @@ app.get("/", asyncRoute(async (_req, res) => {
 
   const sampleLink = samplePdfUrl
     ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
-    : `<span class="btn-ghost" style="opacity:.4;cursor:default" title="Sample report available after first scan">Sample report (soon)</span>`;
+    : `<span style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#7a8890;border:1px dashed #ffffff33;padding:8px 14px;cursor:default" title="Sample report available after first scan">Sample report — available after first scan</span>`;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -4750,7 +4747,7 @@ app.get("/", asyncRoute(async (_req, res) => {
 html{scroll-behavior:smooth}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-.wrap{padding:0 32px}
+.wrap{padding:0 32px;max-width:1320px;margin-left:auto;margin-right:auto}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
 .topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
 .topstrip .wrap{display:flex;justify-content:space-between;align-items:center;height:34px}
@@ -5028,7 +5025,7 @@ ${chaseNowHtml}
 <footer><div class="wrap">
   <div><div class="logo">Gov<b>Revenue</b></div><p class="bl">A public-sector revenue intelligence service. We turn fragmented public spend, contract and supplier data into one commercial decision: bid, partner, monitor, prepare, or ignore.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">See all desks →</a></li></ul></div>
-  <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/scan" title="Buyer Watchlist is included in your scan report">Watchlist</a></li><li><a href="/scan" title="Available after your first scan">Consultant license</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">The Scan</a></li><li><a href="/desks">Intelligence Desks</a></li><li><a href="/scan">Run a scan &rarr;</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 GovRevenue &middot; United Kingdom &middot; Confidential</span><span>Intelligence, not certainty. Public data shows payments, not wrongdoing.</span></div>
 </div></footer>
@@ -6029,7 +6026,7 @@ a{color:inherit;text-decoration:none}
 .dm-mast-inner{padding:0 56px;display:grid;grid-template-columns:1fr 360px;gap:72px;align-items:start}
 .dm-mast-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
 .dm-mast h1{font-family:var(--serif);font-size:64px;line-height:1.0;letter-spacing:-.01em;text-transform:uppercase;margin-bottom:20px}
-.dm-mast-lede{font-size:17px;color:var(--slate);line-height:1.7;margin-bottom:20px}
+.dm-mast-lede{font-size:17px;color:var(--slate);line-height:1.7;margin-bottom:20px;max-width:42em}
 .dm-source-badge{font-size:13px;color:var(--slate);display:flex;align-items:center;gap:7px}
 .dm-mast-cta{border:1px solid var(--line-strong);padding:32px 32px 32px}
 .dm-mast-cta p{font-family:var(--serif);font-size:19px;line-height:1.5;margin-bottom:24px}
@@ -6038,7 +6035,7 @@ a{color:inherit;text-decoration:none}
 /* Three panels */
 .dp-panels{border-bottom:1px solid var(--line-strong)}
 .dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-left:1px solid var(--line-strong)}
-.dp-panel{padding:64px 60px;border-right:1px solid var(--line-strong)}
+.dp-panel{padding:48px 36px;border-right:1px solid var(--line-strong)}
 .dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate)}
 .dp-info{font-size:13px;color:var(--slate);cursor:help;margin-left:4px}
@@ -6063,7 +6060,8 @@ a{color:inherit;text-decoration:none}
 .dp-bar-fill{height:4px;background:var(--accent);border-radius:2px}
 .dp-bar-val{font-family:var(--mono);font-size:12px;color:var(--slate);text-align:right}
 /* Live signal */
-.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;margin-right:2px}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1d6b4f;flex-shrink:0;margin-right:2px;animation:ldpulse 2.4s ease-in-out infinite}
+@keyframes ldpulse{0%{box-shadow:0 0 0 0 #1d6b4f55}70%{box-shadow:0 0 0 6px #1d6b4f00}100%{box-shadow:0 0 0 0 #1d6b4f00}}
 .ls-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
 .ls-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 12px 0;border-bottom:1px solid var(--line-strong)}
 .ls-table td{padding:14px 8px 14px 0;border-bottom:1px solid var(--line);vertical-align:top}
@@ -6167,7 +6165,7 @@ ${deskOpportunityCss()}
       </div>
       <div class="gh-badge">
         <span>CF &middot; public record</span>
-        <span>Built for public trust</span>
+        <span>Public record only</span>
       </div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
@@ -6186,7 +6184,7 @@ ${deskOpportunityCss()}
       </div>
     </div>
     <div class="dm-mast-cta">
-      <p>This is the public record for ${escapeHtml(profile.label)}.<br>Run it against your firm.</p>
+      <p>This is the public record for ${escapeHtml(profile.label)}.<br>Run the record against your firm's profile.</p>
       <a class="btn-cta" href="/scan">RUN A SCAN &nbsp;&rarr;</a>
     </div>
   </div>
@@ -6227,7 +6225,7 @@ ${deskOpportunityCss()}
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
 </div>
-<div class="dm-foot-copy">&copy; GovRevenue</div>
+<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
 </html>`;
@@ -6448,7 +6446,7 @@ a{color:inherit;text-decoration:none}
       </div>
       <div class="gh-badge">
         <span>CF &middot; public record</span>
-        <span>Built for public trust</span>
+        <span>Public record only</span>
       </div>
     </div>
     <nav class="gh-nav">${navLinks}</nav>
@@ -6555,7 +6553,7 @@ a{color:inherit;text-decoration:none}
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
 </div>
-<div class="dm-foot-copy">&copy; GovRevenue</div>
+<div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
 </html>`;
@@ -6649,7 +6647,7 @@ function pageShellFoot(): string {
     <span>Data is indicative, not exhaustive.</span>
   </div>
 </footer>
-<div class="pg-copy">&copy; GovRevenue</div>`;
+<div class="pg-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:#0F141926">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>`;
 }
 
 // ─── /desks ────────────────────────────────────────────────────────────────────
@@ -7096,6 +7094,7 @@ ${pageShellFoot()}
   render();
 })();
 </script>
+<div style="text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:16px 0 20px;border-top:1px solid var(--line)"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Public record only.</div>
 </body>
 </html>`;
 }

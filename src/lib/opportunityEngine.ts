@@ -937,7 +937,7 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
   </div>
   <div class="cnc-stat-bar">
     <div class="cnc-stat"><span class="cnc-stat-label">Open now</span><span class="cnc-stat-val cnc-stat-val--green">${stats.totalOpen || "—"}</span></div>
-    <div class="cnc-stat"><span class="cnc-stat-label">Avg. contract size</span><span class="cnc-stat-val">${stats.avgValueK ? `£${stats.avgValueK}k` : "—"}</span></div>
+    <div class="cnc-stat"><span class="cnc-stat-label">Avg. contract size</span><span class="cnc-stat-val">${stats.avgValueK ? (stats.avgValueK >= 1000 ? `£${(stats.avgValueK / 1000).toFixed(1)}m` : `£${stats.avgValueK}k`) : "—"}</span></div>
     <div class="cnc-stat"><span class="cnc-stat-label">Closing this month</span><span class="cnc-stat-val">${stats.closingThisMonth || "—"}</span></div>
     ${miniChart}
   </div>
