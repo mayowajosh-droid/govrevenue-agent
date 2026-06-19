@@ -2193,10 +2193,11 @@ function resolveSector(text: string): SectorResult {
 }
 
 function resolveSectorFromInput(input: any): SectorResult {
+  // Use only what the company DOES — not who their buyers are.
+  // idealBuyers/frameworkStatus/lastPublicContract contain buyer-type terms (e.g. "NHS Trust")
+  // that trigger the health-sector check before cleaning/facilities, causing wrong sector classification.
   const text = [
     input?.companyName, input?.mainServices, input?.secondaryServices,
-    input?.mainGoal, input?.preferredOutput, input?.idealBuyers,
-    input?.frameworkStatus, input?.lastPublicContract
   ].filter(Boolean).join(" ");
   return resolveSector(text);
 }
@@ -2205,10 +2206,7 @@ function resolveSectorFromScan(scan: any): SectorResult {
   const input: any = scan.input_json || {};
   const text = [
     input.companyName, input.mainServices, input.secondaryServices,
-    input.idealBuyers, input.mainGoal, input.preferredOutput,
-    input.frameworkStatus, input.lastPublicContract,
-    scan.company_name, scan.sector, scan.industry,
-    scan.services, scan.main_services,
+    scan.company_name,
   ].filter(Boolean).join(" ");
   return resolveSector(text);
 }
