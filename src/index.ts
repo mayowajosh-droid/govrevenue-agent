@@ -5865,7 +5865,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
        <p class="dp-caveat-sm">Based on awarded notices found in the public record<br>for this desk profile (last 12 months).</p>
        <div class="dp-stats">
          <div class="dp-stat">
-           <span class="dp-val">${escapeHtml(fmtBig(totalAwarded))}</span>
+           <span class="dp-val">${escapeHtml(fmtBig(totalAwarded))}+</span>
            <span class="dp-stat-label">Total awarded value</span>
          </div>
          <div class="dp-stat">
@@ -6468,7 +6468,7 @@ a{color:inherit;text-decoration:none}
     <p class="sub-lede">Public procurement activity for <strong>${escapeHtml(subLabel)}</strong> across the UK public sector.</p>
     <div class="sub-stats">
       <div class="sub-stat">
-        <span class="sub-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue) : "—"}</span>
+        <span class="sub-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue)+"+" : "—"}</span>
         <span class="sub-stat-label">Awarded value</span>
       </div>
       <div class="sub-stat">
@@ -6703,7 +6703,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 
     const statsGrid = `
       <div class="dl-stats">
-        <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue) : "—"}</div><div class="dl-stat-lbl">Awarded Value</div></div>
+        <div class="dl-stat"><div class="dl-stat-val">${d.totalValue > 0 ? fmtMoney(d.totalValue)+"+" : "—"}</div><div class="dl-stat-lbl">Awarded Value</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.openCount > 0 ? d.openCount : "—"}</div><div class="dl-stat-lbl">Open Now</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.awardedCount > 0 ? d.awardedCount : "—"}</div><div class="dl-stat-lbl">Awarded</div></div>
         <div class="dl-stat"><div class="dl-stat-val">${d.uniqueBuyers > 0 ? d.uniqueBuyers : "—"}</div><div class="dl-stat-lbl">Buyers</div></div>
@@ -6836,7 +6836,7 @@ ${pageShellCss()}
     <h1>UK Public-Sector<br>Contract Intelligence</h1>
     <p class="dl-hero-sub">Live procurement data across ${liveCount} active desks. Sourced from Contracts Finder and Find a Tender. Updated continuously.</p>
     <div class="dl-agg">
-      <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal) : "—"}</div><div class="dl-agg-lbl">Total Contract Value</div></div>
+      <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal)+"+" : "—"}</div><div class="dl-agg-lbl">Total Contract Value</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalOpen > 0 ? totalOpen.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Open Now</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalAwarded > 0 ? totalAwarded.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Awarded</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalBuyers > 0 ? totalBuyers.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Buyers Tracked</div></div>
@@ -6963,7 +6963,7 @@ ${pageShellHeader(profile)}
       <div class="nb-stat-pill">
         <div class="nb-stat-icon" style="background:rgba(59,130,246,.1)">&#128176;</div>
         <div>
-          <div class="nb-stat-num" style="color:#1e40af">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue)) : "—"}</div>
+          <div class="nb-stat-num" style="color:#1e40af">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue))+"+" : "—"}</div>
           <div class="nb-stat-label">Total awarded value</div>
         </div>
       </div>
@@ -7232,7 +7232,7 @@ ${pageShellHeader(profile)}
         <span class="pg-stat-label">Unique buyers</span>
       </div>
       <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : totalSpend > 0 ? fmtMoney(totalSpend) : "—"}</span>
+        <span class="pg-stat-val">${isCompiling ? "—" : totalSpend > 0 ? fmtMoney(totalSpend)+"+" : "—"}</span>
         <span class="pg-stat-label">Total awarded spend</span>
       </div>
       <div class="pg-stat">
