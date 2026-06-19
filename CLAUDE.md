@@ -12,7 +12,8 @@ UK public-sector procurement intelligence tool. Companies submit a profile → a
 - Node 22 + TypeScript ESM + Express
 - PostgreSQL (Railway) with in-memory Map fallback
 - BullMQ + Redis for scan queue (in-process fallback)
-- OpenAI SDK v6 — `openai.responses.create()` with web_search for reports; `gpt-4.1-mini` chat completions for keyword generation
+- Report generation: **Claude** (`@anthropic-ai/sdk`, `claude-opus-4-8` default) with server-side web_search — primary when `ANTHROPIC_API_KEY` is set; **OpenAI** (`openai.responses.create()` with web_search) is the automatic fallback
+- Keyword generation: OpenAI `gpt-4.1-mini` chat completions
 - Puppeteer for PDF (A4)
 - Resend for email notifications
 - AWS S3-compatible PDF storage (optional)
@@ -51,6 +52,9 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 
 ### LLM keyword generation is primary
 `generateSearchKeywords()` calls `gpt-4.1-mini` to produce accurate Contracts Finder search terms. Falls back to `buildKeywords()` only on failure. Never swap this order. The static `buildKeywords()` causes sector mismatches; LLM keywords are semantically accurate.
+
+### Report generation is provider-abstracted (Claude primary, OpenAI fallback)
+`callLlmReport(prompt)` is the single report chokepoint. If `anthropic` is configured (env `ANTHROPIC_API_KEY`), it calls `callClaudeReport()` (Anthropic Messages API + `web_search_20250305` tool, 150s timeout); on any error it logs to Sentry and falls back to `callOpenAiReport()` (the original `responses.create` path, 90s). The same `buildPrompt()` output drives both — it ends with "Return clean Markdown only" + the exact 10-section structure, so `parseEdpFromMarkdown()` works identically regardless of provider. Do not give Claude a different prompt or structure. `/health` reports the active `reportProvider`/`reportModel`.
 
 ### PDF consistency guard is mandatory
 `validateReportConsistency()` checks for conflicting grades/verdicts before PDF export. Returns HTTP 422 if invalid. Never bypass or remove this check.
@@ -92,8 +96,10 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 |---|---|---|
 | `DATABASE_URL` | Yes (prod) | PostgreSQL — falls back to memory store |
 | `REDIS_URL` | Yes (prod) | Redis — falls back to in-process scan |
-| `OPENAI_API_KEY` | Yes | OpenAI |
+| `OPENAI_API_KEY` | Yes | OpenAI — report fallback + keyword generation |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4.1-mini` |
+| `ANTHROPIC_API_KEY` | No | Enables Claude as primary report generator (recommended — the report is the product) |
+| `ANTHROPIC_MODEL` | No | Defaults to `claude-opus-4-8`. Set to `claude-sonnet-4-6` for faster/cheaper reports |
 | `ADMIN_TOKEN` | Yes | Protects `/admin/*` routes |
 | `COMPANIES_HOUSE_API_KEY` | No | Companies House search |
 | `SENTRY_DSN` | No | Error tracking |

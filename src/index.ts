@@ -11,6 +11,7 @@ import cors from "cors";
 import * as Sentry from "@sentry/node";
 import { Pool } from "pg";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
@@ -151,6 +152,9 @@ app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+// Report generation uses Claude when ANTHROPIC_API_KEY is set (the report is the product —
+// a frontier model writes materially better ones), falling back to OpenAI otherwise.
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
 const REDIS_URL = process.env.REDIS_URL || null;
 const RUN_WEB = process.env.RUN_WEB !== "false";
@@ -178,6 +182,9 @@ const deskCacheMemStore = new Map<string, { data: ProcurementData; cached_at: st
 const compilingDesks = new Set<string>();
 const scanEvents = new EventEmitter();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 
 const redisConnection = REDIS_URL
   ? new Redis(REDIS_URL, {
@@ -2763,13 +2770,18 @@ End with:
 }
 
 
-function withOpenAiTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90_000);
+  const timer = setTimeout(() => controller.abort(), ms);
   return fn(controller.signal).finally(() => clearTimeout(timer));
 }
 
-async function callLlmReport(prompt: string): Promise<string> {
+// OpenAI calls are capped at 90s (see CLAUDE.md) to keep the scan queue from stalling.
+function withOpenAiTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  return withTimeout(90_000, fn);
+}
+
+async function callOpenAiReport(prompt: string): Promise<string> {
   return withOpenAiTimeout(async signal => {
     try {
       const response = await openai.responses.create({
@@ -2794,6 +2806,40 @@ async function callLlmReport(prompt: string): Promise<string> {
       }
     }
   });
+}
+
+// Claude generates the report (the product) with server-side web search. Opus + search
+// needs more headroom than the 90s OpenAI budget, so it gets its own 150s cap.
+async function callClaudeReport(prompt: string): Promise<string> {
+  if (!anthropic) throw new Error("Anthropic client not configured.");
+  return withTimeout(150_000, async signal => {
+    const message = await anthropic.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 8000,
+      system: "You are GovRevenue's senior UK public-sector procurement analyst. Follow the user's instructions exactly. Return only the finished report as clean GitHub-flavored Markdown — no preamble, no sign-off, no commentary outside the report itself.",
+      messages: [{ role: "user", content: prompt }],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] as any
+    }, { signal });
+    const text = message.content
+      .map(block => (block.type === "text" ? block.text : ""))
+      .join("")
+      .trim();
+    return enforceDataQualityLanguage(text || "No report returned.");
+  });
+}
+
+async function callLlmReport(prompt: string): Promise<string> {
+  if (anthropic) {
+    try {
+      return await callClaudeReport(prompt);
+    } catch (claudeError: any) {
+      captureError(claudeError, {
+        anthropic: { model: ANTHROPIC_MODEL, fellBackToOpenAI: true, error: claudeError?.message || String(claudeError) }
+      });
+      console.error("[report] Claude failed, falling back to OpenAI:", claudeError?.message || claudeError);
+    }
+  }
+  return callOpenAiReport(prompt);
 }
 
 const SCAN_FETCH_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
@@ -4487,6 +4533,8 @@ app.get("/health", (_req, res) => {
     runWorker: RUN_WORKER,
     sentry: SENTRY_ENABLED ? "enabled" : "disabled",
     email: isEmailConfigured() ? "enabled" : "disabled",
+    reportProvider: anthropic ? "anthropic" : "openai",
+    reportModel: anthropic ? ANTHROPIC_MODEL : OPENAI_MODEL,
     model: OPENAI_MODEL
   });
 });
