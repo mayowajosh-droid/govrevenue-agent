@@ -5746,14 +5746,30 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     ? inferDeskCategories(awardedNotices, profile.categories)
     : [];
 
+  // Self-calibrating outlier threshold: median notice value × 10,000.
+  // Clamped between £50m (floor) and £10bn (ceiling) so we never exclude
+  // legitimate large contracts while always catching magnitude data errors
+  // (e.g. academy school at £18bn when the desk median is £200k → threshold £2bn → excluded).
+  const sortedNoticeValues = awardedNotices
+    .map(n => n.awardedValue ?? 0)
+    .filter(v => v > 0)
+    .sort((a, b) => a - b);
+  const medianNoticeValue = sortedNoticeValues.length > 0
+    ? sortedNoticeValues[Math.floor(sortedNoticeValues.length / 2)]
+    : 0;
+  const noticeOutlierThreshold = medianNoticeValue > 0
+    ? Math.min(Math.max(medianNoticeValue * 10_000, 50_000_000), 10_000_000_000)
+    : 10_000_000_000;
+
   // Buyer map: aggregate awarded value + open notice count per buyer
   const buyerMap = new Map<string, { awardedValue: number; awardedCount: number; openCount: number }>();
   for (const n of awardedNotices) {
     if (!n.buyer || n.buyer === "Not stated") continue;
+    const noticeValue = n.awardedValue ?? 0;
+    if (noticeValue > noticeOutlierThreshold) continue; // skip data-error outlier, not a cap
     const e = buyerMap.get(n.buyer) || { awardedValue: 0, awardedCount: 0, openCount: 0 };
     e.awardedCount++;
-    // Cap per-notice value at £2bn — guards against source data errors (e.g. academy showing £18bn)
-    e.awardedValue += Math.min(n.awardedValue ?? 0, 2_000_000_000);
+    e.awardedValue += noticeValue;
     buyerMap.set(n.buyer, e);
   }
   for (const n of allOpen) {
