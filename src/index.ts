@@ -6871,7 +6871,7 @@ function noticesPage(
     ? scoreAndBucketNotices(allAwarded.map(normaliseFromProcurementNotice), boardOppContext)
     : [];
 
-  // Bucket counts for sidebar
+  // Bucket counts for sidebar filter
   const bucketCounts = new Map<string, number>();
   for (const n of scoredOpen) {
     bucketCounts.set(n.bucket, (bucketCounts.get(n.bucket) || 0) + 1);
@@ -6884,32 +6884,26 @@ function noticesPage(
   }).length;
 
   const sidebarBuckets: Array<{ key: string; label: string; color: string }> = [
-    { key: "chase_now",      label: "Chase Now",             color: "#22c55e" },
-    { key: "worth_checking", label: "Worth Checking",        color: "#3b82f6" },
-    { key: "prepare_first",  label: "Prepare First",         color: "#f59e0b" },
-    { key: "partner_route",  label: "Partner Route",         color: "#a855f7" },
-    { key: "watchlist",      label: "Watchlist",             color: "#6b7280" },
-    { key: "low_confidence", label: "Low Confidence",        color: "#9ca3af" },
+    { key: "all",            label: "All notices",     color: "#0B0F14" },
+    { key: "chase_now",      label: "Strong Fit",       color: "#22c55e" },
+    { key: "worth_checking", label: "Possible Fit",     color: "#3b82f6" },
+    { key: "prepare_first",  label: "Prepare First",    color: "#f59e0b" },
+    { key: "partner_route",  label: "Partner Route",    color: "#a855f7" },
+    { key: "watchlist",      label: "Watchlist",        color: "#6b7280" },
+    { key: "low_confidence", label: "Low Confidence",   color: "#9ca3af" },
   ];
 
   const sidebarHtml = isCompiling ? "" : `
-    <div class="nb-sb-label">Buckets</div>
+    <div class="nb-sb-label">Filter by fit</div>
     ${sidebarBuckets.map((b, i) => {
-      const count = bucketCounts.get(b.key) || 0;
+      const count = b.key === "all" ? scoredOpen.length : (bucketCounts.get(b.key) || 0);
       const isHot = b.key === "chase_now" && count > 0;
-      return `<a href="#nbbucket-${escapeHtml(b.key)}" class="nb-sb-item${i === 0 ? " nb-sb-active" : ""}" data-sb="${escapeHtml(b.key)}">
+      return `<button class="nb-sb-item${i === 0 ? " nb-sb-active" : ""}" data-filter="${escapeHtml(b.key)}">
         <span class="nb-sb-dot" style="background:${b.color}"></span>
         <span class="nb-sb-name">${escapeHtml(b.label)}</span>
         <span class="nb-sb-badge${isHot ? " nb-sb-badge--hot" : ""}">${count}</span>
-      </a>`;
+      </button>`;
     }).join("")}
-    ${scoredAwarded.length > 0 ? `
-    <div class="nb-sb-divider"></div>
-    <a href="#nbbucket-awarded" class="nb-sb-item" data-sb="awarded">
-      <span class="nb-sb-dot" style="background:#4b5563"></span>
-      <span class="nb-sb-name">Awarded Intel</span>
-      <span class="nb-sb-badge">${Math.min(scoredAwarded.length, 15)}</span>
-    </a>` : ""}
     <div class="nb-sb-divider"></div>
     <div class="nb-sb-label">Actions</div>
     <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-sb-item">
@@ -6999,13 +6993,14 @@ ${pageShellHeader(profile)}
   <button class="nb-filter-btn" data-src="CF">Contracts Finder</button>
   <button class="nb-filter-btn" data-src="FTS">Find a Tender</button>
   <span class="nb-filter-sep"></span>
-  <span class="nb-filter-label">Sort:</span>
+  <span class="nb-filter-label">Sort by:</span>
   <select class="nb-sort-select" id="nb-sort">
+    <option value="default">Best match</option>
     <option value="deadline">Deadline (soonest)</option>
     <option value="value">Value (highest)</option>
     <option value="published">Published (newest)</option>
-    <option value="score">Fit score</option>
   </select>
+  <span id="nb-count-label" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--slate)"></span>
 </div>
 
 <div class="nb-layout">
@@ -7019,73 +7014,109 @@ ${pageShellHeader(profile)}
 ${pageShellFoot()}
 <script>
 (function(){
-  // Source filter
+  var PAGE_SIZE=12;
+  var page=1;
+  var activeSrc='all';
+  var activeBucket='all';
+  var activeSort='default';
+  var grid=document.getElementById('nb-grid');
+  var paginationEl=document.getElementById('nb-pagination');
+  var countLabel=document.getElementById('nb-count-label');
+  if(!grid)return;
+
+  var allCards=Array.from(grid.querySelectorAll('.nb-card'));
+  // Store original sort order as data attribute
+  allCards.forEach(function(c,i){c.setAttribute('data-orig',String(i));});
+
+  function getVisible(){
+    return allCards.filter(function(c){
+      var srcOk=activeSrc==='all'||c.getAttribute('data-src')===activeSrc;
+      var bucketOk=activeBucket==='all'||c.getAttribute('data-bucket')===activeBucket;
+      return srcOk&&bucketOk;
+    });
+  }
+
+  function sortCards(cards){
+    if(activeSort==='default'){
+      return cards.slice().sort(function(a,b){return parseInt(a.getAttribute('data-orig')||'0',10)-parseInt(b.getAttribute('data-orig')||'0',10);});
+    }
+    return cards.slice().sort(function(a,b){
+      if(activeSort==='deadline'){
+        var ta=parseInt(a.getAttribute('data-deadline-ts')||'0',10);
+        var tb=parseInt(b.getAttribute('data-deadline-ts')||'0',10);
+        if(ta===0&&tb===0)return 0;
+        if(ta===0)return 1;
+        if(tb===0)return -1;
+        return ta-tb;
+      }
+      if(activeSort==='value') return parseInt(b.getAttribute('data-value')||'0',10)-parseInt(a.getAttribute('data-value')||'0',10);
+      if(activeSort==='published') return parseInt(b.getAttribute('data-published-ts')||'0',10)-parseInt(a.getAttribute('data-published-ts')||'0',10);
+      return 0;
+    });
+  }
+
+  function render(){
+    var visible=getVisible();
+    var sorted=sortCards(visible);
+    var totalPages=Math.max(1,Math.ceil(sorted.length/PAGE_SIZE));
+    if(page>totalPages)page=1;
+    var start=(page-1)*PAGE_SIZE;
+    var pageCards=sorted.slice(start,start+PAGE_SIZE);
+
+    // Show/hide
+    allCards.forEach(function(c){c.style.display='none';});
+    pageCards.forEach(function(c){c.style.display='';grid.appendChild(c);});
+
+    // Count label
+    if(countLabel){
+      var end=Math.min(start+PAGE_SIZE,sorted.length);
+      countLabel.textContent=sorted.length>0?(start+1)+'–'+end+' of '+sorted.length+' notices':'No notices match';
+    }
+
+    // Pagination
+    if(!paginationEl)return;
+    if(totalPages<=1){paginationEl.innerHTML='';return;}
+    var nums='';
+    var lo=Math.max(1,page-2);
+    var hi=Math.min(totalPages,page+2);
+    if(lo>1)nums+='<button class="nb-pg-num" data-p="1">1</button>'+(lo>2?'<span style="padding:6px 4px;font-family:var(--mono);font-size:11px;color:var(--slate)">&hellip;</span>':'');
+    for(var i=lo;i<=hi;i++){nums+='<button class="nb-pg-num'+(i===page?' nb-pg-active':'')+'" data-p="'+i+'">'+i+'</button>';}
+    if(hi<totalPages)nums+=(hi<totalPages-1?'<span style="padding:6px 4px;font-family:var(--mono);font-size:11px;color:var(--slate)">&hellip;</span>':'')+'<button class="nb-pg-num" data-p="'+totalPages+'">'+totalPages+'</button>';
+    paginationEl.innerHTML='<button class="nb-pg-btn" id="nb-prev"'+(page===1?' disabled':'')+'>&#8592; Prev</button><div class="nb-pg-nums">'+nums+'</div><button class="nb-pg-btn" id="nb-next"'+(page===totalPages?' disabled':'')+'>Next &#8594;</button>';
+    paginationEl.querySelectorAll('.nb-pg-num').forEach(function(btn){
+      btn.addEventListener('click',function(){page=parseInt(btn.getAttribute('data-p')||'1',10);render();window.scrollTo({top:grid.offsetTop-80,behavior:'smooth'});});
+    });
+    var prevBtn=document.getElementById('nb-prev');
+    var nextBtn=document.getElementById('nb-next');
+    if(prevBtn)prevBtn.addEventListener('click',function(){if(page>1){page--;render();window.scrollTo({top:grid.offsetTop-80,behavior:'smooth'});}});
+    if(nextBtn)nextBtn.addEventListener('click',function(){if(page<totalPages){page++;render();window.scrollTo({top:grid.offsetTop-80,behavior:'smooth'});}});
+  }
+
+  // Source filter buttons
   document.querySelectorAll('.nb-filter-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
       document.querySelectorAll('.nb-filter-btn').forEach(function(b){b.classList.remove('nb-active');});
       btn.classList.add('nb-active');
-      var src=btn.getAttribute('data-src');
-      document.querySelectorAll('.nb-card').forEach(function(card){
-        if(src==='all'||card.getAttribute('data-src')===src){
-          card.style.display='';
-        }else{
-          card.style.display='none';
-        }
-      });
+      activeSrc=btn.getAttribute('data-src')||'all';
+      page=1;render();
     });
   });
 
-  // Sort within each bucket
-  var sortSelect=document.getElementById('nb-sort');
-  if(sortSelect){
-    sortSelect.addEventListener('change',function(){
-      var key=sortSelect.value;
-      document.querySelectorAll('.nb-card-grid').forEach(function(grid){
-        var cards=Array.from(grid.querySelectorAll('.nb-card'));
-        cards.sort(function(a,b){
-          if(key==='deadline'){
-            var ta=parseInt(a.getAttribute('data-deadline-ts')||'0',10);
-            var tb=parseInt(b.getAttribute('data-deadline-ts')||'0',10);
-            if(ta===0&&tb===0)return 0;
-            if(ta===0)return 1;
-            if(tb===0)return -1;
-            return ta-tb;
-          }
-          if(key==='value'){
-            return parseInt(b.getAttribute('data-value')||'0',10)-parseInt(a.getAttribute('data-value')||'0',10);
-          }
-          if(key==='published'){
-            return parseInt(b.getAttribute('data-published-ts')||'0',10)-parseInt(a.getAttribute('data-published-ts')||'0',10);
-          }
-          if(key==='score'){
-            return parseInt(b.getAttribute('data-score')||'0',10)-parseInt(a.getAttribute('data-score')||'0',10);
-          }
-          return 0;
-        });
-        cards.forEach(function(c){grid.appendChild(c);});
-      });
-    });
-  }
+  // Sort select
+  var sortSel=document.getElementById('nb-sort');
+  if(sortSel)sortSel.addEventListener('change',function(){activeSort=(sortSel as HTMLSelectElement).value;page=1;render();});
 
-  // Sidebar active state on scroll
-  var sbItems=document.querySelectorAll('.nb-sb-item[data-sb]');
-  var buckets=document.querySelectorAll('.nb-bucket[id]');
-  var ticking=false;
-  window.addEventListener('scroll',function(){
-    if(ticking)return;
-    ticking=true;
-    requestAnimationFrame(function(){
-      ticking=false;
-      var scrollY=window.scrollY+160;
-      var active=null;
-      buckets.forEach(function(bucket){
-        if(bucket.offsetTop<=scrollY)active=bucket.id.replace('nbbucket-','');
-      });
-      sbItems.forEach(function(item){
-        item.classList.toggle('nb-sb-active',item.getAttribute('data-sb')===active);
-      });
+  // Sidebar bucket filter
+  document.querySelectorAll('.nb-sb-item[data-filter]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.nb-sb-item[data-filter]').forEach(function(b){b.classList.remove('nb-sb-active');});
+      btn.classList.add('nb-sb-active');
+      activeBucket=btn.getAttribute('data-filter')||'all';
+      page=1;render();
     });
   });
+
+  render();
 })();
 </script>
 </body>

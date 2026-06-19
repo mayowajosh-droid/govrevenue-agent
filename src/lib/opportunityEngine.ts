@@ -688,6 +688,20 @@ function nbDeadlineChip(dateStr: string | null): string {
   return `<span class="nb-chip nb-deadline-ok">&#10003; ${days}d left</span>`;
 }
 
+const NB_BUCKET_COLORS: Record<OpportunityPursuitBucket, string> = {
+  chase_now:      "#22c55e",
+  worth_checking: "#3b82f6",
+  prepare_first:  "#f59e0b",
+  partner_route:  "#a855f7",
+  watchlist:      "#6b7280",
+  low_confidence: "#9ca3af",
+};
+
+const NB_BUCKET_PRIORITY: Record<OpportunityPursuitBucket, number> = {
+  chase_now: 0, worth_checking: 1, prepare_first: 2,
+  partner_route: 3, watchlist: 4, low_confidence: 5,
+};
+
 function renderNoticesCard(scored: ScoredOpportunity, deskSlug: string): string {
   const safeUrl = buildSafeUrl(scored.url);
   const scanParams = `/scan?desk=${esc(deskSlug)}&noticeId=${esc(scored.id)}`;
@@ -696,6 +710,7 @@ function renderNoticesCard(scored: ScoredOpportunity, deskSlug: string): string 
   const publishedEpoch = scored.publishedDate ? new Date(scored.publishedDate).getTime() : 0;
   const valueNum = noticeVal(scored);
   const valueStr = valueNum > 0 ? esc(fmt(valueNum)) : (scored.displayValue !== "Not stated" ? esc(scored.displayValue) : "");
+  const bucketColor = NB_BUCKET_COLORS[scored.bucket] || "#6b7280";
 
   const matchTags = scored.matchReasons.slice(0, 3).map(r => {
     const label = r.includes(": ") ? r.split(": ").slice(1).join(": ") : r;
@@ -708,20 +723,21 @@ function renderNoticesCard(scored: ScoredOpportunity, deskSlug: string): string 
 
   return `<article class="nb-card nb-card--${esc(scored.bucket)}"
   data-src="${esc(src)}"
+  data-bucket="${esc(scored.bucket)}"
   data-deadline-ts="${deadlineEpoch}"
   data-value="${valueNum}"
   data-published-ts="${publishedEpoch}"
   data-score="${scored.score}">
   <div class="nb-card-top">
     <div class="nb-chips">
+      <span class="nb-chip" style="background:${bucketColor}18;color:${bucketColor};border:1px solid ${bucketColor}30;filter:brightness(.85)">${esc(scored.fitLabel)}</span>
       ${nbDeadlineChip(scored.deadlineDate)}
-      ${scored.score >= 60 ? `<span class="nb-chip nb-fit-chip">${scored.score}% fit</span>` : ""}
     </div>
     ${valueStr ? `<div class="nb-value">${valueStr}</div>` : ""}
   </div>
   <h3 class="nb-card-title">${safeUrl !== "#" ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(scored.title.slice(0, 120))}</a>` : esc(scored.title.slice(0, 120))}</h3>
   <div class="nb-buyer">&#127963; ${esc(scored.buyer.slice(0, 70))}</div>
-  ${matchTags ? `<div class="nb-tags">${matchTags}<span class="nb-chip nb-src-chip">${esc(src)}</span></div>` : `<div class="nb-tags"><span class="nb-chip nb-src-chip">${esc(src)}</span></div>`}
+  <div class="nb-tags">${matchTags}<span class="nb-chip nb-src-chip">${esc(src)}</span></div>
   ${cautionHtml}
   <div class="nb-cta-row">
     <a href="${esc(scanParams)}" class="nb-cta-primary">Run Fit Check &rarr;</a>
@@ -730,67 +746,26 @@ function renderNoticesCard(scored: ScoredOpportunity, deskSlug: string): string 
 </article>`;
 }
 
-// ─── Board section renderer ───────────────────────────────────────────────────
-
-const NB_BOARD_SECTIONS: Array<{
-  bucket: OpportunityPursuitBucket;
-  heading: string;
-  description: string;
-  color: string;
-  wide: boolean;
-}> = [
-  { bucket: "chase_now",      heading: "Chase Now",                  description: "High fit, open, and actionable. You can bid on these today.",                    color: "#22c55e", wide: true  },
-  { bucket: "worth_checking", heading: "Worth Checking",             description: "Decent fit — verify scope and eligibility before committing time.",              color: "#3b82f6", wide: true  },
-  { bucket: "prepare_first",  heading: "Prepare First",              description: "Good sector fit but evidence, certifications, or capacity gaps to address.",    color: "#f59e0b", wide: false },
-  { bucket: "partner_route",  heading: "Framework / Partner Route",  description: "Too large, specialist, or framework-heavy to bid alone. Find a partner.",       color: "#a855f7", wide: false },
-  { bucket: "watchlist",      heading: "Watchlist",                  description: "Useful buyer or category signal. Not immediately chaseable.",                    color: "#6b7280", wide: false },
-  { bucket: "low_confidence", heading: "Low Confidence",             description: "Keyword hit but likely off-sector or weak signal. Included, not hidden.",        color: "#374151", wide: false },
-];
+// ─── Board renderer (flat paginated grid) ─────────────────────────────────────
 
 export function renderOpportunityBoardContent(
   scored: ScoredOpportunity[],
   deskSlug: string,
-  awardedIntel: ScoredOpportunity[]
+  _awardedIntel: ScoredOpportunity[]
 ): string {
-  const byBucket = new Map<OpportunityPursuitBucket, ScoredOpportunity[]>();
-  for (const s of scored) {
-    const arr = byBucket.get(s.bucket) || [];
-    arr.push(s);
-    byBucket.set(s.bucket, arr);
+  if (scored.length === 0) {
+    return `<div class="nb-empty">No notices found for this desk. Check back after the next data refresh.</div>`;
   }
 
-  const sections = NB_BOARD_SECTIONS.map(({ bucket, heading, description, color, wide }) => {
-    const notices = byBucket.get(bucket) || [];
-    if (notices.length === 0 && bucket !== "chase_now") return "";
+  const sorted = [...scored].sort((a, b) => {
+    const pd = (NB_BUCKET_PRIORITY[a.bucket] ?? 5) - (NB_BUCKET_PRIORITY[b.bucket] ?? 5);
+    return pd !== 0 ? pd : b.score - a.score;
+  });
 
-    const gridClass = wide ? "nb-card-grid nb-card-grid--2col" : "nb-card-grid nb-card-grid--1col";
-    const cards = notices.length > 0
-      ? notices.map(n => renderNoticesCard(n, deskSlug)).join("")
-      : `<div class="nb-empty">No notices currently match this bucket. Check back after the next data refresh.</div>`;
-
-    return `<div class="nb-bucket" id="nbbucket-${esc(bucket)}">
-  <div class="nb-bucket-head">
-    <div class="nb-bucket-stripe" style="background:${color}"></div>
-    <div class="nb-bucket-name">${esc(heading)}</div>
-    <div class="nb-bucket-count">${notices.length} notice${notices.length !== 1 ? "s" : ""}</div>
-    <div class="nb-bucket-desc">${esc(description)}</div>
-  </div>
-  <div class="${gridClass}">${cards}</div>
-</div>`;
-  }).join("");
-
-  const awardedSection = awardedIntel.length > 0 ? `
-<div class="nb-bucket" id="nbbucket-awarded">
-  <div class="nb-bucket-head">
-    <div class="nb-bucket-stripe" style="background:#4b5563"></div>
-    <div class="nb-bucket-name">Awarded Intelligence</div>
-    <div class="nb-bucket-count">${awardedIntel.length} notice${awardedIntel.length !== 1 ? "s" : ""}</div>
-    <div class="nb-bucket-desc">Demand signals from awarded contracts. Not live opportunities — use for buyer mapping.</div>
-  </div>
-  <div class="nb-card-grid nb-card-grid--1col">${awardedIntel.slice(0, 15).map(n => renderNoticesCard(n, deskSlug)).join("")}</div>
-</div>` : "";
-
-  return sections + awardedSection;
+  return `<div class="nb-flat-grid" id="nb-grid">
+${sorted.map(n => renderNoticesCard(n, deskSlug)).join("\n")}
+</div>
+<div class="nb-pagination" id="nb-pagination"></div>`;
 }
 
 // ─── Post-scan action panel ───────────────────────────────────────────────────
@@ -1081,7 +1056,7 @@ export function noticesBoardCss(): string {
 .nb-sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--line-strong);padding:24px 0;position:sticky;top:0;max-height:100vh;overflow-y:auto}
 .nb-sb-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);padding:0 20px;margin:16px 0 6px}
 .nb-sb-label:first-child{margin-top:0}
-.nb-sb-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;transition:background .15s;text-decoration:none;color:inherit;border-left:2px solid transparent}
+.nb-sb-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;transition:background .15s;text-decoration:none;color:inherit;border-left:2px solid transparent;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left;font-family:inherit}
 .nb-sb-item:hover{background:var(--paper-2)}
 .nb-sb-item.nb-sb-active{background:rgba(155,44,44,.05);border-left-color:var(--accent);padding-left:18px}
 .nb-sb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -1102,7 +1077,20 @@ export function noticesBoardCss(): string {
 .nb-bucket-count{font-family:var(--mono);font-size:10px;color:var(--slate);padding:2px 9px;background:var(--paper-2);border:1px solid var(--line-strong);border-radius:10px}
 .nb-bucket-desc{font-family:var(--sans);font-size:12px;color:var(--slate);margin-left:auto}
 
-/* ── Card grid ───────────────────────────────────────────── */
+/* ── Flat grid + pagination ──────────────────────────────── */
+.nb-flat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nb-pagination{display:flex;align-items:center;justify-content:space-between;margin-top:28px;padding-top:20px;border-top:1px solid var(--line-strong);font-family:var(--mono);font-size:12px;color:var(--slate)}
+.nb-pg-info{letter-spacing:.03em}
+.nb-pg-btns{display:flex;gap:8px}
+.nb-pg-btn{padding:7px 16px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.04em;transition:.15s}
+.nb-pg-btn:hover:not(:disabled){border-color:var(--ink)}
+.nb-pg-btn:disabled{opacity:.35;cursor:default}
+.nb-pg-nums{display:flex;gap:4px}
+.nb-pg-num{padding:6px 10px;border:1px solid var(--line-strong);background:var(--paper);color:var(--slate);cursor:pointer;font-family:var(--mono);font-size:11px;transition:.15s;min-width:34px;text-align:center}
+.nb-pg-num:hover{border-color:var(--ink);color:var(--ink)}
+.nb-pg-num.nb-pg-active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* ── Card grid (kept for post-scan panel compat) ─────────── */
 .nb-card-grid{display:grid;gap:14px}
 .nb-card-grid--2col{grid-template-columns:1fr 1fr}
 .nb-card-grid--1col{grid-template-columns:1fr}
