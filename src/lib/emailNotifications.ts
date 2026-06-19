@@ -121,6 +121,52 @@ export type WeeklyAlertNotice = {
   source: string;
 };
 
+export type BriefingSignal = {
+  title: string;
+  buyer: string;
+  value: string;
+  category: string;
+  deadline: string | null;
+  url: string;
+};
+
+export async function sendBriefingEmail(input: {
+  email: string;
+  signals: BriefingSignal[];
+  unsubscribeUrl: string;
+}) {
+  const client = getResend();
+  const from = env("FROM_EMAIL");
+  if (!client || !from || !input.email) return;
+
+  const lines = input.signals.map((s, i) =>
+    [
+      `${i + 1}. ${s.title}`,
+      `   Sector: ${s.category}`,
+      `   Buyer: ${s.buyer}`,
+      `   Value: ${s.value}`,
+      s.deadline ? `   Deadline: ${s.deadline}` : null,
+      `   ${s.url}`
+    ].filter(Boolean).join("\n")
+  ).join("\n\n");
+
+  await sendEmail({
+    to: input.email,
+    subject: `GovRevenue weekly briefing — ${input.signals.length} open opportunities`,
+    text: [
+      `Weekly government procurement briefing`,
+      ``,
+      `${input.signals.length} open opportunities across UK public sector desks:`,
+      ``,
+      lines,
+      ``,
+      `Browse all desks: ${absoluteUrl("/")}`,
+      ``,
+      `Unsubscribe: ${input.unsubscribeUrl}`
+    ].join("\n")
+  });
+}
+
 export async function sendWeeklyAlert(input: {
   subscriptionId: string;
   companyName: string;

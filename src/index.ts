@@ -17,7 +17,7 @@ import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
-import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert } from "./lib/emailNotifications.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail } from "./lib/emailNotifications.js";
 import {
   normaliseFromProcurementNotice,
   scoreAndBucketNotices,
@@ -1089,25 +1089,18 @@ async function queryLatestSignals(limit: number): Promise<HomepageSignal[]> {
 async function count24hSignals(): Promise<number> {
   if (pool) {
     const r = await pool.query<{ n: string }>(
-      `SELECT COUNT(*) AS n FROM homepage_signals WHERE fetched_at > NOW() - INTERVAL '24 hours'`
+      `SELECT COUNT(*) AS n FROM homepage_signals WHERE notice_date > NOW() - INTERVAL '24 hours'`
     );
     return parseInt(r.rows[0]?.n || "0", 10);
   }
   const cutoff = new Date(Date.now() - 86_400_000).toISOString();
-  return [...sigMemStore.values()].filter(s => s.fetched_at > cutoff).length;
+  return [...sigMemStore.values()].filter(s => (s.notice_date || s.fetched_at) > cutoff).length;
 }
 
 async function findSamplePdf(): Promise<string | null> {
-  if (pool) {
-    const r = await pool.query<{ pdf_storage_url: string }>(
-      `SELECT pdf_storage_url FROM scans WHERE pdf_storage_url IS NOT NULL ORDER BY created_at DESC LIMIT 1`
-    );
-    return r.rows[0]?.pdf_storage_url || null;
-  }
-  for (const s of memoryStore.values()) {
-    if (s.pdf_storage_url) return s.pdf_storage_url;
-  }
-  return null;
+  // Only serve an explicitly configured sample — never expose real customer PDFs.
+  const explicit = process.env.SAMPLE_PDF_URL?.trim();
+  return explicit || null;
 }
 
 async function queryDeskSignals(categories: string[]): Promise<Map<string, HomepageSignal>> {
@@ -1182,8 +1175,8 @@ type ChaseStats = {
 async function queryChaseableStats(): Promise<ChaseStats> {
   if (!pool) return { totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] };
   const [totals, byDesk, closing] = await Promise.all([
-    pool.query<{ total: string; avg_val: string | null }>(
-      `SELECT COUNT(*) AS total, AVG(value_amount)::numeric AS avg_val
+    pool.query<{ total: string }>(
+      `SELECT COUNT(*) AS total
        FROM homepage_signals
        WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
          AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')`
@@ -1203,7 +1196,7 @@ async function queryChaseableStats(): Promise<ChaseStats> {
   ]);
   return {
     totalOpen: parseInt(totals.rows[0]?.total || "0"),
-    avgValueK: totals.rows[0]?.avg_val ? Math.round(parseFloat(totals.rows[0].avg_val) / 1_000) : null,
+    avgValueK: null,
     closingThisMonth: parseInt(closing.rows[0]?.cnt || "0"),
     byDesk: byDesk.rows.map(r => ({ category: r.category, count: parseInt(r.cnt) })),
   };
@@ -1829,9 +1822,15 @@ async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?:
 }
 
 function procurementDataMarkdown(data: ProcurementData) {
-  const open = data.contractsFinder.open.slice(0, 20);
-  const awarded = data.contractsFinder.awarded.slice(0, 20);
-  const findTender = (data.findTender?.notices || []).slice(0, 20);
+  const open = [...data.contractsFinder.open]
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+    .slice(0, 20);
+  const awarded = [...data.contractsFinder.awarded]
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+    .slice(0, 20);
+  const findTender = [...(data.findTender?.notices || [])]
+    .sort((a, b) => new Date(b.publishedDate || 0).getTime() - new Date(a.publishedDate || 0).getTime())
+    .slice(0, 20);
   const companiesHouse = data.companiesHouse?.matches || [];
   const allErrors = [
     ...(data.contractsFinder.errors || []).map(error => `Contracts Finder: ${error}`),
@@ -3049,6 +3048,108 @@ function startAlertWorker() {
   });
 
   console.log("[alerts] worker started");
+}
+
+type BriefingSubscriberRow = { id: string; email: string; category: string | null };
+
+async function runBriefingAlerts(): Promise<void> {
+  if (!isEmailConfigured()) {
+    console.log("[briefing] email not configured, skipping");
+    return;
+  }
+  const subscribers: BriefingSubscriberRow[] = pool
+    ? (await pool.query<BriefingSubscriberRow>(`SELECT id, email, category FROM briefing_subscribers ORDER BY created_at ASC`)).rows
+    : [...briefMemStore.values()];
+
+  if (subscribers.length === 0) {
+    console.log("[briefing] no subscribers");
+    return;
+  }
+
+  // Fetch recent open signals across all live desks
+  let signals: HomepageSignal[] = [];
+  if (pool) {
+    const r = await pool.query<HomepageSignal>(
+      `SELECT id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
+       FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND (deadline_date IS NULL OR deadline_date > NOW())
+       ORDER BY notice_date DESC NULLS LAST
+       LIMIT 10`
+    );
+    signals = r.rows;
+  } else {
+    signals = [...sigMemStore.values()]
+      .filter(s => !s.status || s.status.toLowerCase().includes("open") || s.status.toLowerCase().includes("active"))
+      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
+      .slice(0, 10);
+  }
+
+  if (signals.length === 0) {
+    console.log("[briefing] no signals to send");
+    return;
+  }
+
+  const briefingSignals = signals.map(s => ({
+    title: s.title || "Untitled",
+    buyer: s.buyer || "Buyer not stated",
+    category: CATEGORY_LABELS[s.category] || s.category || "General",
+    value: s.value_amount && s.value_amount > 0
+      ? s.value_amount >= 1_000_000 ? `£${(s.value_amount / 1_000_000).toFixed(1)}m` : `£${Math.round(s.value_amount / 1_000)}k`
+      : "Value not stated",
+    deadline: s.deadline_date ? new Date(s.deadline_date).toLocaleDateString("en-GB") : null,
+    url: s.source_url || absoluteAppUrl(`/desk/${s.category}`)
+  }));
+
+  let sent = 0;
+  for (const sub of subscribers) {
+    try {
+      await sendBriefingEmail({
+        email: sub.email,
+        signals: briefingSignals,
+        unsubscribeUrl: absoluteAppUrl(`/unsubscribe-briefing/${sub.id}`)
+      });
+      sent++;
+    } catch (err) {
+      console.error(`[briefing] failed to send to ${sub.email}`, err);
+    }
+  }
+  console.log(`[briefing] sent to ${sent}/${subscribers.length} subscribers`);
+}
+
+function startBriefingWorker() {
+  if (!redisConnection) {
+    console.log("[briefing] Redis not configured. Weekly briefings disabled.");
+    return;
+  }
+
+  const briefingQueue = new Queue("govrevenue-briefing", { connection: redisConnection as any });
+  briefingQueue.add(
+    "weekly-briefing",
+    {},
+    {
+      repeat: { every: 7 * 24 * 60 * 60 * 1000 },
+      jobId: "briefing",
+      attempts: 2,
+      backoff: { type: "exponential", delay: 10_000 },
+      removeOnComplete: { age: 60 * 60 * 24 * 30 },
+      removeOnFail: { age: 60 * 60 * 24 * 30 }
+    }
+  ).catch(err => console.error("[briefing] failed to schedule job", err));
+
+  const worker = new Worker(
+    "govrevenue-briefing",
+    async () => { await runBriefingAlerts(); },
+    { connection: redisConnection as any, concurrency: 1 }
+  );
+
+  worker.on("completed", job => { console.log(`[briefing] completed job ${job.id}`); });
+  worker.on("failed", (job, err) => {
+    console.error(`[briefing] failed job ${job?.id}`, err);
+    captureError(err, { briefingWorker: true });
+  });
+
+  console.log("[briefing] worker started");
 }
 
 
@@ -5730,15 +5831,16 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     });
   const deskKeywords = profile.categories.flatMap(c => c.keywords);
   const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
-  const openNotices = allOpen.filter(n => {
+  const allMatchingOpen = allOpen.filter(n => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
     if (t <= cutoff365) return false;
     const title = n.title.toLowerCase();
     return deskKeywords.some(kw => title.includes(kw));
-  }).slice(0, 6);
+  });
+  const openNoticeCount = allMatchingOpen.length;
+  const openNotices = allMatchingOpen.slice(0, 6);
   const awardedNotices = data?.contractsFinder.awarded || [];
 
-  const totalAwarded = awardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
   const awardedCount = awardedNotices.length;
   const uniqueBuyerCount = new Set(awardedNotices.map(n => n.buyer).filter(b => b && b !== "Not stated")).size;
 
@@ -5760,6 +5862,10 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const noticeOutlierThreshold = medianNoticeValue > 0
     ? Math.min(Math.max(medianNoticeValue * 10_000, 50_000_000), 10_000_000_000)
     : 10_000_000_000;
+
+  // Exclude data-error outliers (magnitude errors like £18bn for an academy) from totals
+  const validAwardedNotices = awardedNotices.filter(n => (n.awardedValue ?? 0) <= noticeOutlierThreshold);
+  const totalAwarded = validAwardedNotices.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
 
   // Buyer map: aggregate awarded value + open notice count per buyer
   const buyerMap = new Map<string, { awardedValue: number; awardedCount: number; openCount: number }>();
@@ -5804,13 +5910,14 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   // ── Market intelligence data ─────────────────────────────────────────────
   const nowMs = Date.now();
 
-  const avgContractVal = awardedCount > 0 ? totalAwarded / awardedCount : 0;
+  const awardedCountWithValue = validAwardedNotices.filter(n => (n.awardedValue ?? 0) > 0).length;
+  const avgContractVal = awardedCountWithValue > 0 ? totalAwarded / awardedCountWithValue : 0;
 
   const buyersThisMonth = new Set(
     allOpen.filter(n => {
       if (nowMs - new Date(n.publishedDate || 0).getTime() > 30 * 24 * 3_600_000) return false;
       return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
-    }).map(n => n.buyer).filter(Boolean)
+    }).map(n => n.buyer).filter(b => b && !isAggregatorBuyer(b))
   ).size;
 
   const closingSoonRawCount = allOpen.filter(n => {
@@ -5993,7 +6100,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         <span class="dp-pulse-label">Market size (12m)</span>
       </div>
       <div class="dp-pulse-stat">
-        <span class="dp-pulse-val">${openNotices.length}</span>
+        <span class="dp-pulse-val">${openNoticeCount}</span>
         <span class="dp-pulse-label">Active tenders</span>
       </div>
       <div class="dp-pulse-stat">
@@ -7873,6 +7980,25 @@ app.get("/unsubscribe/:id", asyncRoute(async (req, res) => {
 </body></html>`);
 }));
 
+app.get("/unsubscribe-briefing/:id", asyncRoute(async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) { res.status(400).type("html").send(`<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;padding:40px"><p>Invalid link.</p></body>`); return; }
+  if (pool) {
+    await pool.query(`DELETE FROM briefing_subscribers WHERE id = $1`, [id]);
+  } else {
+    for (const [k, v] of briefMemStore.entries()) { if (v.id === id) { briefMemStore.delete(k); break; } }
+  }
+  res.type("html").send(`<!doctype html>
+<html lang="en">
+<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:40px">
+<div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
+  <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
+  <p>You have been removed from the weekly procurement briefing.</p>
+  <p><a href="/" style="color:#1d6b4f">Back to GovRevenue</a></p>
+</div>
+</body></html>`);
+}));
+
 app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
   const subs = await listAllSubscriptions();
   const token = String(req.query.token || "");
@@ -7932,6 +8058,7 @@ initDb()
     if (RUN_WORKER) {
       startScanWorker();
       startAlertWorker();
+      startBriefingWorker();
       startSignalsWorker();
     } else {
       console.log("[queue] worker disabled by RUN_WORKER=false");
