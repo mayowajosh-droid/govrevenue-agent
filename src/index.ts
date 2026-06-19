@@ -5303,7 +5303,7 @@ h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em
 </div></header>
 <main class="page">
   <div class="page-head">
-    <div class="eyebrow">Revenue scan</div>
+    <div class="eyebrow">Intelligence scan</div>
     <h1>Tell us about your firm.</h1>
     <p class="sub">The more context you give, the sharper the signal. We scan Contracts Finder, Find a Tender and LA spend data, then return a sourced verdict on where the money is and how to reach it.</p>
   </div>
@@ -5781,7 +5781,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
     : deskScoredOpen.length
       ? deskScoredOpen.slice(0, 4).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("")
-      : `<p class="dp-caveat-sm">No open notices at last refresh. <a href="/desk/${profile.slug}/notices" class="dp-link-sm">Check the full board</a>.</p>`
+      : `<p class="dp-caveat-sm">No open notices at last refresh.</p><a href="/desk/${profile.slug}/notices" class="dp-map-link" style="text-decoration-color:var(--accent);font-weight:700">Check the full board &rarr;</a>`
   }
   <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Public record only</p>`;
 
@@ -6054,7 +6054,7 @@ ${deskOpportunityCss()}
       </div>
     </div>
     <div class="dm-mast-cta">
-      <p>This is the public record for ${escapeHtml(profile.label)}.<br>Run the record against your firm's profile.</p>
+      <p>Find out if your firm fits this desk. A scan compares your services against live ${escapeHtml(profile.label)} procurement and returns a sourced verdict in minutes.</p>
       <a class="btn-cta" href="/scan">RUN A SCAN &nbsp;&rarr;</a>
     </div>
   </div>
