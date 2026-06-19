@@ -952,7 +952,7 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
 export function chaseNowCss(): string {
   return `
 .cnc-section{padding:60px 0;border-top:1px solid var(--line-strong);background:var(--paper)}
-.cnc-inner{max-width:1140px;margin:0 auto;padding:0 32px}
+.cnc-inner{padding:0 32px}
 .cnc-head{margin-bottom:24px}
 .cnc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#1d6b4f;display:flex;align-items:center;gap:6px;margin-bottom:10px}
 .cnc-dot{width:6px;height:6px;border-radius:50%;background:#1d6b4f;animation:cnc-pulse 2s ease-in-out infinite;flex-shrink:0}
@@ -1043,7 +1043,7 @@ export function noticesBoardCss(): string {
 @keyframes nb-pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
 
 /* ── Board wrapper ──────────────────────────────────────── */
-.nb-board-wrap{max-width:1400px;margin:0 auto;padding:0 48px 64px}
+.nb-board-wrap{padding:0 48px 64px}
 
 /* ── Filter bar ─────────────────────────────────────────── */
 .nb-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:18px 0 16px;border-bottom:1px solid var(--line-strong);margin-bottom:20px}

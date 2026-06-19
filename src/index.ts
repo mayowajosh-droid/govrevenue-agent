@@ -4750,7 +4750,7 @@ app.get("/", asyncRoute(async (_req, res) => {
 html{scroll-behavior:smooth}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+.wrap{padding:0 32px}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
 .topstrip{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
 .topstrip .wrap{display:flex;justify-content:space-between;align-items:center;height:34px}
@@ -6010,7 +6010,7 @@ a{color:inherit;text-decoration:none}
 .chip-amber{border-color:#a9793244;color:#a97932}
 /* Global header */
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-inner{padding:0 56px}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
@@ -6343,7 +6343,7 @@ function subPage(
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-inner{padding:0 56px}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
@@ -6358,7 +6358,7 @@ a{color:inherit;text-decoration:none}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
 .sub-mast{padding:52px 0 44px;border-bottom:1px solid var(--line-strong)}
-.sub-mast-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.sub-mast-inner{padding:0 56px}
 .sub-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sub-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
 .sub-crumb a:hover{color:var(--accent)}
@@ -6373,7 +6373,7 @@ a{color:inherit;text-decoration:none}
 .sub-stat-val{display:block;font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .sub-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:6px}
 .sub-body{padding:56px 0}
-.sub-body-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.sub-body-inner{padding:0 56px}
 .sub-two-col{display:grid;grid-template-columns:1fr 320px;gap:48px;margin-bottom:56px}
 .sub-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line-strong)}
 .sub-sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);display:flex;align-items:center;gap:6px}
@@ -6570,7 +6570,7 @@ function pageShellCss(): string {
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .gh{background:var(--ink);color:var(--paper)}
-.gh-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.gh-inner{padding:0 56px}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
@@ -6585,7 +6585,7 @@ a{color:inherit;text-decoration:none}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
 .pg-mast{padding:48px 0 40px;border-bottom:1px solid var(--line-strong)}
-.pg-mast-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.pg-mast-inner{padding:0 56px}
 .pg-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pg-crumb a{color:var(--slate);text-decoration:underline;text-decoration-color:var(--line-strong)}
 .pg-crumb a:hover{color:var(--accent)}
@@ -6598,7 +6598,7 @@ a{color:inherit;text-decoration:none}
 .pg-stat-val{display:block;font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .pg-stat-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);margin-top:5px}
 .pg-body{padding:48px 0 64px}
-.pg-body-inner{max-width:1440px;margin:0 auto;padding:0 56px}
+.pg-body-inner{padding:0 56px}
 .bw-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:2px 7px;border-radius:2px;display:inline-block}
 .bw-tag-health{background:#e8f5f0;color:#1d6b4f;border:1px solid #1d6b4f33}
 .bw-tag-la{background:#eef2f7;color:#2563ab;border:1px solid #2563ab33}
@@ -6608,7 +6608,7 @@ a{color:inherit;text-decoration:none}
 .bw-tag-other{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
 .pg-empty{font-family:var(--mono);font-size:13px;color:var(--slate);padding:40px 0}
 .pg-foot{background:var(--paper-2);border-top:1px solid var(--line-strong)}
-.pg-foot-inner{max-width:1440px;margin:0 auto;padding:14px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
+.pg-foot-inner{padding:14px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
 .pg-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:10px 0 14px;border-top:1px solid var(--line)}
 @media(max-width:760px){
   .gh-tag,.gh-badge{display:none}
