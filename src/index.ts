@@ -32,6 +32,7 @@ import {
   deskOpportunityCss,
   reportChaseNowCss,
   chaseNowCss,
+  noticesBoardCss,
   type ScoredOpportunity,
   type ScanOpportunityContext,
   type DeskOpportunityContext,
@@ -6870,10 +6871,60 @@ function noticesPage(
     ? scoreAndBucketNotices(allAwarded.map(normaliseFromProcurementNotice), boardOppContext)
     : [];
 
+  // Bucket counts for sidebar
+  const bucketCounts = new Map<string, number>();
+  for (const n of scoredOpen) {
+    bucketCounts.set(n.bucket, (bucketCounts.get(n.bucket) || 0) + 1);
+  }
+  const chaseNowCount = bucketCounts.get("chase_now") || 0;
+  const closingThisWeek = scoredOpen.filter(n => {
+    if (!n.deadlineDate) return false;
+    const days = Math.floor((new Date(n.deadlineDate).getTime() - Date.now()) / 86_400_000);
+    return days >= 0 && days <= 7;
+  }).length;
+
+  const sidebarBuckets: Array<{ key: string; label: string; color: string }> = [
+    { key: "chase_now",      label: "Chase Now",             color: "#22c55e" },
+    { key: "worth_checking", label: "Worth Checking",        color: "#3b82f6" },
+    { key: "prepare_first",  label: "Prepare First",         color: "#f59e0b" },
+    { key: "partner_route",  label: "Partner Route",         color: "#a855f7" },
+    { key: "watchlist",      label: "Watchlist",             color: "#6b7280" },
+    { key: "low_confidence", label: "Low Confidence",        color: "#9ca3af" },
+  ];
+
+  const sidebarHtml = isCompiling ? "" : `
+    <div class="nb-sb-label">Buckets</div>
+    ${sidebarBuckets.map((b, i) => {
+      const count = bucketCounts.get(b.key) || 0;
+      const isHot = b.key === "chase_now" && count > 0;
+      return `<a href="#nbbucket-${escapeHtml(b.key)}" class="nb-sb-item${i === 0 ? " nb-sb-active" : ""}" data-sb="${escapeHtml(b.key)}">
+        <span class="nb-sb-dot" style="background:${b.color}"></span>
+        <span class="nb-sb-name">${escapeHtml(b.label)}</span>
+        <span class="nb-sb-badge${isHot ? " nb-sb-badge--hot" : ""}">${count}</span>
+      </a>`;
+    }).join("")}
+    ${scoredAwarded.length > 0 ? `
+    <div class="nb-sb-divider"></div>
+    <a href="#nbbucket-awarded" class="nb-sb-item" data-sb="awarded">
+      <span class="nb-sb-dot" style="background:#4b5563"></span>
+      <span class="nb-sb-name">Awarded Intel</span>
+      <span class="nb-sb-badge">${Math.min(scoredAwarded.length, 15)}</span>
+    </a>` : ""}
+    <div class="nb-sb-divider"></div>
+    <div class="nb-sb-label">Actions</div>
+    <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-sb-item">
+      <span style="font-size:12px;flex-shrink:0">&#128269;</span>
+      <span class="nb-sb-name" style="color:var(--slate)">Run Fit Check</span>
+    </a>
+    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="nb-sb-item">
+      <span style="font-size:12px;flex-shrink:0">&#127963;</span>
+      <span class="nb-sb-name" style="color:var(--slate)">Buyer Intelligence</span>
+    </a>`;
+
   const boardContent = isCompiling
-    ? `<div class="opp-cold" style="padding:32px;text-align:center">
-        <strong>Compiling the public record.</strong> Run a scan while this desk warms up.
-        <br><br><a href="/scan" style="font-family:var(--mono);font-size:11px;color:var(--accent);text-decoration:underline">Run a fit check &rarr;</a>
+    ? `<div class="nb-empty" style="padding:40px 32px;text-align:center">
+        <strong>Compiling the public record.</strong> Run a scan while this desk warms up.<br><br>
+        <a href="/scan" style="font-family:var(--mono);font-size:11px;color:var(--accent);text-decoration:underline">Run a fit check &rarr;</a>
        </div>`
     : renderOpportunityBoardContent(scoredOpen, profile.slug, scoredAwarded);
 
@@ -6887,6 +6938,7 @@ function noticesPage(
 ${pageShellCss()}
 ${oppCardCss()}
 ${winBriefCss()}
+${noticesBoardCss()}
 </style>
 </head>
 <body>
@@ -6900,36 +6952,142 @@ ${pageShellHeader(profile)}
       <span class="pg-crumb-active">Opportunity Board</span>
     </div>
     <h1>OPPORTUNITY BOARD &mdash; ${escapeHtml(profile.label.toUpperCase())}</h1>
-    <p style="font-size:14px;color:var(--slate);margin-top:8px">Contracts You Can Chase Now. Public notices scored against this desk profile.</p>
-    <div class="pg-stats">
-      <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : String(allOpen.length)}</span>
-        <span class="pg-stat-label">Open notices</span>
+    <p style="font-size:14px;color:var(--slate);margin-top:8px">Contracts you can chase now. Public notices scored against this desk profile.</p>
+    <div class="nb-stats">
+      <div class="nb-stat-pill">
+        <div class="nb-stat-icon" style="background:rgba(34,197,94,.1)">&#128203;</div>
+        <div>
+          <div class="nb-stat-num" style="color:#166534">${isCompiling ? "—" : String(allOpen.length)}<span class="nb-pulse"></span></div>
+          <div class="nb-stat-label">Open notices</div>
+        </div>
       </div>
-      <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : String(scoredOpen.filter(n => n.bucket === "chase_now").length)}</span>
-        <span class="pg-stat-label">Chase now</span>
+      <div class="nb-stat-pill">
+        <div class="nb-stat-icon" style="background:rgba(185,28,28,.1)">&#9889;</div>
+        <div>
+          <div class="nb-stat-num" style="color:#b91c1c">${isCompiling ? "—" : String(chaseNowCount)}</div>
+          <div class="nb-stat-label">Chase now</div>
+        </div>
       </div>
-      <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : totalValue > 0 ? fmtMoney(totalValue) : "—"}</span>
-        <span class="pg-stat-label">Total awarded value</span>
+      <div class="nb-stat-pill">
+        <div class="nb-stat-icon" style="background:rgba(146,64,14,.1)">&#128197;</div>
+        <div>
+          <div class="nb-stat-num" style="color:#92400e">${isCompiling ? "—" : String(closingThisWeek)}</div>
+          <div class="nb-stat-label">Closing this week</div>
+        </div>
       </div>
-      <div class="pg-stat">
-        <span class="pg-stat-val">${isCompiling ? "—" : String(uniqueBuyers)}</span>
-        <span class="pg-stat-label">Unique buyers</span>
+      <div class="nb-stat-pill">
+        <div class="nb-stat-icon" style="background:rgba(59,130,246,.1)">&#128176;</div>
+        <div>
+          <div class="nb-stat-num" style="color:#1e40af">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue)) : "—"}</div>
+          <div class="nb-stat-label">Total awarded value</div>
+        </div>
+      </div>
+      <div class="nb-stat-pill">
+        <div class="nb-stat-icon" style="background:rgba(168,85,247,.1)">&#127963;</div>
+        <div>
+          <div class="nb-stat-num" style="color:#6b21a8">${isCompiling ? "—" : String(uniqueBuyers)}</div>
+          <div class="nb-stat-label">Unique buyers</div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="pg-body">
-  <div class="pg-body-inner">
-    <p style="font-family:var(--mono);font-size:11px;color:var(--slate);margin-bottom:28px">Public record only &middot; No insider information &middot; Matched against the desk profile, not your specific firm &middot; Run a scan for a personalised fit check</p>
+<div class="nb-filter-bar">
+  <span class="nb-filter-label">Source:</span>
+  <button class="nb-filter-btn nb-active" data-src="all">All</button>
+  <button class="nb-filter-btn" data-src="CF">Contracts Finder</button>
+  <button class="nb-filter-btn" data-src="FTS">Find a Tender</button>
+  <span class="nb-filter-sep"></span>
+  <span class="nb-filter-label">Sort:</span>
+  <select class="nb-sort-select" id="nb-sort">
+    <option value="deadline">Deadline (soonest)</option>
+    <option value="value">Value (highest)</option>
+    <option value="published">Published (newest)</option>
+    <option value="score">Fit score</option>
+  </select>
+</div>
+
+<div class="nb-layout">
+  <aside class="nb-sidebar">${sidebarHtml}</aside>
+  <main class="nb-main">
+    <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the desk profile &middot; Run a scan for a personalised fit check</p>
     ${boardContent}
-  </div>
-</section>
+  </main>
+</div>
 
 ${pageShellFoot()}
+<script>
+(function(){
+  // Source filter
+  document.querySelectorAll('.nb-filter-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.nb-filter-btn').forEach(function(b){b.classList.remove('nb-active');});
+      btn.classList.add('nb-active');
+      var src=btn.getAttribute('data-src');
+      document.querySelectorAll('.nb-card').forEach(function(card){
+        if(src==='all'||card.getAttribute('data-src')===src){
+          card.style.display='';
+        }else{
+          card.style.display='none';
+        }
+      });
+    });
+  });
+
+  // Sort within each bucket
+  var sortSelect=document.getElementById('nb-sort');
+  if(sortSelect){
+    sortSelect.addEventListener('change',function(){
+      var key=sortSelect.value;
+      document.querySelectorAll('.nb-card-grid').forEach(function(grid){
+        var cards=Array.from(grid.querySelectorAll('.nb-card'));
+        cards.sort(function(a,b){
+          if(key==='deadline'){
+            var ta=parseInt(a.getAttribute('data-deadline-ts')||'0',10);
+            var tb=parseInt(b.getAttribute('data-deadline-ts')||'0',10);
+            if(ta===0&&tb===0)return 0;
+            if(ta===0)return 1;
+            if(tb===0)return -1;
+            return ta-tb;
+          }
+          if(key==='value'){
+            return parseInt(b.getAttribute('data-value')||'0',10)-parseInt(a.getAttribute('data-value')||'0',10);
+          }
+          if(key==='published'){
+            return parseInt(b.getAttribute('data-published-ts')||'0',10)-parseInt(a.getAttribute('data-published-ts')||'0',10);
+          }
+          if(key==='score'){
+            return parseInt(b.getAttribute('data-score')||'0',10)-parseInt(a.getAttribute('data-score')||'0',10);
+          }
+          return 0;
+        });
+        cards.forEach(function(c){grid.appendChild(c);});
+      });
+    });
+  }
+
+  // Sidebar active state on scroll
+  var sbItems=document.querySelectorAll('.nb-sb-item[data-sb]');
+  var buckets=document.querySelectorAll('.nb-bucket[id]');
+  var ticking=false;
+  window.addEventListener('scroll',function(){
+    if(ticking)return;
+    ticking=true;
+    requestAnimationFrame(function(){
+      ticking=false;
+      var scrollY=window.scrollY+160;
+      var active=null;
+      buckets.forEach(function(bucket){
+        if(bucket.offsetTop<=scrollY)active=bucket.id.replace('nbbucket-','');
+      });
+      sbItems.forEach(function(item){
+        item.classList.toggle('nb-sb-active',item.getAttribute('data-sb')===active);
+      });
+    });
+  });
+})();
+</script>
 </body>
 </html>`;
 }

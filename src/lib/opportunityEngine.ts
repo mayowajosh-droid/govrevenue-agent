@@ -677,19 +677,74 @@ function fitLabelToBucket(label: OpportunityFitLabel): OpportunityPursuitBucket 
   return map[label];
 }
 
+// ─── Notices board card (new design) ─────────────────────────────────────────
+
+function nbDeadlineChip(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const days = Math.floor((new Date(dateStr).getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return `<span class="nb-chip nb-deadline-red">Deadline passed</span>`;
+  if (days <= 7) return `<span class="nb-chip nb-deadline-red">&#9889; ${days}d left</span>`;
+  if (days <= 30) return `<span class="nb-chip nb-deadline-amber">&#8987; ${days}d left</span>`;
+  return `<span class="nb-chip nb-deadline-ok">&#10003; ${days}d left</span>`;
+}
+
+function renderNoticesCard(scored: ScoredOpportunity, deskSlug: string): string {
+  const safeUrl = buildSafeUrl(scored.url);
+  const scanParams = `/scan?desk=${esc(deskSlug)}&noticeId=${esc(scored.id)}`;
+  const src = scored.source === "Find a Tender" ? "FTS" : "CF";
+  const deadlineEpoch = scored.deadlineDate ? new Date(scored.deadlineDate).getTime() : 0;
+  const publishedEpoch = scored.publishedDate ? new Date(scored.publishedDate).getTime() : 0;
+  const valueNum = noticeVal(scored);
+  const valueStr = valueNum > 0 ? esc(fmt(valueNum)) : (scored.displayValue !== "Not stated" ? esc(scored.displayValue) : "");
+
+  const matchTags = scored.matchReasons.slice(0, 3).map(r => {
+    const label = r.includes(": ") ? r.split(": ").slice(1).join(": ") : r;
+    return `<span class="nb-tag">${esc(label.slice(0, 28))}</span>`;
+  }).join("");
+
+  const cautionHtml = scored.cautions.length > 0
+    ? `<div class="nb-caution">${esc(scored.cautions[0])}</div>`
+    : "";
+
+  return `<article class="nb-card nb-card--${esc(scored.bucket)}"
+  data-src="${esc(src)}"
+  data-deadline-ts="${deadlineEpoch}"
+  data-value="${valueNum}"
+  data-published-ts="${publishedEpoch}"
+  data-score="${scored.score}">
+  <div class="nb-card-top">
+    <div class="nb-chips">
+      ${nbDeadlineChip(scored.deadlineDate)}
+      ${scored.score >= 60 ? `<span class="nb-chip nb-fit-chip">${scored.score}% fit</span>` : ""}
+    </div>
+    ${valueStr ? `<div class="nb-value">${valueStr}</div>` : ""}
+  </div>
+  <h3 class="nb-card-title">${safeUrl !== "#" ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(scored.title.slice(0, 120))}</a>` : esc(scored.title.slice(0, 120))}</h3>
+  <div class="nb-buyer">&#127963; ${esc(scored.buyer.slice(0, 70))}</div>
+  ${matchTags ? `<div class="nb-tags">${matchTags}<span class="nb-chip nb-src-chip">${esc(src)}</span></div>` : `<div class="nb-tags"><span class="nb-chip nb-src-chip">${esc(src)}</span></div>`}
+  ${cautionHtml}
+  <div class="nb-cta-row">
+    <a href="${esc(scanParams)}" class="nb-cta-primary">Run Fit Check &rarr;</a>
+    ${safeUrl !== "#" ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer" class="nb-cta-secondary">View &rarr;</a>` : ""}
+  </div>
+</article>`;
+}
+
 // ─── Board section renderer ───────────────────────────────────────────────────
 
-const BOARD_SECTIONS: Array<{
+const NB_BOARD_SECTIONS: Array<{
   bucket: OpportunityPursuitBucket;
   heading: string;
   description: string;
+  color: string;
+  wide: boolean;
 }> = [
-  { bucket: "chase_now",       heading: "Chase now",               description: "Relevant, realistic, and actionable. Matched against this desk profile." },
-  { bucket: "worth_checking",  heading: "Worth checking",          description: "Relevant but incomplete data. Verify scope before committing." },
-  { bucket: "prepare_first",   heading: "Prepare first",           description: "Good sector fit but evidence, certs, or capacity gaps need addressing." },
-  { bucket: "partner_route",   heading: "Framework / partner routes", description: "Relevant but too large, specialist, or framework-heavy to bid alone." },
-  { bucket: "watchlist",       heading: "Buyer watch",             description: "Useful buyer or category intel. Not immediately chaseable." },
-  { bucket: "low_confidence",  heading: "Low confidence / noisy matches", description: "Keyword hit but likely off-sector or weak signal. Labelled, not hidden." },
+  { bucket: "chase_now",      heading: "Chase Now",                  description: "High fit, open, and actionable. You can bid on these today.",                    color: "#22c55e", wide: true  },
+  { bucket: "worth_checking", heading: "Worth Checking",             description: "Decent fit — verify scope and eligibility before committing time.",              color: "#3b82f6", wide: true  },
+  { bucket: "prepare_first",  heading: "Prepare First",              description: "Good sector fit but evidence, certifications, or capacity gaps to address.",    color: "#f59e0b", wide: false },
+  { bucket: "partner_route",  heading: "Framework / Partner Route",  description: "Too large, specialist, or framework-heavy to bid alone. Find a partner.",       color: "#a855f7", wide: false },
+  { bucket: "watchlist",      heading: "Watchlist",                  description: "Useful buyer or category signal. Not immediately chaseable.",                    color: "#6b7280", wide: false },
+  { bucket: "low_confidence", heading: "Low Confidence",             description: "Keyword hit but likely off-sector or weak signal. Included, not hidden.",        color: "#374151", wide: false },
 ];
 
 export function renderOpportunityBoardContent(
@@ -704,32 +759,35 @@ export function renderOpportunityBoardContent(
     byBucket.set(s.bucket, arr);
   }
 
-  const sections = BOARD_SECTIONS.map(({ bucket, heading, description }) => {
+  const sections = NB_BOARD_SECTIONS.map(({ bucket, heading, description, color, wide }) => {
     const notices = byBucket.get(bucket) || [];
     if (notices.length === 0 && bucket !== "chase_now") return "";
 
+    const gridClass = wide ? "nb-card-grid nb-card-grid--2col" : "nb-card-grid nb-card-grid--1col";
     const cards = notices.length > 0
-      ? notices.map(n => renderOpportunityCard(n, { deskSlug })).join("")
-      : `<div class="opp-cold">No notices currently match this bucket for this desk. <strong>Check back after the next data refresh.</strong></div>`;
+      ? notices.map(n => renderNoticesCard(n, deskSlug)).join("")
+      : `<div class="nb-empty">No notices currently match this bucket. Check back after the next data refresh.</div>`;
 
-    return `<div class="opp-board-section" id="bucket-${bucket}">
-  <div class="opp-section-head">
-    <span class="opp-section-title">${esc(heading)}</span>
-    <span class="opp-section-count">${notices.length} notice${notices.length !== 1 ? "s" : ""}</span>
+    return `<div class="nb-bucket" id="nbbucket-${esc(bucket)}">
+  <div class="nb-bucket-head">
+    <div class="nb-bucket-stripe" style="background:${color}"></div>
+    <div class="nb-bucket-name">${esc(heading)}</div>
+    <div class="nb-bucket-count">${notices.length} notice${notices.length !== 1 ? "s" : ""}</div>
+    <div class="nb-bucket-desc">${esc(description)}</div>
   </div>
-  <p style="font-size:13px;color:var(--slate);margin-bottom:14px">${esc(description)}</p>
-  <div class="opp-cards">${cards}</div>
+  <div class="${gridClass}">${cards}</div>
 </div>`;
   }).join("");
 
   const awardedSection = awardedIntel.length > 0 ? `
-<div class="opp-board-section" id="bucket-awarded">
-  <div class="opp-section-head">
-    <span class="opp-section-title">Awarded intelligence</span>
-    <span class="opp-section-count">${awardedIntel.length} notice${awardedIntel.length !== 1 ? "s" : ""}</span>
+<div class="nb-bucket" id="nbbucket-awarded">
+  <div class="nb-bucket-head">
+    <div class="nb-bucket-stripe" style="background:#4b5563"></div>
+    <div class="nb-bucket-name">Awarded Intelligence</div>
+    <div class="nb-bucket-count">${awardedIntel.length} notice${awardedIntel.length !== 1 ? "s" : ""}</div>
+    <div class="nb-bucket-desc">Demand signals from awarded contracts. Not live opportunities — use for buyer mapping.</div>
   </div>
-  <p style="font-size:13px;color:var(--slate);margin-bottom:14px">Contracts awarded in this desk. Demand signals and incumbent identification only — not live opportunities.</p>
-  <div class="opp-cards">${awardedIntel.slice(0, 15).map(n => renderOpportunityCard(n, { deskSlug })).join("")}</div>
+  <div class="nb-card-grid nb-card-grid--1col">${awardedIntel.slice(0, 15).map(n => renderNoticesCard(n, deskSlug)).join("")}</div>
 </div>` : "";
 
   return sections + awardedSection;
@@ -995,5 +1053,110 @@ export function reportChaseNowCss(): string {
 .chase-title{font-family:var(--serif,Georgia,serif);font-size:22px;font-weight:600;margin:0 0 8px}
 .chase-sub{font-size:14px;line-height:1.6;color:var(--ink,#24140f);margin-bottom:6px}
 .chase-caveat{font-family:var(--mono,monospace);font-size:11px;color:var(--muted,#6f5b50)}
+`;
+}
+
+export function noticesBoardCss(): string {
+  return `
+/* ── Notices board stats pills ─────────────────────────── */
+.nb-stats{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+.nb-stat-pill{background:var(--paper-2);border:1px solid var(--line-strong);border-radius:6px;padding:12px 18px;display:flex;align-items:center;gap:12px;flex:1;min-width:140px}
+.nb-stat-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.nb-stat-num{font-family:var(--serif);font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:6px}
+.nb-stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-top:3px}
+.nb-pulse{width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;box-shadow:0 0 0 0 rgba(34,197,94,.4);animation:nb-pulse 2s infinite;flex-shrink:0}
+@keyframes nb-pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
+
+/* ── Filter bar ─────────────────────────────────────────── */
+.nb-filter-bar{background:var(--paper-2);border-bottom:1px solid var(--line-strong);padding:10px 56px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nb-filter-label{font-family:var(--mono);font-size:11px;color:var(--slate);letter-spacing:.04em;white-space:nowrap}
+.nb-filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--line-strong);background:transparent;color:var(--slate);font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:.03em;transition:border-color .15s,color .15s}
+.nb-filter-btn:hover{border-color:var(--ink);color:var(--ink)}
+.nb-filter-btn.nb-active{border-color:var(--accent);color:var(--accent);background:rgba(155,44,44,.06)}
+.nb-filter-sep{width:1px;height:16px;background:var(--line-strong);flex-shrink:0;margin:0 4px}
+.nb-sort-select{background:var(--paper);border:1px solid var(--line-strong);color:var(--ink);border-radius:4px;padding:5px 10px;font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:.03em}
+
+/* ── Two-column layout ──────────────────────────────────── */
+.nb-layout{display:flex;align-items:flex-start;max-width:1440px;margin:0 auto;padding-bottom:64px}
+.nb-sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--line-strong);padding:24px 0;position:sticky;top:0;max-height:100vh;overflow-y:auto}
+.nb-sb-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);padding:0 20px;margin:16px 0 6px}
+.nb-sb-label:first-child{margin-top:0}
+.nb-sb-item{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;transition:background .15s;text-decoration:none;color:inherit;border-left:2px solid transparent}
+.nb-sb-item:hover{background:var(--paper-2)}
+.nb-sb-item.nb-sb-active{background:rgba(155,44,44,.05);border-left-color:var(--accent);padding-left:18px}
+.nb-sb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.nb-sb-name{font-family:var(--mono);font-size:11.5px;flex:1;letter-spacing:.02em}
+.nb-sb-badge{font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:10px;background:var(--paper-2);border:1px solid var(--line-strong);color:var(--slate);white-space:nowrap}
+.nb-sb-badge--hot{background:rgba(185,28,28,.08);border-color:rgba(185,28,28,.25);color:#b91c1c}
+.nb-sb-divider{height:1px;background:var(--line-strong);margin:8px 0}
+
+/* ── Main content ───────────────────────────────────────── */
+.nb-main{flex:1;padding:32px 48px 32px 40px;min-width:0}
+.nb-disclaimer{font-family:var(--mono);font-size:11px;color:var(--slate);margin-bottom:28px}
+
+/* ── Bucket sections ─────────────────────────────────────── */
+.nb-bucket{margin-bottom:44px}
+.nb-bucket-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line-strong);flex-wrap:wrap}
+.nb-bucket-stripe{width:3px;height:24px;border-radius:2px;flex-shrink:0}
+.nb-bucket-name{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.nb-bucket-count{font-family:var(--mono);font-size:10px;color:var(--slate);padding:2px 9px;background:var(--paper-2);border:1px solid var(--line-strong);border-radius:10px}
+.nb-bucket-desc{font-family:var(--sans);font-size:12px;color:var(--slate);margin-left:auto}
+
+/* ── Card grid ───────────────────────────────────────────── */
+.nb-card-grid{display:grid;gap:14px}
+.nb-card-grid--2col{grid-template-columns:1fr 1fr}
+.nb-card-grid--1col{grid-template-columns:1fr}
+
+/* ── Card ────────────────────────────────────────────────── */
+.nb-card{background:var(--paper);border:1px solid var(--line-strong);border-left:3px solid var(--line-strong);padding:16px;transition:border-color .15s,box-shadow .15s}
+.nb-card:hover{border-top-color:var(--ink);border-right-color:var(--ink);border-bottom-color:var(--ink);box-shadow:0 2px 10px rgba(11,15,20,.07)}
+.nb-card--chase_now{border-left-color:#22c55e}
+.nb-card--worth_checking{border-left-color:#3b82f6}
+.nb-card--prepare_first{border-left-color:#f59e0b}
+.nb-card--partner_route{border-left-color:#a855f7}
+.nb-card--watchlist{border-left-color:var(--line-strong);opacity:.88}
+.nb-card--low_confidence{border-left-color:var(--line);opacity:.75}
+
+.nb-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.nb-chips{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.nb-chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:10px}
+.nb-deadline-red{background:rgba(185,28,28,.08);color:#b91c1c;border:1px solid rgba(185,28,28,.18)}
+.nb-deadline-amber{background:rgba(146,64,14,.08);color:#92400e;border:1px solid rgba(146,64,14,.18)}
+.nb-deadline-ok{background:rgba(22,101,52,.06);color:#166534;border:1px solid rgba(22,101,52,.15)}
+.nb-fit-chip{background:rgba(155,44,44,.07);color:var(--accent);border:1px solid rgba(155,44,44,.14)}
+.nb-src-chip{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.nb-value{font-family:var(--serif);font-size:18px;font-weight:700;letter-spacing:-.02em;color:var(--ink);white-space:nowrap;flex-shrink:0}
+.nb-card--watchlist .nb-value,.nb-card--low_confidence .nb-value{font-size:14px;color:var(--slate)}
+
+.nb-card-title{font-family:var(--serif);font-size:14.5px;font-weight:600;line-height:1.35;margin:0 0 7px;color:var(--ink)}
+.nb-card-title a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-strong)}
+.nb-card-title a:hover{color:var(--accent)}
+.nb-buyer{font-size:12px;color:var(--slate);margin-bottom:10px}
+.nb-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.nb-tag{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.nb-caution{font-size:11.5px;color:#92400e;background:#fffbeb;border-left:2px solid #f59e0b;padding:6px 10px;margin-bottom:10px;line-height:1.5}
+
+.nb-cta-row{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.nb-cta-primary{flex:1;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:9px 14px;background:var(--ink);color:var(--paper);border:1px solid var(--ink);transition:background .15s,border-color .15s;white-space:nowrap}
+.nb-cta-primary:hover{background:var(--accent);border-color:var(--accent)}
+.nb-card--chase_now .nb-cta-primary{background:#15803d;border-color:#15803d;color:#fff}
+.nb-card--chase_now .nb-cta-primary:hover{background:#166534;border-color:#166534}
+.nb-cta-secondary{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:8px 12px;border:1px solid var(--line-strong);color:var(--slate);transition:border-color .15s,color .15s;white-space:nowrap}
+.nb-cta-secondary:hover{border-color:var(--ink);color:var(--ink)}
+.nb-empty{padding:24px;background:var(--paper-2);border:1px solid var(--line);color:var(--slate);font-family:var(--mono);font-size:12px;line-height:1.6}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media(max-width:1100px){
+  .nb-filter-bar{padding:10px 20px}
+  .nb-sidebar{display:none}
+  .nb-main{padding:24px 20px}
+  .nb-card-grid--2col{grid-template-columns:1fr}
+  .nb-bucket-desc{display:none}
+}
+@media(max-width:760px){
+  .nb-stats{flex-direction:column}
+  .nb-stat-pill{min-width:unset}
+  .nb-bucket-count{display:none}
+}
 `;
 }
