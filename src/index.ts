@@ -5924,10 +5924,11 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       ${closingSoonScored.slice(0, 3).map(n => {
         const d = new Date(n.deadlineDate!).getTime();
         const daysLeft = Math.max(1, Math.ceil((d - nowMs) / (24 * 3_600_000)));
-        return `<div class="urgency-item">
+        const safeHref = n.url && n.url !== "#" ? escapeHtml(n.url) : "#";
+        return `<a class="urgency-item" href="${safeHref}" target="_blank" rel="noopener noreferrer">
           <span class="urgency-title">${escapeHtml(n.title.slice(0, 70))}</span>
           <span class="urgency-badge">${daysLeft}d left</span>
-        </div>`;
+        </a>`;
       }).join("")}
     </div>`
     : "";
@@ -6219,9 +6220,11 @@ a{color:inherit;text-decoration:none}
 /* Urgency strip */
 .urgency-strip{background:rgba(155,44,44,.1);border:1px solid rgba(194,85,63,.2);padding:12px 16px;margin-bottom:16px}
 .urgency-strip-head{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C2553F;margin-bottom:10px;display:flex;align-items:center;gap:4px}
-.urgency-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(155,44,44,.1)}
+.urgency-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(155,44,44,.1);text-decoration:none;transition:background .12s;margin:0 -16px;padding-left:16px;padding-right:16px}
 .urgency-item:last-child{border-bottom:none;padding-bottom:0}
-.urgency-title{font-size:12.5px;color:#e0c8c0;line-height:1.35;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px}
+.urgency-item:hover{background:rgba(155,44,44,.12)}
+.urgency-item:hover .urgency-title{color:#FAF8F3}
+.urgency-title{font-size:12.5px;color:#e0c8c0;line-height:1.35;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px;transition:color .12s}
 .urgency-badge{font-family:var(--mono);font-size:10px;background:#7a1f1f;color:#FAF8F3;padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
 /* Analytics section — dark zone continuation */
 .analytics-section{background:#0B0F14;padding:56px 0;border-bottom:1px solid rgba(255,255,255,.06)}
