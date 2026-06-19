@@ -5771,10 +5771,65 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     ? `£${(v / 1_000_000_000).toFixed(2)}bn`
     : `£${(v / 1_000_000).toFixed(2)}m`;
 
+  const fmtShort = (v: number) => v >= 1e9 ? `£${(v / 1e9).toFixed(1)}bn`
+    : v >= 1e6 ? `£${(v / 1e6).toFixed(0)}m`
+    : v >= 1e3 ? `£${Math.round(v / 1e3)}k`
+    : `£${Math.round(v)}`;
+
   const topCats = profile.live && !isCompiling
     ? [...demandCategories].sort((a, b) => b.value - a.value).slice(0, 5).filter(c => c.value > 0)
     : [];
   const maxCatVal = topCats[0]?.value || 1;
+
+  // ── Market intelligence data ─────────────────────────────────────────────
+  const nowMs = Date.now();
+
+  const avgContractVal = awardedCount > 0 ? totalAwarded / awardedCount : 0;
+
+  const buyersThisMonth = new Set(
+    allOpen.filter(n => {
+      if (nowMs - new Date(n.publishedDate || 0).getTime() > 30 * 24 * 3_600_000) return false;
+      return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+    }).map(n => n.buyer).filter(Boolean)
+  ).size;
+
+  const closingSoonRawCount = allOpen.filter(n => {
+    if (!n.deadlineDate) return false;
+    const d = new Date(n.deadlineDate).getTime();
+    return d > nowMs && d <= nowMs + 7 * 24 * 3_600_000 &&
+      deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+  }).length;
+
+  // Monthly spend trend (last 12 months, from awardedNotices)
+  const monthlySpend = new Map<string, number>();
+  for (const n of awardedNotices) {
+    const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
+    if (!d || d.getTime() < cutoff365) continue;
+    const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthlySpend.set(mk, (monthlySpend.get(mk) || 0) + (n.awardedValue || 0));
+  }
+  const trendData = [...monthlySpend.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const maxMonthVal = Math.max(...trendData.map(([, v]) => v), 1);
+
+  // Recent awards (keyword-matched, last 90 days)
+  const cutoff90ms = nowMs - 90 * 24 * 3_600_000;
+  const recentAwards = awardedNotices.filter(n => {
+    const t = new Date(n.awardedDate || n.publishedDate || 0).getTime();
+    if (t < cutoff90ms) return false;
+    return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+  }).sort((a, b) =>
+    new Date(b.awardedDate || b.publishedDate || 0).getTime() -
+    new Date(a.awardedDate || a.publishedDate || 0).getTime()
+  ).slice(0, 6);
+
+  // Buyer tier classification (relative to top buyer's spend)
+  const maxBuyerSpend = topBuyers[0]?.[1].awardedValue || 1;
+  const buyerTierLabel = (spend: number): [string, string] => {
+    const pct = spend / maxBuyerSpend;
+    if (pct >= 0.6) return ["T1", "bw-tier-1"];
+    if (pct >= 0.2) return ["T2", "bw-tier-2"];
+    return ["T3", "bw-tier-3"];
+  };
 
   // Demand signal panel
   const demandHtml = profile.live && !isCompiling
@@ -5824,6 +5879,33 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const deskScoredOpen = profile.live && !isCompiling && openNotices.length > 0
     ? scoreAndBucketNotices(openNotices.map(normaliseFromProcurementNotice), deskOppContext)
     : [];
+
+  // Urgency strip: scored notices closing within 7 days
+  const closingSoonScored = deskScoredOpen.filter(n => {
+    if (!n.deadlineDate) return false;
+    const d = new Date(n.deadlineDate).getTime();
+    return d > nowMs && d <= nowMs + 7 * 24 * 3_600_000;
+  });
+  const urgencyIds = new Set(closingSoonScored.slice(0, 3).map(n => n.id));
+  const regularCards = deskScoredOpen.filter(n => !urgencyIds.has(n.id));
+
+  const urgencyStripHtml = closingSoonScored.length > 0
+    ? `<div class="urgency-strip">
+      <div class="urgency-strip-head">
+        <span class="live-dot" style="background:#C2553F;animation:none;margin-right:2px"></span>
+        CLOSING IN 7 DAYS &mdash; ${closingSoonScored.length} ${closingSoonScored.length === 1 ? "notice" : "notices"}
+      </div>
+      ${closingSoonScored.slice(0, 3).map(n => {
+        const d = new Date(n.deadlineDate!).getTime();
+        const daysLeft = Math.max(1, Math.ceil((d - nowMs) / (24 * 3_600_000)));
+        return `<div class="urgency-item">
+          <span class="urgency-title">${escapeHtml(n.title.slice(0, 70))}</span>
+          <span class="urgency-badge">${daysLeft}d left</span>
+        </div>`;
+      }).join("")}
+    </div>`
+    : "";
+
   const liveHtml = `<div class="dp-head-row" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px">
       <span class="live-dot"></span>
@@ -5834,7 +5916,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   ${!profile.live || isCompiling
     ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
     : deskScoredOpen.length
-      ? deskScoredOpen.slice(0, 3).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("") + `<a href="/desk/${profile.slug}/notices" class="dp-link-sm" style="display:inline-block;margin-top:14px">See all opportunities &rarr;</a>`
+      ? urgencyStripHtml + regularCards.slice(0, 3).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("") + `<a href="/desk/${profile.slug}/notices" class="dp-link-sm" style="display:inline-block;margin-top:14px">See all opportunities &rarr;</a>`
       : `<p class="dp-caveat-sm">No open notices at last refresh.</p><a href="/desk/${profile.slug}/notices" class="dp-map-link" style="text-decoration-color:var(--accent);font-weight:700">Check the full board &rarr;</a>`
   }
   <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Public record only</p>`;
@@ -5860,21 +5942,143 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
           : orgType === "HOUSING" ? "bw-tag-housing"
           : orgType === "EDUCATION" ? "bw-tag-edu"
           : "bw-tag-other";
+        const [tierLabel, tierClass] = buyerTierLabel(info.awardedValue);
+        const spendPct = Math.round((info.awardedValue / maxBuyerSpend) * 100);
         return `<div class="bw-row">
           <div class="bw-avatar">${escapeHtml(initials)}</div>
           <div class="bw-info">
-            <div class="bw-name">${escapeHtml(buyer.slice(0, 55))}</div>
-            ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
-            <div class="bw-meta">
-              <span class="bw-spend">${escapeHtml(spend)}</span>
-              <span class="bw-meta-label"> Est. annual spend</span>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
+              <div class="bw-name" style="margin-bottom:0">${escapeHtml(buyer.slice(0, 50))}</div>
+              <span class="bw-tier ${tierClass}">${tierLabel}</span>
             </div>
+            ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
+            <div class="bw-meta" style="margin-top:6px">
+              <span class="bw-spend">${escapeHtml(spend)}</span>
+              <span class="bw-meta-label"> est. annual</span>
+            </div>
+            <div class="bw-spend-bar-track"><div class="bw-spend-bar-fill" style="width:${spendPct}%"></div></div>
             <div class="bw-meta"><span class="bw-meta-label">Active notices: ${activeCount}</span></div>
           </div>
         </div>`;
       }).join("")
   }
   <p class="dp-caveat-foot">Watchlist rotates daily. Figures are indicative.</p>`;
+
+  // ── Market Pulse strip ──────────────────────────────────────────────────
+  const pulseHtml = profile.live && !isCompiling ? `
+  <div class="dp-pulse">
+    <div class="dp-pulse-inner">
+      <div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${escapeHtml(fmtBig(totalAwarded))}+</span>
+        <span class="dp-pulse-label">Market size (12m)</span>
+      </div>
+      <div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${openNotices.length}</span>
+        <span class="dp-pulse-label">Active tenders</span>
+      </div>
+      <div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${avgContractVal > 0 ? escapeHtml(fmtBig(avgContractVal)) : "&mdash;"}</span>
+        <span class="dp-pulse-label">Avg contract value</span>
+      </div>
+      <div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${buyersThisMonth > 0 ? buyersThisMonth : "&mdash;"}</span>
+        <span class="dp-pulse-label">Buyers publishing now</span>
+      </div>
+      <div class="dp-pulse-stat${closingSoonRawCount > 0 ? " dp-pulse-urgent" : ""}">
+        <span class="dp-pulse-val">${closingSoonRawCount > 0 ? closingSoonRawCount : "&mdash;"}</span>
+        <span class="dp-pulse-label">Closing in 7 days</span>
+      </div>
+    </div>
+  </div>` : "";
+
+  // ── In-page tab bar ──────────────────────────────────────────────────────
+  const tabBarHtml = `
+  <nav class="desk-tab-bar">
+    <a href="#" class="desk-tab desk-tab--active" data-tab="overview">Overview</a>
+    <a href="#" class="desk-tab" data-tab="analytics">Analytics</a>
+    <a href="/desk/${escapeHtml(profile.slug)}/notices" class="desk-tab desk-tab--ext">Opportunities &#8599;</a>
+    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="desk-tab desk-tab--ext">Buyers &#8599;</a>
+  </nav>`;
+
+  // ── Spend trend chart ────────────────────────────────────────────────────
+  const spendChartHtml = trendData.length >= 2
+    ? `<div class="trend-chart">
+      <div class="trend-bars">
+        ${trendData.map(([key, val]) => {
+          const pct = Math.max(Math.round((val / maxMonthVal) * 100), 2);
+          const dt = new Date(key + "-01");
+          const mo = dt.toLocaleDateString("en-GB", { month: "short" });
+          const yr = String(dt.getFullYear()).slice(2);
+          return `<div class="trend-bar-col" title="${escapeHtml(mo + " '" + yr + ": " + fmtShort(val))}">
+            <div class="trend-bar" style="height:${pct}%"></div>
+            <div class="trend-bar-label">${escapeHtml(mo)}<br><span>${escapeHtml("'" + yr)}</span></div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="trend-foot">
+        <span class="trend-total">${escapeHtml(fmtBig(totalAwarded))}+</span>
+        <span class="trend-total-label">12-month awarded total &mdash; ${trendData.length} months of data</span>
+      </div>
+    </div>`
+    : `<p style="color:var(--slate);font-size:14px;margin-top:16px">Trend data compiles after the desk has been live for a few weeks.</p>`;
+
+  // ── Analytics tab section ────────────────────────────────────────────────
+  const catBreakdownHtml = topCats.length > 0
+    ? topCats.map(c => {
+      const pct = Math.round((c.value / maxCatVal) * 100);
+      return `<div class="cat-breakdown-item">
+        <div>
+          <div class="cat-breakdown-label">${escapeHtml(c.label)}</div>
+          <div class="cat-breakdown-track"><div class="cat-breakdown-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="cat-breakdown-val">${escapeHtml(fmtMoney(c.value))}</div>
+      </div>`;
+    }).join("")
+    : `<p style="color:var(--slate);font-size:14px;margin-top:16px">Category breakdown compiles on first desk load.</p>`;
+
+  const analyticsHtml = `
+  <section class="analytics-section" id="tab-analytics" hidden>
+    <div class="analytics-inner">
+      <div>
+        <div class="analytics-head">12-MONTH SPEND TREND</div>
+        <p style="font-size:13px;color:var(--slate);margin-bottom:20px">Monthly awarded contract value on this desk (public record).</p>
+        ${spendChartHtml}
+      </div>
+      <div>
+        <div class="analytics-head">CATEGORY BREAKDOWN</div>
+        <p style="font-size:13px;color:var(--slate);margin-bottom:24px">Top sub-sectors by awarded spend (12 months).</p>
+        ${catBreakdownHtml}
+      </div>
+    </div>
+  </section>`;
+
+  // ── Recent awards strip ──────────────────────────────────────────────────
+  const recentAwardsHtml = recentAwards.length > 0
+    ? `<section class="awards-section">
+      <div class="awards-inner">
+        <div class="awards-head-row">
+          <span class="awards-title">RECENT AWARDS &mdash; LAST 90 DAYS</span>
+          <span style="font-family:var(--mono);font-size:10.5px;color:var(--slate)">${recentAwards.length} award${recentAwards.length === 1 ? "" : "s"} found</span>
+        </div>
+        <div class="awards-grid">
+          ${recentAwards.map(n => {
+            const val = n.awardedValue;
+            const dt = n.awardedDate || n.publishedDate;
+            const dtFmt = dt ? new Date(dt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+            return `<div class="award-card">
+              <div class="award-card-buyer">${escapeHtml(n.buyer.slice(0, 45))}</div>
+              <div class="award-card-title">${escapeHtml(n.title.slice(0, 90))}</div>
+              <div class="award-card-meta">
+                <span class="award-card-val">${val && val > 0 ? escapeHtml(fmtMoney(val)) : "&mdash;"}</span>
+                <span class="award-card-date">${escapeHtml(dtFmt)}</span>
+              </div>
+              ${n.awardedSupplier ? `<div class="award-card-winner">&#127942; ${escapeHtml(n.awardedSupplier.slice(0, 50))}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </section>`
+    : "";
 
   // Demand map grid
   const sortedCategories = [...profile.categories].sort((a, b) => {
@@ -5986,6 +6190,71 @@ a{color:inherit;text-decoration:none}
 /* Live dot */
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2d9b6f;flex-shrink:0;margin-right:4px;animation:ldpulse 2.4s ease-in-out infinite}
 @keyframes ldpulse{0%{box-shadow:0 0 0 0 #2d9b6f55}70%{box-shadow:0 0 0 6px #2d9b6f00}100%{box-shadow:0 0 0 0 #2d9b6f00}}
+/* Market Pulse strip */
+.dp-pulse{background:var(--ink);border-bottom:1px solid rgba(255,255,255,.06)}
+.dp-pulse-inner{padding:0 56px;display:flex}
+.dp-pulse-stat{flex:1;padding:20px 24px;border-right:1px solid rgba(255,255,255,.06)}
+.dp-pulse-stat:last-child{border-right:none}
+.dp-pulse-val{display:block;font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;color:#FAF8F3;line-height:1.1}
+.dp-pulse-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:#3a4a58;margin-top:6px}
+.dp-pulse-urgent .dp-pulse-val{color:#C2553F}
+.dp-pulse-urgent .dp-pulse-label{color:#7a2020}
+/* In-page tab bar */
+.desk-tab-bar{background:#0d1219;border-bottom:1px solid rgba(255,255,255,.06);display:flex;padding:0 56px}
+.desk-tab{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#3a4a58;padding:0 20px;height:42px;display:flex;align-items:center;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap;text-decoration:none}
+.desk-tab:first-child{padding-left:0}
+.desk-tab--active{color:#FAF8F3;border-bottom-color:#FAF8F3}
+.desk-tab:hover:not(.desk-tab--active){color:#9aabb7}
+.desk-tab--ext{margin-left:auto;color:#2e3e4c}
+.desk-tab--ext:hover{color:#5a6e7e}
+/* Urgency strip */
+.urgency-strip{background:rgba(155,44,44,.1);border:1px solid rgba(194,85,63,.2);padding:12px 16px;margin-bottom:16px}
+.urgency-strip-head{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#C2553F;margin-bottom:10px;display:flex;align-items:center;gap:4px}
+.urgency-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(155,44,44,.1)}
+.urgency-item:last-child{border-bottom:none;padding-bottom:0}
+.urgency-title{font-size:12.5px;color:#e0c8c0;line-height:1.35;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px}
+.urgency-badge{font-family:var(--mono);font-size:10px;background:#7a1f1f;color:#FAF8F3;padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
+/* Analytics section */
+.analytics-section{background:var(--paper);padding:64px 0;border-bottom:1px solid var(--line-strong)}
+.analytics-inner{padding:0 56px;display:grid;grid-template-columns:3fr 2fr;gap:64px;align-items:start}
+.analytics-head{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin-bottom:8px}
+/* Spend trend chart */
+.trend-chart{background:#111820;border:1px solid rgba(255,255,255,.07);padding:28px 24px 0}
+.trend-bars{display:flex;align-items:flex-end;gap:5px;height:140px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:0}
+.trend-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.trend-bar{width:100%;background:linear-gradient(to top,#7a1f1f,#C2553F);border-radius:2px 2px 0 0;transition:opacity .15s;cursor:default}
+.trend-bar:hover{opacity:.75}
+.trend-bar-label{font-family:var(--mono);font-size:8.5px;color:#2e3e4c;text-align:center;padding:10px 0 12px;line-height:1.4}
+.trend-foot{padding:20px 0 28px;display:flex;align-items:baseline;gap:12px}
+.trend-total{font-family:var(--serif);font-size:30px;font-weight:600;color:#FAF8F3}
+.trend-total-label{font-family:var(--mono);font-size:10px;color:#3a4a58;letter-spacing:.06em;text-transform:uppercase}
+/* Category breakdown */
+.cat-breakdown-item{display:grid;grid-template-columns:1fr 72px;gap:16px;align-items:center;margin-bottom:22px}
+.cat-breakdown-label{font-size:13.5px;color:var(--ink);margin-bottom:6px}
+.cat-breakdown-track{height:3px;background:var(--paper-2);border:1px solid var(--line-strong);border-radius:2px}
+.cat-breakdown-fill{height:3px;background:var(--accent);border-radius:2px}
+.cat-breakdown-val{font-family:var(--mono);font-size:12px;color:var(--slate);text-align:right;padding-top:20px}
+/* Recent awards */
+.awards-section{background:var(--paper-2);border-bottom:1px solid var(--line-strong)}
+.awards-inner{padding:56px 56px}
+.awards-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+.awards-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.awards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.award-card{background:var(--paper);border:1px solid var(--line-strong);padding:22px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
+.award-card:hover{border-color:#0B0F1440;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.award-card-buyer{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.award-card-title{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.45;margin-bottom:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1}
+.award-card-meta{display:flex;justify-content:space-between;align-items:baseline}
+.award-card-val{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink)}
+.award-card-date{font-family:var(--mono);font-size:10px;color:var(--slate)}
+.award-card-winner{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--line);padding-top:10px}
+/* Buyer tier & spend bar */
+.bw-tier{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;padding:2px 7px;border-radius:2px;flex-shrink:0}
+.bw-tier-1{background:rgba(194,85,63,.15);color:#C2553F;border:1px solid rgba(194,85,63,.25)}
+.bw-tier-2{background:rgba(45,155,111,.1);color:#2d9b6f;border:1px solid rgba(45,155,111,.2)}
+.bw-tier-3{background:rgba(255,255,255,.04);color:#3a4a58;border:1px solid rgba(255,255,255,.08)}
+.bw-spend-bar-track{height:2px;background:rgba(255,255,255,.07);border-radius:1px;margin:8px 0 4px}
+.bw-spend-bar-fill{height:2px;background:#C2553F;border-radius:1px;opacity:.7}
 /* ls-table (used in subPage) */
 .ls-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
 .ls-table th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);text-align:left;padding:0 8px 12px 0;border-bottom:1px solid var(--line-strong)}
@@ -6053,10 +6322,13 @@ a{color:inherit;text-decoration:none}
   .dm-mast-inner{grid-template-columns:1fr}
   .dm-mast-cta{display:none}
   .dm-mast h1{font-size:52px}
+  .analytics-inner{grid-template-columns:1fr;gap:40px}
+  .awards-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:760px){
   .gh-tag,.gh-badge{display:none}
   .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
+  .dp-pulse-inner,.analytics-inner,.awards-inner,.desk-tab-bar{padding-left:16px;padding-right:16px}
   .dm-mast{padding:40px 0 36px}
   .dm-mast-inner{grid-template-columns:1fr;gap:0}
   .dm-mast h1{font-size:34px}
@@ -6071,10 +6343,16 @@ a{color:inherit;text-decoration:none}
   .dm-sources-inner{flex-direction:column;align-items:flex-start;gap:6px;padding-top:14px;padding-bottom:14px}
   .dm-sources-right{flex-wrap:wrap}
   .ls-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .dp-pulse-inner{flex-wrap:wrap}
+  .dp-pulse-stat{flex:0 0 50%;border-right:none;border-bottom:1px solid rgba(255,255,255,.06)}
+  .awards-grid{grid-template-columns:1fr}
+  .analytics-inner{grid-template-columns:1fr;gap:32px}
+  .awards-inner{padding:40px 16px}
 }
 @media(max-width:480px){
   .dm-grid{grid-template-columns:1fr}
   .dp-stats{grid-template-columns:1fr}
+  .dp-pulse-stat{flex:0 0 100%}
 }
 ${oppCardCss()}
 /* Scoped overrides: opp-cards on dark panel surface */
@@ -6123,13 +6401,21 @@ ${deskOpportunityCss()}
   </div>
 </section>
 
-<div class="dp-panels">
-  <div class="dp-panels-inner">
-    <div class="dp-panel">${demandHtml}</div>
-    <div class="dp-panel">${liveHtml}</div>
-    <div class="dp-panel">${watchlistHtml}</div>
+${pulseHtml}
+${tabBarHtml}
+
+<div id="tab-overview">
+  <div class="dp-panels">
+    <div class="dp-panels-inner">
+      <div class="dp-panel">${demandHtml}</div>
+      <div class="dp-panel">${liveHtml}</div>
+      <div class="dp-panel">${watchlistHtml}</div>
+    </div>
   </div>
+  ${recentAwardsHtml}
 </div>
+
+${analyticsHtml}
 
 <section class="dm-section" id="demand-map">
   <div class="dm-section-inner">
@@ -6160,6 +6446,27 @@ ${deskOpportunityCss()}
 </div>
 <div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.desk-tab[data-tab]');
+  var overview = document.getElementById('tab-overview');
+  var analytics = document.getElementById('tab-analytics');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(e){
+      e.preventDefault();
+      var target = this.getAttribute('data-tab');
+      if (target === 'overview') {
+        if (overview) overview.hidden = false;
+        if (analytics) analytics.hidden = true;
+      } else if (target === 'analytics') {
+        if (overview) overview.hidden = true;
+        if (analytics) analytics.hidden = false;
+      }
+      tabs.forEach(function(t){ t.classList.toggle('desk-tab--active', t === tab); });
+    });
+  });
+})();
+</script>
 </body>
 </html>`;
 }
