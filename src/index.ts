@@ -729,9 +729,9 @@ function normaliseNotice(raw: any, keyword: string): ProcurementNotice | null {
     publishedDate: item.publishedDate || null,
     deadlineDate: item.deadlineDate || null,
     awardedDate: item.awardedDate || null,
-    valueLow: typeof item.valueLow === "number" ? item.valueLow : null,
-    valueHigh: typeof item.valueHigh === "number" ? item.valueHigh : null,
-    awardedValue: typeof item.awardedValue === "number" ? item.awardedValue : null,
+    valueLow: item.valueLow != null ? (Number(item.valueLow) || null) : null,
+    valueHigh: item.valueHigh != null ? (Number(item.valueHigh) || null) : null,
+    awardedValue: item.awardedValue != null ? (Number(item.awardedValue) || null) : null,
     awardedSupplier: decodeHtmlEntities(String(item.awardedSupplier || "")),
     suitableForSme: typeof item.isSuitableForSme === "boolean" ? item.isSuitableForSme : null,
     url: noticeUrl(id),
@@ -805,7 +805,7 @@ function normaliseFindTenderRelease(release: any, keyword: string): ProcurementN
   if (!title) return null;
 
   const buyerName = decodeHtmlEntities(String(release?.buyer?.name || release?.parties?.find?.((party: any) => Array.isArray(party.roles) && party.roles.includes("buyer"))?.name || "Not stated"));
-  const amount = typeof tender?.value?.amount === "number" ? tender.value.amount : null;
+  const amount = tender?.value?.amount != null ? (Number(tender.value.amount) || null) : null;
   const region = String(
     tender?.items?.[0]?.deliveryAddresses?.[0]?.region ||
     release?.parties?.[0]?.address?.region ||
