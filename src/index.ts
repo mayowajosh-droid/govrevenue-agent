@@ -3380,13 +3380,30 @@ const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 
-function renderDeskCard(sig: HomepageSignal, tag: string): string {
+function renderDeskCard(sig: HomepageSignal, tag: string, slug: string): string {
   const dateStr = sig.notice_date
-    ? new Date(sig.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(sig.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
     : "—";
-  const buyer = sig.buyer ? escapeHtml(sig.buyer.slice(0, 60)) : "Buyer not stated";
-  const title = escapeHtml(sig.title.slice(0, 90));
-  return `<article class="desk reveal"><div class="tag"><em>${escapeHtml(tag)}</em><time>${escapeHtml(dateStr)}</time></div><h3>${title}</h3><p>${buyer}</p><div class="src">Source: ${escapeHtml(sig.source)} &middot; public record</div></article>`;
+  const buyer = sig.buyer ? escapeHtml(sig.buyer.slice(0, 55)) : "Buyer not stated";
+  const title = escapeHtml(sig.title.slice(0, 85));
+  let valueChip = "";
+  if (sig.value_amount && sig.value_amount > 0) {
+    const v = sig.value_amount;
+    const vLabel = v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}M` : `£${Math.round(v / 1_000)}k`;
+    valueChip = `<span class="dc-chip dc-chip-value">${vLabel}</span>`;
+  }
+  const isOpen = !sig.status || !sig.status.toUpperCase().includes("AWARD");
+  const statusChip = isOpen
+    ? `<span class="dc-chip dc-chip-open">Open</span>`
+    : `<span class="dc-chip dc-chip-awarded">Awarded</span>`;
+  const srcLabel = sig.source && sig.source.toLowerCase().includes("tender") ? "FTS" : "CF";
+  const srcChip = `<span class="dc-chip dc-chip-src">${srcLabel}</span>`;
+  return `<a class="desk-card reveal" href="/desk/${escapeHtml(slug)}">
+  <div class="dc-top"><span class="dc-label">${escapeHtml(tag)}</span><div class="dc-chips">${valueChip}${statusChip}${srcChip}</div></div>
+  <div class="dc-title">${title}</div>
+  <div class="dc-buyer">${buyer}</div>
+  <div class="dc-foot"><span class="dc-date">${escapeHtml(dateStr)}</span><span class="dc-cta">View opportunities &rarr;</span></div>
+</a>`;
 }
 
 async function refreshHomepageSignals(): Promise<void> {
@@ -4808,17 +4825,23 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .section-head h2{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em}
 .section-head a{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);text-decoration:underline;text-underline-offset:4px}
 .section-head a:hover{color:var(--accent)}
-.desk-grid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line-strong)}
-.desk{padding:24px 26px 26px 0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);transition:.2s}
-.desk:nth-child(3n){border-right:0;padding-right:0}
-.desk:hover{background:#fff;box-shadow:0 14px 30px -24px #0f141955}
-.desk .tag{display:flex;align-items:center;gap:9px;margin-bottom:12px}
-.desk .tag em{font-family:var(--mono);font-style:normal;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
-.desk .tag time{font-family:var(--mono);font-size:11px;color:var(--slate)}
-.desk h3{font-family:var(--serif);font-size:21px;line-height:1.25;font-weight:600;margin-bottom:9px;transition:.15s}
-.desk:hover h3{color:var(--accent)}
-.desk p{font-size:14.5px;color:#3a444d;line-height:1.5;margin-bottom:14px}
-.desk .src{font-family:var(--mono);font-size:10.5px;color:var(--slate)}
+.desk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.desk-card{display:flex;flex-direction:column;gap:10px;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;text-decoration:none;color:inherit;background:#fff;transition:.2s}
+.desk-card:hover{box-shadow:0 8px 24px -12px #0f141933;transform:translateY(-2px)}
+.dc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dc-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
+.dc-chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.dc-chip{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.dc-chip-value{background:#1a3a2a;color:#4ade80}
+.dc-chip-open{background:#dcfce7;color:#15803d}
+.dc-chip-awarded{background:#f3f4f6;color:#6b7280}
+.dc-chip-src{background:#e8f0fe;color:#1d4ed8}
+.dc-title{font-family:var(--serif);font-size:16px;line-height:1.3;font-weight:600;color:var(--ink)}
+.dc-buyer{font-size:12.5px;color:var(--slate);line-height:1.4}
+.dc-foot{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.dc-date{font-family:var(--mono);font-size:11px;color:var(--slate)}
+.dc-cta{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.05em}
+.desk-card:hover .dc-cta{text-decoration:underline}
 .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
 .reveal.in{opacity:1;transform:none}
 .product{background:var(--ink);color:var(--paper);border-bottom:1px solid #000}
@@ -4858,7 +4881,6 @@ footer .legal{grid-column:1/-1;border-top:1px solid #ffffff14;margin-top:30px;pa
   #globe-canvas{opacity:.4}
   .hero-grad{background:linear-gradient(180deg,#0B0F14cc,#0B0F14)}
   .desk-grid{grid-template-columns:1fr}
-  .desk{border-right:0!important;padding-right:0!important}
   footer .wrap{grid-template-columns:1fr 1fr}
   nav.primary,.mast-cta{display:none}
 }
@@ -4954,8 +4976,8 @@ ${chaseNowHtml}
       ${DESK_PROFILES.filter(d => d.live).map(d => {
         const sig = deskSignals.get(d.slug);
         return sig
-          ? renderDeskCard(sig, d.label)
-          : `<article class="desk reveal"><div class="tag"><em>${escapeHtml(d.label)}</em><time>—</time></div><h3>${escapeHtml(d.label)} — scanning</h3><p>Signals load on first hourly refresh.</p><div class="src">Source: Contracts Finder &middot; FTS</div></article>`;
+          ? renderDeskCard(sig, d.label, d.slug)
+          : `<a class="desk-card reveal" href="/desk/${escapeHtml(d.slug)}"><div class="dc-top"><span class="dc-label">${escapeHtml(d.label)}</span><div class="dc-chips"><span class="dc-chip dc-chip-src">CF</span></div></div><div class="dc-title">Scanning for live notices…</div><div class="dc-buyer">Signals load on first hourly refresh.</div><div class="dc-foot"><span class="dc-date">—</span><span class="dc-cta">View desk &rarr;</span></div></a>`;
       }).join("")}
     </div>
   </div>
