@@ -1475,7 +1475,7 @@ async function listAllSubscriptions(): Promise<SubscriptionRecord[]> {
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = req.header("x-admin-token") || String(req.query.token || "");
   if (token !== ADMIN_TOKEN) {
-    res.status(401).json({ error: "Unauthorized. Add ?token=YOUR_ADMIN_TOKEN" });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
   next();
@@ -3976,9 +3976,9 @@ function reportPage(scan: ScanRecord) {
     : `<p>Status: <strong>${escapeHtml(scan.status)}</strong></p><p>${scan.error_message ? escapeHtml(scan.error_message) : "Still running. Refresh shortly."}</p>`;
 
   return `<!doctype html>
-<html>
+<html lang="en">
 <head>
-  <title>${escapeHtml(scan.company_name)} - GovRevenue Scan</title>
+  <title>${escapeHtml(scan.company_name)} &mdash; GovRevenue Scan</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
@@ -5303,7 +5303,8 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
   const parsed = intakeSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).send(`<pre>${JSON.stringify(parsed.error.flatten(), null, 2)}</pre>`);
+    const issues = parsed.error.issues.map(i => escapeHtml(i.message)).join(", ");
+    res.status(400).type("html").send(`<!doctype html><html lang="en"><body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:40px"><div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:28px"><h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Submission error</h1><p style="color:#9b2d20;margin-bottom:20px">${issues}</p><p><a href="/scan" style="color:#1d6b4f">&larr; Back to the form</a></p></div></body></html>`);
     return;
   }
 
@@ -7510,7 +7511,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token || "");
 
   res.type("html").send(`<!doctype html>
-<html>
+<html lang="en">
 <body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
 <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">GovRevenue Scans</h1>
 <table border="1" cellpadding="10" cellspacing="0" style="background:#fff;width:100%;max-width:1120px">
@@ -7568,7 +7569,7 @@ app.get("/unsubscribe/:id", asyncRoute(async (req, res) => {
   }
   await deactivateSubscription(sub.id);
   res.type("html").send(`<!doctype html>
-<html>
+<html lang="en">
 <body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:40px">
 <div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
   <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
@@ -7582,7 +7583,7 @@ app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
   const subs = await listAllSubscriptions();
   const token = String(req.query.token || "");
   res.type("html").send(`<!doctype html>
-<html>
+<html lang="en">
 <body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px">
 <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif">Weekly Alert Subscriptions</h1>
 <p><a href="/admin/scans?token=${encodeURIComponent(token)}">← Back to scans</a></p>
