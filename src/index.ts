@@ -6760,7 +6760,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <style>
 ${pageShellCss()}
 .dl-hero{background:var(--ink);color:var(--paper);padding:72px 0 60px}
-.dl-hero-inner,.dl-body-inner{max-width:1200px;margin:0 auto;padding:0 56px}
+.dl-hero-inner,.dl-body-inner{max-width:1440px;margin:0 auto;padding:0 56px}
 .dl-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9aabb7;margin-bottom:18px}
 .dl-hero h1{font-family:var(--serif);font-size:52px;font-weight:400;line-height:1.1;margin-bottom:14px}
 .dl-hero-sub{font-size:15px;color:#9aabb7;max-width:540px;line-height:1.6;margin-bottom:48px}
