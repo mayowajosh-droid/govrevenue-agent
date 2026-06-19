@@ -3615,7 +3615,7 @@ function premiumClosingHtml(scan: ScanRecord, parsedEdp?: ParsedEdp | null) {
 
   return `
     <section class="marketing-close">
-      <div class="close-kicker">GovRevenue commercial close</div>
+      <div class="close-kicker">Revenue intelligence</div>
       <h2>From public-sector noise to a route-to-revenue system.</h2>
       <p>For <strong>${escapeHtml(company)}</strong>, this scan translates public procurement data into a practical commercial map: where demand exists, which buyers matter, what evidence is missing, and which route should be pursued first.</p>
       <div class="close-grid">
@@ -4361,7 +4361,7 @@ function reportPage(scan: ScanRecord) {
 <body>
   <main class="page">
     <div class="topbar">
-      <div class="brand">GovRevenue Agent</div>
+      <div class="brand">GovRevenue</div>
       <div class="actions">
         <a class="btn" href="/api/scans/${scan.id}/report.pdf">Download PDF</a>
         <button type="button" class="btn secondary" onclick="window.print()">Browser Print</button>
@@ -5027,8 +5027,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 })();
 (function(){
   const s=document.getElementById('spark'); if(!s) return;
-  const d=[6,9,7,12,11,16,14,20,19,26,24,32,30,40];
-  const max=42,W=320,H=46; let pts='';
+  const d=${JSON.stringify(chartPoints.length >= 3 ? chartPoints : [6,9,7,12,11,16,14,20,19,26,24,32,30,40])};
+  const max=Math.max(...d)*1.15||42,W=320,H=46; let pts='';
   d.forEach((v,i)=>{pts+=(i?' ':'')+( i/(d.length-1)*W).toFixed(1)+','+(H-(v/max)*H).toFixed(1);});
   s.innerHTML='<polyline points="'+pts+'" fill="none" stroke="#C2553F" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round"/>';
 })();
@@ -5432,7 +5432,7 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan) {
-    res.status(404).send("Scan not found");
+    res.status(404).type("html").send(notFoundHtml("Scan not found"));
     return;
   }
 
@@ -5452,7 +5452,7 @@ app.get("/desks", asyncRoute(async (req, res) => {
 
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).send("Desk not found"); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
 
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
@@ -5467,7 +5467,7 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
 
 app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).send("Desk not found"); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
 
   let matchCat: DeskCategory | null = null;
   let matchSub: string | null = null;
@@ -5477,7 +5477,7 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
     }
     if (matchCat) break;
   }
-  if (!matchCat || !matchSub) { res.status(404).send("Subcategory not found"); return; }
+  if (!matchCat || !matchSub) { res.status(404).type("html").send(notFoundHtml("Subcategory not found")); return; }
 
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
@@ -5490,7 +5490,7 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
 
 app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).send("Desk not found"); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
@@ -5500,7 +5500,7 @@ app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
 
 app.get("/desk/:slug/buyers", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).send("Desk not found"); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
@@ -5510,7 +5510,7 @@ app.get("/desk/:slug/buyers", asyncRoute(async (req, res) => {
 app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || scan.status !== "completed") {
-    res.status(404).send("Scan not found or not completed");
+    res.status(404).type("html").send(notFoundHtml("Scan not found or not completed"));
     return;
   }
   const prior = (await getScansByCompany(scan.company_name, scan.id))[0] || null;
@@ -5881,7 +5881,7 @@ a{color:inherit;text-decoration:none}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
-.gh-logo b{color:#d97070}
+.gh-logo b{color:var(--accent)}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
 .gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
@@ -6216,7 +6216,7 @@ a{color:inherit;text-decoration:none}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
-.gh-logo b{color:#d97070}
+.gh-logo b{color:var(--accent)}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
 .gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
@@ -6444,7 +6444,7 @@ a{color:inherit;text-decoration:none}
 .gh-top{display:flex;align-items:center;justify-content:space-between;height:52px;gap:24px}
 .gh-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .gh-logo{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--paper)}
-.gh-logo b{color:#d97070}
+.gh-logo b{color:var(--accent)}
 .gh-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7a909e;border-left:1px solid #ffffff1a;padding-left:10px}
 .gh-nav{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
 .gh-nav::-webkit-scrollbar{display:none}
@@ -6520,6 +6520,27 @@ function pageShellFoot(): string {
   </div>
 </footer>
 <div class="pg-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:#0F141926">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>`;
+}
+
+function notFoundHtml(message: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found &mdash; GovRevenue</title>
+<style>${pageShellCss()}</style>
+</head>
+<body>
+${pageShellHeader(null)}
+<main style="padding:80px 56px">
+  <p style="font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:16px">404</p>
+  <h1 style="font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px">${escapeHtml(message)}</h1>
+  <a href="/" style="font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);text-decoration:underline;text-underline-offset:3px">&larr; Back to GovRevenue</a>
+</main>
+${pageShellFoot()}
+</body>
+</html>`;
 }
 
 // ─── /desks ────────────────────────────────────────────────────────────────────
@@ -7241,7 +7262,7 @@ app.get("/api/scans/:id/report.pdf", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan || !scan.report_markdown) {
-    res.status(404).send("Report not found or not complete yet.");
+    res.status(404).json({ error: "Report not found or not complete yet." });
     return;
   }
 
@@ -7348,7 +7369,7 @@ app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan || !scan.report_markdown) {
-    res.status(404).send("Report not found or not complete yet.");
+    res.status(404).json({ error: "Report not found or not complete yet." });
     return;
   }
 
