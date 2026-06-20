@@ -6884,44 +6884,119 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
 app.get("/signals", asyncRoute(async (req, res) => {
   const catFilter = typeof req.query.cat === "string" ? req.query.cat : null;
   const statusFilter = typeof req.query.status === "string" ? req.query.status : "all";
+  const srcFilter = typeof req.query.src === "string" ? req.query.src : null;
+  const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
+  const PER_PAGE = 50;
+  const offset = (page - 1) * PER_PAGE;
+
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  const fmtVal = (v: number | null) => !v ? null : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : v >= 1000 ? `£${Math.round(v / 1000)}k` : `£${v}`;
+  const categoryLabel = (slug: string) => DESK_PROFILES.find(d => d.slug === slug)?.label || slug;
+
+  type SigStats = { total: string; open_cnt: string; total_val: string; closing14: string; closing7: string };
+  let stats: SigStats = { total: "0", open_cnt: "0", total_val: "0", closing14: "0", closing7: "0" };
   let signals: HomepageSignal[] = [];
+  let totalFiltered = 0;
+
   if (pool) {
-    const conditions: string[] = [];
+    const [statsRow] = (await pool.query<SigStats>(`
+      SELECT
+        COUNT(*)::text AS total,
+        COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::text AS open_cnt,
+        COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0), 0)::text AS total_val,
+        COUNT(*) FILTER (WHERE deadline_date IS NOT NULL AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '14 days')::text AS closing14,
+        COUNT(*) FILTER (WHERE deadline_date IS NOT NULL AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '7 days')::text AS closing7
+      FROM homepage_signals
+    `)).rows;
+    if (statsRow) stats = statsRow;
+
+    const conds: string[] = [];
     const params: (string | number)[] = [];
-    if (catFilter) { params.push(catFilter); conditions.push(`category = $${params.length}`); }
-    if (statusFilter === "open") conditions.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    if (catFilter) { params.push(catFilter); conds.push(`category = $${params.length}`); }
+    if (statusFilter === "open") conds.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
+    if (srcFilter) { params.push(srcFilter); conds.push(`source = $${params.length}`); }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+
+    const countRow = await pool.query<{ n: string }>(`SELECT COUNT(*)::text AS n FROM homepage_signals ${where}`, params);
+    totalFiltered = parseInt(countRow.rows[0]?.n || "0", 10);
+
+    const pageParams = [...params, PER_PAGE, offset];
     const r = await pool.query<HomepageSignal>(
-      `SELECT * FROM homepage_signals ${where} ORDER BY notice_date DESC NULLS LAST LIMIT 200`,
-      params
+      `SELECT * FROM homepage_signals ${where} ORDER BY notice_date DESC NULLS LAST LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+      pageParams
     );
     signals = r.rows;
   } else {
-    signals = [...sigMemStore.values()]
+    const all = [...sigMemStore.values()]
       .filter(s => !catFilter || s.category === catFilter)
       .filter(s => statusFilter !== "open" || /open|active/i.test(s.status || ""))
-      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
-      .slice(0, 200);
+      .filter(s => !srcFilter || s.source === srcFilter)
+      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""));
+    totalFiltered = all.length;
+    signals = all.slice(offset, offset + PER_PAGE);
+    const allSigs = [...sigMemStore.values()];
+    stats.total = String(allSigs.length);
+    stats.open_cnt = String(allSigs.filter(s => /open|active/i.test(s.status || "")).length);
   }
-  const allCategories = [...new Set(DESK_PROFILES.filter(d => d.live).map(d => d.slug))];
-  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-  const fmtVal = (v: number | null) => !v ? "—" : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : `£${Math.round(v / 1000)}k`;
-  const categoryLabel = (slug: string) => DESK_PROFILES.find(d => d.slug === slug)?.label || slug;
+
+  const totalPages = Math.ceil(totalFiltered / PER_PAGE);
+  const totalVal = parseFloat(stats.total_val) || 0;
+  const fmtBigVal = (v: number) => v >= 1_000_000_000 ? `£${(v / 1_000_000_000).toFixed(1)}bn` : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(0)}m` : `£${Math.round(v / 1000)}k`;
+
+  const nowMs = Date.now();
   const rows = signals.map(s => {
     const isOpen = /open|active/i.test(s.status || "");
-    return `<tr>
-      <td><span class="sig-cat">${escapeHtml(categoryLabel(s.category))}</span></td>
+    const val = fmtVal(s.value_amount);
+    const isHighVal = (s.value_amount || 0) >= 1_000_000;
+    const deadlineMs = s.deadline_date ? new Date(s.deadline_date).getTime() : null;
+    const daysLeft = deadlineMs ? Math.ceil((deadlineMs - nowMs) / 86_400_000) : null;
+    let urgencyClass = "";
+    let urgencyBadge = "";
+    if (daysLeft !== null && daysLeft >= 0) {
+      if (daysLeft <= 7) { urgencyClass = "row-urgent"; urgencyBadge = `<span class="dl-badge dl-red">${daysLeft}d left</span>`; }
+      else if (daysLeft <= 14) { urgencyClass = "row-warn"; urgencyBadge = `<span class="dl-badge dl-amber">${daysLeft}d left</span>`; }
+      else { urgencyBadge = `<span class="dl-badge dl-grey">${daysLeft}d</span>`; }
+    }
+    return `<tr class="${urgencyClass}">
+      <td><a href="/desk/${escapeHtml(s.category)}" class="sig-cat">${escapeHtml(categoryLabel(s.category))}</a></td>
       <td class="sig-title"><a href="${escapeHtml(s.source_url)}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a></td>
-      <td>${escapeHtml(s.buyer || "—")}</td>
-      <td>${fmtVal(s.value_amount)}</td>
-      <td><span class="sig-status ${isOpen ? "sig-open" : "sig-awarded"}">${escapeHtml(s.status || "—")}</span></td>
+      <td class="sig-buyer">${escapeHtml(s.buyer || "—")}</td>
+      <td class="sig-val ${isHighVal ? "sig-val-high" : ""}">${val ? escapeHtml(val) : '<span class="sig-nil">—</span>'}</td>
+      <td><span class="sig-status ${isOpen ? "sig-open" : "sig-awarded"}">${isOpen ? "Open" : "Awarded"}</span></td>
       <td class="sig-date">${fmtDate(s.notice_date)}</td>
-      <td class="sig-src">${escapeHtml(s.source)}</td>
+      <td class="sig-dl">${urgencyBadge || (s.deadline_date ? fmtDate(s.deadline_date) : '<span class="sig-nil">—</span>')}</td>
+      <td class="sig-src"><span class="src-badge src-${escapeHtml(s.source.toLowerCase())}">${escapeHtml(s.source)}</span></td>
     </tr>`;
   }).join("");
+
+  const allCategories = DESK_PROFILES.filter(d => d.live).map(d => d.slug);
   const catOptions = allCategories.map(c =>
     `<option value="${escapeHtml(c)}" ${catFilter === c ? "selected" : ""}>${escapeHtml(categoryLabel(c))}</option>`
   ).join("");
+
+  const qs = (overrides: Record<string, string | number | null>) => {
+    const base: Record<string, string> = {};
+    if (catFilter) base.cat = catFilter;
+    if (statusFilter !== "all") base.status = statusFilter;
+    if (srcFilter) base.src = srcFilter;
+    Object.entries(overrides).forEach(([k, v]) => { if (v !== null) base[k] = String(v); else delete base[k]; });
+    const s = new URLSearchParams(base).toString();
+    return s ? `/signals?${s}` : "/signals";
+  };
+
+  const pagerLink = (p: number, label: string, disabled = false) =>
+    disabled
+      ? `<span class="pg-link pg-dis">${label}</span>`
+      : `<a href="${qs({ page: p })}" class="pg-link">${label}</a>`;
+
+  const pager = totalPages <= 1 ? "" : `<div class="pager">
+    ${pagerLink(page - 1, "← Prev", page <= 1)}
+    <span class="pg-info">Page ${page} of ${totalPages} &mdash; ${totalFiltered.toLocaleString()} signals</span>
+    ${pagerLink(page + 1, "Next →", page >= totalPages)}
+  </div>`;
+
+  const hasFilter = !!(catFilter || statusFilter !== "all" || srcFilter);
+
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6929,67 +7004,123 @@ app.get("/signals", asyncRoute(async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Live Signals — GovRevenue</title>
 <style>
-:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--green:#14532D;--amber:#78350F;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.wrap{padding:0 32px;max-width:1200px;margin:0 auto}
+.wrap{padding:0 32px;max-width:1280px;margin:0 auto}
 header{border-bottom:1px solid var(--line-strong);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}
-.logo b{color:var(--accent)}
+.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}.logo b{color:var(--accent)}
 nav.hd-nav{display:flex;gap:28px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
 nav.hd-nav a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
 nav.hd-nav a:hover,nav.hd-nav a.active{color:var(--ink);border-color:var(--accent)}
-.page-head{padding:52px 0 40px}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
-h1{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:12px}
-.sub{font-size:15px;color:var(--slate);max-width:42em}
-.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:24px 0;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);margin-bottom:0}
-.filters select,.filters button{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);padding:8px 14px;cursor:pointer}
-.filters select:focus{outline:none;border-color:var(--accent)}
-.filters button{background:var(--ink);color:#fff;border-color:var(--ink)}
-.filters button:hover{background:var(--accent);border-color:var(--accent)}
-.sig-count{font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--slate);margin-left:auto}
-table{width:100%;border-collapse:collapse}
-thead th{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);padding:12px 10px;border-bottom:2px solid var(--line-strong);text-align:left;white-space:nowrap}
-tbody tr{border-bottom:1px solid var(--line)}
+/* stats strip */
+.stats-strip{background:var(--ink);color:#e8edf3;display:flex;gap:0}
+.stat-block{flex:1;padding:22px 28px;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px}
+.stat-block:last-child{border-right:none}
+.stat-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a9aaa}
+.stat-value{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.02em;color:#fff;line-height:1}
+.stat-sub{font-family:var(--mono);font-size:10px;color:#8a9aaa;margin-top:2px}
+.stat-block.accent-block .stat-value{color:#e07070}
+.stat-block.green-block .stat-value{color:#6ee7a0}
+.stat-block.warn-block .stat-value{color:#fbbf24}
+/* page head */
+.page-head{padding:40px 0 32px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.page-head-left{}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h1{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:6px}
+.sub{font-size:14px;color:var(--slate)}
+/* filters */
+.filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line-strong);border-bottom:2px solid var(--ink);margin-bottom:0}
+.filter-bar select{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);padding:8px 12px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235A6B7B'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.filter-bar select:focus{outline:none;border-color:var(--accent)}
+.filter-bar button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:none;background:var(--ink);color:#fff;padding:9px 18px;cursor:pointer}
+.filter-bar button:hover{background:var(--accent)}
+.filter-clear{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);text-decoration:underline;padding:4px 0}
+.sig-count{font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--slate);margin-left:auto;white-space:nowrap}
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+thead{background:var(--paper-2)}
+thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);padding:11px 10px;border-bottom:2px solid var(--line-strong);text-align:left;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--line);transition:background .12s}
 tbody tr:hover{background:var(--paper-2)}
-td{padding:12px 10px;font-size:13px;vertical-align:middle}
-.sig-cat{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:rgba(155,44,44,.08);padding:3px 8px;white-space:nowrap}
-.sig-title a{color:var(--ink);text-decoration:none;font-weight:500;line-height:1.3}
+tbody tr.row-urgent{background:rgba(185,28,28,.04)}
+tbody tr.row-urgent:hover{background:rgba(185,28,28,.08)}
+tbody tr.row-warn{background:rgba(180,120,0,.03)}
+td{padding:12px 10px;font-size:13px;vertical-align:top}
+.sig-cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);background:rgba(155,44,44,.08);padding:3px 7px;white-space:nowrap;display:inline-block}
+.sig-cat:hover{background:rgba(155,44,44,.16)}
+.sig-title{max-width:320px}
+.sig-title a{color:var(--ink);font-weight:500;line-height:1.35;display:block}
 .sig-title a:hover{color:var(--accent);text-decoration:underline}
-.sig-title{max-width:340px}
-.sig-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;white-space:nowrap}
-.sig-open{color:#1a5c36;background:rgba(26,92,54,.1)}
-.sig-awarded{color:var(--slate);background:rgba(90,107,123,.1)}
-.sig-date,.sig-src{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap}
-.empty{padding:60px 0;text-align:center;color:var(--slate);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-footer{border-top:1px solid var(--line-strong);padding:32px 0;margin-top:64px;font-family:var(--mono);font-size:11px;color:var(--slate);display:flex;justify-content:space-between;align-items:center}
-footer a{color:var(--slate)}
-footer a:hover{color:var(--ink)}
-@media(max-width:860px){.sig-title{max-width:200px}nav.hd-nav{display:none}h1{font-size:28px}}
-@media(max-width:600px){table{display:block;overflow-x:auto}.sig-date,.sig-src{display:none}}
+.sig-buyer{max-width:180px;font-size:12.5px;color:var(--slate)}
+.sig-val{font-family:var(--mono);font-size:12.5px;font-weight:600;white-space:nowrap;color:var(--ink)}
+.sig-val.sig-val-high{color:var(--accent)}
+.sig-nil{color:#b0bcc8}
+.sig-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;white-space:nowrap;display:inline-block}
+.sig-open{color:var(--green);background:rgba(20,83,45,.1)}
+.sig-awarded{color:var(--slate);background:rgba(90,107,123,.12)}
+.sig-date,.sig-dl{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap}
+.dl-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;display:inline-block;font-weight:700}
+.dl-red{color:#fff;background:#b91c1c}
+.dl-amber{color:#fff;background:#b45309}
+.dl-grey{color:var(--slate);background:rgba(90,107,123,.12)}
+.src-badge{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px}
+.src-cf{color:#1e4d6b;background:rgba(30,77,107,.1)}
+.src-fts{color:#4b2d8a;background:rgba(75,45,138,.1)}
+/* pager */
+.pager{display:flex;align-items:center;gap:16px;padding:28px 0 48px}
+.pg-link{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);border:1px solid var(--line-strong);padding:8px 18px}
+.pg-link:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pg-dis{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#c5cdd3;border:1px solid var(--line);padding:8px 18px;pointer-events:none}
+.pg-info{font-family:var(--mono);font-size:11px;color:var(--slate);margin:0 auto}
+.empty{padding:72px 0;text-align:center;color:var(--slate);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--mono);font-size:11px;color:var(--slate)}
+@media(max-width:900px){.stat-block{padding:16px 18px}.stat-value{font-size:22px}nav.hd-nav{display:none}h1{font-size:26px}.page-head{flex-direction:column;align-items:flex-start}}
+@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.sig-buyer,.sig-dl,.sig-src{display:none}}
 </style>
 </head>
 <body>
 <header>
   <a href="/" class="logo">Gov<b>Revenue</b></a>
   <nav class="hd-nav">
-    <a href="/desks">Desks</a>
-    <a href="/signals" class="active">Signals</a>
-    <a href="/scan">The Scan</a>
-    <a href="/pricing">Pricing</a>
-    <a href="/articles">Articles</a>
+    <a href="/desks">Desks</a><a href="/signals" class="active">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="/articles">Articles</a>
   </nav>
 </header>
+<div class="stats-strip">
+  <div class="stat-block">
+    <span class="stat-label">Signals tracked</span>
+    <span class="stat-value">${parseInt(stats.total).toLocaleString()}</span>
+    <span class="stat-sub">Across all 24 desks</span>
+  </div>
+  <div class="stat-block green-block">
+    <span class="stat-label">Open / live</span>
+    <span class="stat-value">${parseInt(stats.open_cnt).toLocaleString()}</span>
+    <span class="stat-sub">Active tenders &amp; opportunities</span>
+  </div>
+  <div class="stat-block accent-block">
+    <span class="stat-label">Total value tracked</span>
+    <span class="stat-value">${fmtBigVal(totalVal)}</span>
+    <span class="stat-sub">Public spend indexed</span>
+  </div>
+  <div class="stat-block warn-block">
+    <span class="stat-label">Closing within 7 days</span>
+    <span class="stat-value">${parseInt(stats.closing7).toLocaleString()}</span>
+    <span class="stat-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</span>
+  </div>
+</div>
 <main>
 <div class="wrap">
   <div class="page-head">
-    <div class="eyebrow">Live procurement signals</div>
-    <h1>The public record, in real time.</h1>
-    <p class="sub">Every contract notice tracked across Contracts Finder and Find a Tender — updated hourly across all 24 intelligence desks.</p>
+    <div class="page-head-left">
+      <div class="eyebrow">Live procurement signals</div>
+      <h1>The public record, in real time.</h1>
+      <p class="sub">Every contract notice tracked across Contracts Finder and Find a Tender — updated hourly. 50 per page.</p>
+    </div>
+    <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:#fff;padding:12px 22px;white-space:nowrap;flex-shrink:0">Run a revenue scan →</a>
   </div>
-  <form class="filters" method="get" action="/signals">
+  <form class="filter-bar" method="get" action="/signals">
     <select name="cat">
       <option value="">All desks</option>
       ${catOptions}
@@ -6998,26 +7129,32 @@ footer a:hover{color:var(--ink)}
       <option value="all" ${statusFilter === "all" ? "selected" : ""}>All statuses</option>
       <option value="open" ${statusFilter === "open" ? "selected" : ""}>Open / active only</option>
     </select>
-    <button type="submit">Filter</button>
-    ${catFilter || statusFilter !== "all" ? `<a href="/signals" style="font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--slate);text-decoration:underline;padding:8px 0">Clear</a>` : ""}
-    <span class="sig-count">${signals.length} signal${signals.length !== 1 ? "s" : ""}</span>
+    <select name="src">
+      <option value="" ${!srcFilter ? "selected" : ""}>All sources</option>
+      <option value="CF" ${srcFilter === "CF" ? "selected" : ""}>Contracts Finder (CF)</option>
+      <option value="FTS" ${srcFilter === "FTS" ? "selected" : ""}>Find a Tender (FTS)</option>
+    </select>
+    <button type="submit">Apply</button>
+    ${hasFilter ? `<a href="/signals" class="filter-clear">Clear filters</a>` : ""}
+    <span class="sig-count">${totalFiltered.toLocaleString()} signal${totalFiltered !== 1 ? "s" : ""} · page ${page} of ${totalPages}</span>
   </form>
-  <div style="overflow-x:auto">
+  <div class="tbl-wrap">
     <table>
       <thead><tr>
-        <th>Desk</th><th>Notice</th><th>Buyer</th><th>Value</th><th>Status</th><th>Date</th><th>Src</th>
+        <th>Desk</th><th>Notice</th><th>Buyer</th><th>Value</th><th>Status</th><th>Published</th><th>Deadline</th><th>Src</th>
       </tr></thead>
       <tbody>
-        ${rows || `<tr><td colspan="7" class="empty">No signals found</td></tr>`}
+        ${rows || `<tr><td colspan="8" class="empty">No signals found — try adjusting filters</td></tr>`}
       </tbody>
     </table>
   </div>
+  ${pager}
 </div>
 </main>
-<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center;width:100%">
+<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
   <a href="/">Gov<b style="color:var(--accent)">Revenue</b></a>
-  <span>Public record only &middot; Source: Contracts Finder + Find a Tender</span>
-  <a href="/scan">Run a scan &rarr;</a>
+  <span>Public record only &middot; Contracts Finder + Find a Tender &middot; Updated hourly</span>
+  <a href="/scan" style="color:var(--accent)">Run a scan →</a>
 </div></footer>
 </body>
 </html>`);
