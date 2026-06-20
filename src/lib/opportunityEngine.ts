@@ -917,7 +917,7 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
   }).join("");
 
   const remaining = Math.max(0, stats.totalOpen - Math.min(signals.length, 6));
-  const seeAllCard = `<a class="cnc-card-see-all" href="/desks">
+  const seeAllCard = `<a class="cnc-card-see-all" href="/signals">
   <div>
     <div class="cnc-see-count">${remaining > 0 ? remaining : stats.totalOpen}</div>
     <div class="cnc-see-label">more open contracts<br>across 24 desks</div>
