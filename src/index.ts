@@ -6899,12 +6899,13 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let totalFiltered = 0;
 
   if (pool) {
-    // Stats: deduplicate by source_url (id) so each notice counts once
+    // Stats: deduplicate by (title, buyer, category) — collapses lot-variants of the same notice
     const [statsRow] = (await pool.query<SigStats>(`
       WITH deduped AS (
-        SELECT DISTINCT ON (id) id, status, value_amount, deadline_date
+        SELECT DISTINCT ON (LOWER(title), COALESCE(buyer,''), category)
+          id, status, value_amount, deadline_date
         FROM homepage_signals
-        ORDER BY id, notice_date DESC NULLS LAST
+        ORDER BY LOWER(title), COALESCE(buyer,''), category, deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
       )
       SELECT
         COUNT(*)::text AS total,
@@ -6923,9 +6924,13 @@ app.get("/signals", asyncRoute(async (req, res) => {
     if (srcFilter) { params.push(srcFilter); conds.push(`source = $${params.length}`); }
     const innerWhere = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
-    // Deduplicate: each notice (by id/source_url) appears once. When cat filter is active keep that category label; otherwise take the first alphabetically.
+    // Deduplicate by (title, buyer, category) keeping the row with the earliest deadline (most urgent)
     const countRow = await pool.query<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM (SELECT DISTINCT ON (id) id FROM homepage_signals ${innerWhere} ORDER BY id) sub`,
+      `SELECT COUNT(*)::text AS n FROM (
+         SELECT DISTINCT ON (LOWER(title), COALESCE(buyer,''), category) id
+         FROM homepage_signals ${innerWhere}
+         ORDER BY LOWER(title), COALESCE(buyer,''), category, deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
+       ) sub`,
       params
     );
     totalFiltered = parseInt(countRow.rows[0]?.n || "0", 10);
@@ -6933,7 +6938,9 @@ app.get("/signals", asyncRoute(async (req, res) => {
     const pageParams = [...params, PER_PAGE, offset];
     const r = await pool.query<HomepageSignal>(
       `SELECT * FROM (
-         SELECT DISTINCT ON (id) * FROM homepage_signals ${innerWhere} ORDER BY id, notice_date DESC NULLS LAST
+         SELECT DISTINCT ON (LOWER(title), COALESCE(buyer,''), category) *
+         FROM homepage_signals ${innerWhere}
+         ORDER BY LOWER(title), COALESCE(buyer,''), category, deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
        ) deduped
        ORDER BY notice_date DESC NULLS LAST
        LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
@@ -6946,8 +6953,9 @@ app.get("/signals", asyncRoute(async (req, res) => {
       .filter(s => !catFilter || s.category === catFilter)
       .filter(s => statusFilter !== "open" || /open|active/i.test(s.status || ""))
       .filter(s => !srcFilter || s.source === srcFilter)
-      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""))
-      .filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+      .sort((a, b) => (a.deadline_date || "9999").localeCompare(b.deadline_date || "9999") || (b.notice_date || "").localeCompare(a.notice_date || ""))
+      .filter(s => { const key = `${s.title.toLowerCase()}|${s.buyer || ""}|${s.category}`; if (seen.has(key)) return false; seen.add(key); return true; })
+      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""));
     totalFiltered = all.length;
     signals = all.slice(offset, offset + PER_PAGE);
     const allUniq = new Map<string, HomepageSignal>(); [...sigMemStore.values()].forEach(s => { if (!allUniq.has(s.id)) allUniq.set(s.id, s); });
