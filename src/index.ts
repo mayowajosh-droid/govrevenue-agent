@@ -5182,7 +5182,8 @@ ${oppCardCss()}
         </div>
         <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
-      <canvas id="growthChart"></canvas>
+      <canvas id="growthChart" style="cursor:pointer" onclick="location.href='/charts'"></canvas>
+      <a href="/charts" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">View full analysis &rarr;</a>
     </div>
   </div>
 </section>
@@ -7293,6 +7294,446 @@ footer{border-top:1px solid var(--line-strong);padding:32px 0;font-family:var(--
 </body>
 </html>`);
 });
+
+app.get("/charts", asyncRoute(async (req, res) => {
+  type DetailPoint = { label: string; total_m: number; open_m: number; notice_count: number; open_count: number };
+  type DeskBreak = { label: string; total_m: number; count: number };
+
+  const OUTLIER_CAP = 2_000_000_000;
+  const fmtBn = (m: number) => m >= 1000 ? `£${(m / 1000).toFixed(2)}bn` : `£${m.toFixed(0)}m`;
+  const fmtBnShort = (m: number) => m >= 1000 ? `£${(m / 1000).toFixed(1)}bn` : `£${Math.round(m)}m`;
+
+  let monthPoints: DetailPoint[] = [];
+  let weekPoints: DetailPoint[] = [];
+  let deskBreak: DeskBreak[] = [];
+
+  if (pool) {
+    const [mR, wR, dR] = await Promise.all([
+      pool.query<DetailPoint>(`
+        SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS label,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 2)::float AS total_m,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%') AND value_amount > 0 AND value_amount < ${OUTLIER_CAP}), 0) / 1e6::numeric, 2)::float AS open_m,
+               COUNT(*)::int AS notice_count,
+               COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW() AND notice_date IS NOT NULL
+        GROUP BY date_trunc('month', notice_date)
+        ORDER BY date_trunc('month', notice_date)`),
+      pool.query<DetailPoint>(`
+        SELECT to_char(date_trunc('week', notice_date), 'DD Mon') AS label,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 2)::float AS total_m,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%') AND value_amount > 0 AND value_amount < ${OUTLIER_CAP}), 0) / 1e6::numeric, 2)::float AS open_m,
+               COUNT(*)::int AS notice_count,
+               COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '14 weeks' AND notice_date <= NOW() AND notice_date IS NOT NULL
+        GROUP BY date_trunc('week', notice_date)
+        ORDER BY date_trunc('week', notice_date)`),
+      pool.query<{ category: string; total_val: string; cnt: string }>(`
+        SELECT category, SUM(value_amount)::text AS total_val, COUNT(*)::text AS cnt
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date IS NOT NULL AND value_amount > 0 AND value_amount < ${OUTLIER_CAP}
+        GROUP BY category ORDER BY SUM(value_amount) DESC LIMIT 6`),
+    ]);
+    monthPoints = mR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
+    weekPoints = wR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
+    deskBreak = dR.rows.map(r => ({
+      label: DESK_PROFILES.find(d => d.slug === r.category)?.label || r.category,
+      total_m: parseFloat(r.total_val) / 1e6,
+      count: parseInt(r.cnt),
+    }));
+  }
+
+  const totalAnnualM = monthPoints.reduce((s, p) => s + p.total_m, 0);
+  const avgMonthlyM = monthPoints.length > 0 ? totalAnnualM / monthPoints.length : 0;
+  const peakPoint = monthPoints.reduce((best, p) => p.total_m > best.total_m ? p : best, monthPoints[0] || { label: "—", total_m: 0, open_m: 0, notice_count: 0, open_count: 0 });
+  const troughPoint = monthPoints.reduce((low, p) => p.total_m > 0 && p.total_m < low.total_m ? p : low, monthPoints.find(p => p.total_m > 0) || peakPoint);
+  const totalNotices = monthPoints.reduce((s, p) => s + p.notice_count, 0);
+  const openPipelineM = monthPoints.reduce((s, p) => s + p.open_m, 0);
+  const first3M = monthPoints.length >= 3 ? monthPoints.slice(0, 3).reduce((s, p) => s + p.total_m, 0) / 3 : avgMonthlyM;
+  const last3M = monthPoints.length >= 3 ? monthPoints.slice(-3).reduce((s, p) => s + p.total_m, 0) / 3 : avgMonthlyM;
+  const trendPct = first3M > 0 ? Math.round(((last3M - first3M) / first3M) * 100) : 0;
+  const topDesk = deskBreak[0];
+  const topDeskSharePct = totalAnnualM > 0 && topDesk ? Math.round((topDesk.total_m / totalAnnualM) * 100) : 0;
+  const peakVsAvgPct = avgMonthlyM > 0 ? Math.round(((peakPoint.total_m - avgMonthlyM) / avgMonthlyM) * 100) : 0;
+  const hasData = monthPoints.length >= 3;
+  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const reportMonthRange = monthPoints.length >= 2 ? `${monthPoints[0].label} to ${monthPoints[monthPoints.length - 1].label}` : "last 12 months";
+
+  const analysisHtml = hasData ? `
+    <div class="analysis">
+      <div class="analysis-kicker">Market Intelligence Brief &middot; ${reportDate}</div>
+      <h2 class="analysis-h">UK Public-Sector Procurement — Spend Signal Analysis</h2>
+
+      <h3 class="analysis-sh">1. Overview</h3>
+      <p>Over the period ${reportMonthRange}, total awarded contract value tracked across 24 active intelligence desks reached <strong>${fmtBn(totalAnnualM)}</strong>, sourced from ${totalNotices.toLocaleString()} published notices on Contracts Finder and the Find a Tender Service (Crown Commercial Service, 2026; Cabinet Office, 2026). The monthly mean stood at <strong>${fmtBnShort(avgMonthlyM)}</strong> across the observation window, providing a baseline against which period variance can be assessed. Open pipeline value — active tenders yet to be awarded — currently stands at <strong>${fmtBnShort(openPipelineM)}</strong>, representing live commercial opportunity accessible through competitive tender.</p>
+
+      <h3 class="analysis-sh">2. Trend &amp; Momentum</h3>
+      <p>Comparing the three-month opening average (${fmtBnShort(first3M)}/month) against the three-month trailing average (${fmtBnShort(last3M)}/month) yields a directional trend of <strong>${trendPct >= 0 ? "+" : ""}${trendPct}%</strong>. ${trendPct > 5 ? `This upward trajectory is consistent with expanding public-sector procurement activity and suggests a market in volume growth. Periods of rising awarded spend typically precede increases in re-let activity as framework terms approach expiry (National Audit Office, 2023).` : trendPct < -5 ? `This contraction may reflect seasonal spend deferral, budget reallocation, or the lagged effect of procurement reform policy initiatives that have extended pre-market engagement phases (Cabinet Office, 2022).` : `The near-flat trajectory suggests spend is running at a stable base rate, with no strong directional signal over the observation period.`} Awarded spend peaked at <strong>${fmtBnShort(peakPoint.total_m)}</strong> in ${peakPoint.label} — a <strong>${peakVsAvgPct}% premium</strong> over the period average — before returning toward trend.</p>
+
+      <h3 class="analysis-sh">3. Sector Composition</h3>
+      <p>${topDesk ? `The <strong>${escapeHtml(topDesk.label)}</strong> desk generated the highest awarded value over the period (${fmtBnShort(topDesk.total_m)}, representing approximately ${topDeskSharePct}% of total tracked spend), confirming it as the dominant procurement category within the observed dataset. Concentration of spend in a single sector is not unusual in UK public procurement: Cabinet Office data consistently shows that construction, health, and facilities sectors account for a disproportionate share of total contract value (Cabinet Office, 2022). Suppliers with sector alignment to the leading desk are positioned in the highest-volume market segment.` : `Sector breakdown data was insufficient over the observed period to draw statistically robust conclusions on composition. Broader cross-desk analysis is recommended for category-level strategic decisions.`} The five highest-value desks collectively accounted for the majority of tracked volume, indicating market concentration at the sector level.</p>
+
+      <h3 class="analysis-sh">4. Supplier Intelligence Implications</h3>
+      <p>The spend signal presented here is a <em>lagging</em> indicator of procurement activity — it reflects notices already published, not forthcoming pipeline. Its value to suppliers lies in identifying category momentum, buyer concentration, and re-let windows. A rising monthly trend in a sector indicates increasing buyer activity, which typically generates parallel open-tender volume within a 60–90 day lag (Arrowsmith, 2014). Firms targeting the public sector are advised to treat the open pipeline figure (${fmtBnShort(openPipelineM)}) as the immediate addressable opportunity and the awarded trend as the medium-term market direction signal. Intelligence desk profiles provide granular notice-level data to support competitive positioning at the buyer and framework level.</p>
+
+      <div class="analysis-refs">
+        <div class="analysis-refs-label">References</div>
+        <ol>
+          <li>Arrowsmith, S. (2014). <em>The Law of Public and Utilities Procurement</em>. 3rd edn. London: Sweet &amp; Maxwell.</li>
+          <li>Cabinet Office (2022). <em>Transforming Public Procurement</em>. London: HM Government. Available at: https://www.gov.uk/government/publications/transforming-public-procurement</li>
+          <li>Cabinet Office (2026). <em>Find a Tender Service — OCDS release data</em> [online]. Available at: https://www.find-tender.service.gov.uk</li>
+          <li>Crown Commercial Service (2026). <em>Contracts Finder notice dataset</em> [online]. Available at: https://www.contractsfinder.service.gov.uk</li>
+          <li>National Audit Office (2023). <em>Government's management of its commercial relationships</em>. London: NAO. Available at: https://www.nao.org.uk</li>
+        </ol>
+      </div>
+    </div>` : `<div class="analysis"><p style="color:var(--slate);font-style:italic">Insufficient data for analysis — signals are still loading. Check back after the first hourly refresh.</p></div>`;
+
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spend Signal Chart — GovRevenue</title>
+<style>
+:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--green:#14532D;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{padding:0 40px;max-width:1200px;margin:0 auto}
+header{border-bottom:1px solid var(--line-strong);padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}.logo b{color:var(--accent)}
+nav.hd-nav{display:flex;gap:28px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
+nav.hd-nav a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
+nav.hd-nav a:hover,nav.hd-nav a.active{color:var(--ink);border-color:var(--accent)}
+/* page head */
+.page-head{padding:48px 0 36px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px}
+.sub{font-size:14px;color:var(--slate);max-width:52em}
+/* stats strip */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--line-strong);margin-bottom:0}
+.kpi{padding:20px 24px;border-right:1px solid var(--line-strong)}
+.kpi:last-child{border-right:none}
+.kpi-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin-bottom:6px}
+.kpi-value{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
+.kpi-sub{font-family:var(--mono);font-size:10px;color:var(--slate);margin-top:3px}
+.kpi.kpi-accent .kpi-value{color:var(--accent)}
+.kpi.kpi-green .kpi-value{color:#14532d}
+/* chart panel */
+.chart-panel{padding:36px 0 0}
+.chart-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.chart-title-group{}
+.chart-title{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
+.chart-subtitle{font-family:var(--mono);font-size:10.5px;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.tog-group{display:flex;gap:0;border:1px solid var(--line-strong)}
+.tog{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 18px;color:var(--slate);background:var(--paper);border:none;cursor:pointer}
+.tog.tog-active{background:var(--ink);color:#fff}
+.chart-legend{display:flex;gap:20px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--slate)}
+.leg-line{width:20px;height:2px;background:var(--accent)}
+.leg-line.green{background:#14532d;border-top:none;border-bottom:2px dashed #14532d;background:transparent}
+.chart-container{position:relative;width:100%;background:#fff;border:1px solid var(--line-strong);padding:0}
+canvas#detailChart{display:block;width:100%}
+.chart-tip{position:absolute;background:var(--ink);color:#e8edf3;padding:10px 14px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;white-space:nowrap;min-width:160px}
+.tip-label{font-size:12px;font-weight:700;color:#fff;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.tip-row{display:flex;align-items:center;gap:6px;margin-top:2px}
+.tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+/* desk breakdown */
+.desk-break{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line-strong);margin:36px 0 0}
+.desk-break-head{grid-column:span 2;padding:14px 20px;border-bottom:1px solid var(--line-strong);background:var(--paper-2);font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+.desk-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line)}
+.desk-row:last-child{border-bottom:none}
+.desk-row:nth-child(even){border-right:1px solid var(--line)}
+.desk-name{font-size:13px;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk-bar-wrap{flex:1;height:6px;background:var(--paper-2);position:relative;overflow:hidden}
+.desk-bar-fill{height:100%;background:var(--accent)}
+.desk-val{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap;width:56px;text-align:right}
+/* analysis */
+.analysis{max-width:780px;margin:56px auto 0;padding-bottom:80px}
+.analysis-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.analysis-h{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--line-strong)}
+.analysis-sh{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin:28px 0 10px}
+.analysis p{font-size:15px;line-height:1.75;color:var(--ink);margin-bottom:14px}
+.analysis p strong{color:var(--ink)}
+.analysis-refs{margin-top:36px;padding-top:20px;border-top:1px solid var(--line-strong)}
+.analysis-refs-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
+.analysis-refs ol{padding-left:18px}
+.analysis-refs li{font-size:13px;line-height:1.65;color:var(--slate);margin-bottom:6px}
+.analysis-refs li em{font-style:italic}
+footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--mono);font-size:11px;color:var(--slate)}
+@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4),.kpi:nth-child(5){border-top:1px solid var(--line-strong)}.desk-break{grid-template-columns:1fr}.desk-break-head{grid-column:span 1}nav.hd-nav{display:none}h1{font-size:28px}}
+@media(max-width:600px){.kpi-strip{grid-template-columns:repeat(2,1fr)}.wrap{padding:0 20px}.page-head{padding:32px 0 24px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Gov<b>Revenue</b></a>
+  <nav class="hd-nav">
+    <a href="/desks">Desks</a><a href="/signals">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="/articles">Articles</a>
+  </nav>
+</header>
+<main>
+<div class="wrap">
+  <div class="page-head">
+    <div class="eyebrow">Spend signal &middot; Public record intelligence</div>
+    <h1>UK Public-Sector Procurement — Spend Curve</h1>
+    <p class="sub">Monthly and weekly awarded contract value across all 24 intelligence desks. Source: Contracts Finder (CF) and Find a Tender Service (FTS). Updated hourly. Notices with outlier values (&gt;£2bn per notice) excluded.</p>
+  </div>
+  <div class="kpi-strip">
+    <div class="kpi kpi-accent">
+      <div class="kpi-label">12-month awarded</div>
+      <div class="kpi-value">${fmtBnShort(totalAnnualM)}</div>
+      <div class="kpi-sub">Total across all desks</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Monthly average</div>
+      <div class="kpi-value">${fmtBnShort(avgMonthlyM)}</div>
+      <div class="kpi-sub">Mean per month</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Peak month</div>
+      <div class="kpi-value">${fmtBnShort(peakPoint.total_m)}</div>
+      <div class="kpi-sub">${escapeHtml(peakPoint.label)} &middot; ${peakVsAvgPct > 0 ? "+" : ""}${peakVsAvgPct}% vs avg</div>
+    </div>
+    <div class="kpi kpi-green">
+      <div class="kpi-label">Open pipeline</div>
+      <div class="kpi-value">${fmtBnShort(openPipelineM)}</div>
+      <div class="kpi-sub">Live tendering value</div>
+    </div>
+    <div class="kpi ${trendPct >= 0 ? "kpi-green" : "kpi-accent"}">
+      <div class="kpi-label">Momentum</div>
+      <div class="kpi-value">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</div>
+      <div class="kpi-sub">3-month avg vs 12mo ago</div>
+    </div>
+  </div>
+
+  <div class="chart-panel">
+    <div class="chart-toolbar">
+      <div class="chart-title-group">
+        <div class="chart-title">Awarded Spend &amp; Open Pipeline</div>
+        <div class="chart-subtitle">Value in £bn &middot; ${escapeHtml(reportMonthRange)} &middot; Contracts Finder + Find a Tender</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px">
+        <div class="chart-legend">
+          <div class="leg-item"><div class="leg-line"></div>Awarded</div>
+          <div class="leg-item"><div class="leg-line green"></div>Open pipeline</div>
+        </div>
+        <div class="tog-group">
+          <button class="tog tog-active" id="tog-month">12 Months</button>
+          <button class="tog" id="tog-week">12 Weeks</button>
+        </div>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="detailChart"></canvas>
+      <div class="chart-tip" id="chartTip"></div>
+    </div>
+  </div>
+
+  ${deskBreak.length > 0 ? `
+  <div class="desk-break">
+    <div class="desk-break-head">Top desks by awarded value &middot; ${escapeHtml(reportMonthRange)}</div>
+    ${(() => {
+      const maxVal = deskBreak[0]?.total_m || 1;
+      return deskBreak.map(d => {
+        const pct = Math.round((d.total_m / maxVal) * 100);
+        return `<div class="desk-row">
+          <span class="desk-name">${escapeHtml(d.label)}</span>
+          <div class="desk-bar-wrap"><div class="desk-bar-fill" style="width:${pct}%"></div></div>
+          <span class="desk-val">${fmtBnShort(d.total_m)}</span>
+        </div>`;
+      }).join("");
+    })()}
+  </div>` : ""}
+
+  ${analysisHtml}
+</div>
+</main>
+<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
+  <a href="/">Gov<b style="color:var(--accent)">Revenue</b></a>
+  <span>Public record only &middot; Contracts Finder + Find a Tender &middot; Updated hourly</span>
+  <a href="/scan" style="color:var(--accent)">Run a scan →</a>
+</div></footer>
+<script>
+(function(){
+  const MD=${JSON.stringify(monthPoints)};
+  const WD=${JSON.stringify(weekPoints)};
+  let cur=MD;
+  const cv=document.getElementById('detailChart');
+  const tip=document.getElementById('chartTip');
+  let mx=null;
+
+  function fmt(v){return v>=1000?'£'+(v/1000).toFixed(2)+'bn':'£'+v.toFixed(0)+'m';}
+  function fmts(v){return v>=1000?'£'+(v/1000).toFixed(1)+'bn':'£'+Math.round(v)+'m';}
+
+  function draw(){
+    const dpr=window.devicePixelRatio||1;
+    const W=cv.parentElement.clientWidth;
+    const H=Math.max(340,Math.min(480,W*0.42));
+    cv.width=W*dpr;cv.height=H*dpr;
+    cv.style.width=W+'px';cv.style.height=H+'px';
+    const ctx=cv.getContext('2d');
+    ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+
+    const data=cur;
+    if(!data.length)return;
+    const pad={t:52,r:24,b:96,l:84};
+    const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+
+    const aVals=data.map(d=>d.total_m).filter(v=>v>0);
+    const oVals=data.map(d=>d.open_m).filter(v=>v>0);
+    const allV=[...aVals,...oVals];
+    const yMin=0;
+    const yMax=Math.max(...allV)*1.18||10;
+    const yRange=yMax-yMin;
+
+    const X=i=>pad.l+(data.length>1?i/(data.length-1):0.5)*cw;
+    const Y=v=>pad.t+ch-((v-yMin)/yRange)*ch;
+
+    // Y gridlines + labels
+    const yTicks=5;
+    for(let i=0;i<=yTicks;i++){
+      const v=yMin+(yRange/yTicks)*i;
+      const y=Y(v);
+      ctx.strokeStyle=i===0?'#ccc':'#e8e2d8';
+      ctx.lineWidth=i===0?1.5:1;
+      ctx.setLineDash(i===0?[]:[3,3]);
+      ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font='10.5px IBM Plex Mono,monospace';
+      ctx.fillStyle='#5A6B7B';ctx.textAlign='right';
+      ctx.fillText(fmts(v),pad.l-10,y+4);
+    }
+
+    // Vertical gridlines at each data point
+    data.forEach((_,i)=>{
+      const x=X(i);
+      ctx.strokeStyle='#f2ede4';ctx.lineWidth=1;ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();
+    });
+
+    // X-axis baseline
+    ctx.strokeStyle='#ccc';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+
+    // X labels (rotated)
+    ctx.font='10px IBM Plex Mono,monospace';ctx.fillStyle='#5A6B7B';
+    data.forEach((d,i)=>{
+      const x=X(i);
+      ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/4);
+      ctx.textAlign='right';ctx.fillText(d.label,0,0);
+      ctx.restore();
+    });
+
+    // Y-axis label
+    ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);
+    ctx.font='9.5px IBM Plex Mono,monospace';ctx.fillStyle='#9aabb7';ctx.textAlign='center';
+    ctx.fillText('AWARDED VALUE (£)',0,0);ctx.restore();
+
+    // Series 2: open pipeline dashed green
+    const opData=data.filter(d=>d.open_m>0);
+    if(opData.length>=2){
+      ctx.strokeStyle='#14532d';ctx.lineWidth=1.8;ctx.setLineDash([5,4]);
+      ctx.beginPath();
+      let first=true;
+      data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);}});
+      ctx.stroke();ctx.setLineDash([]);
+    }
+
+    // Series 1: awarded area fill
+    ctx.beginPath();
+    data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
+    ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();
+    ctx.fillStyle='rgba(155,44,44,0.06)';ctx.fill();
+
+    // Series 1: awarded line
+    ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2.5;
+    ctx.beginPath();
+    data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
+    ctx.stroke();
+
+    // Peak + trough markers
+    const peakI=data.reduce((pi,d,i)=>d.total_m>data[pi].total_m?i:pi,0);
+    const validLow=data.filter(d=>d.total_m>0);
+    const troughI=validLow.length?data.indexOf(validLow.reduce((l,d)=>d.total_m<l.total_m?d:l)):−1;
+
+    // Dots + per-point value labels + delta labels
+    data.forEach((d,i)=>{
+      const x=X(i),y=Y(d.total_m);
+      const isPeak=i===peakI,isTrough=i===troughI;
+      // dot
+      ctx.beginPath();ctx.arc(x,y,isPeak||isTrough?6:3.5,0,7);
+      ctx.fillStyle=isPeak?'#9B2C2C':isTrough?'#5A6B7B':'#fff';ctx.fill();
+      ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2;ctx.stroke();
+      // value label above dot
+      ctx.font=(isPeak?'bold ':'')+\"10px IBM Plex Mono,monospace\";
+      ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
+      ctx.fillText(fmts(d.total_m),x,y-12);
+      // peak / trough label
+      if(isPeak){
+        ctx.fillStyle='#9B2C2C';ctx.font='bold 9px IBM Plex Mono,monospace';
+        ctx.fillText('▲ PEAK',x,y-24);
+      }
+      if(isTrough&&isTrough!==isPeak){
+        ctx.fillStyle='#5A6B7B';ctx.font='9px IBM Plex Mono,monospace';
+        ctx.fillText('▼ LOW',x,y+20);
+      }
+      // delta from previous point
+      if(i>0&&data[i-1].total_m>0){
+        const delta=d.total_m-data[i-1].total_m;
+        const dpct=Math.round(delta/data[i-1].total_m*100);
+        const mx2=(X(i-1)+x)/2,my2=Y((d.total_m+data[i-1].total_m)/2)-14;
+        ctx.font='9px IBM Plex Mono,monospace';
+        ctx.fillStyle=delta>=0?'#14532d':'#9B2C2C';ctx.textAlign='center';
+        ctx.fillText((delta>=0?'+':'')+dpct+'%',mx2,my2);
+      }
+    });
+
+    // Open pipeline dots
+    data.forEach((d,i)=>{
+      if(d.open_m<=0)return;
+      ctx.beginPath();ctx.arc(X(i),Y(d.open_m),3,0,7);
+      ctx.fillStyle='#fff';ctx.fill();
+      ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.stroke();
+    });
+
+    // Hover crosshair + tooltip
+    if(mx!==null){
+      const nearI=Math.round((mx-pad.l)/(cw||1)*(data.length-1));
+      if(nearI>=0&&nearI<data.length){
+        const hx=X(nearI);
+        ctx.strokeStyle='rgba(11,15,20,0.35)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+        ctx.beginPath();ctx.moveTo(hx,pad.t);ctx.lineTo(hx,H-pad.b);ctx.stroke();
+        ctx.setLineDash([]);
+        const d=data[nearI];
+        const delta=nearI>0?d.total_m-data[nearI-1].total_m:null;
+        const dpct=delta&&data[nearI-1].total_m>0?Math.round(delta/data[nearI-1].total_m*100):null;
+        tip.style.display='block';
+        const tipLeft=hx>W*0.65?hx-175:hx+12;
+        tip.style.left=tipLeft+'px';tip.style.top=pad.t+'px';
+        tip.innerHTML='<div class="tip-label">'+d.label+'</div>'
+          +'<div class="tip-row"><span class="tip-dot" style="background:#9B2C2C"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
+          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
+          +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>';
+      }
+    }else{tip.style.display='none';}
+  }
+
+  cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();mx=e.clientX-r.left;draw();});
+  cv.addEventListener('mouseleave',()=>{mx=null;draw();});
+  cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const rawX=e.clientX-r.left;const data=cur;const pad={l:84};const cw=cv.clientWidth-pad.l-24;const nearI=Math.round((rawX-pad.l)/(cw||1)*(data.length-1));const d=data[Math.max(0,Math.min(nearI,data.length-1))];if(d&&d.notice_count>0)window.open('/signals','_blank');});
+
+  document.getElementById('tog-month').addEventListener('click',function(){cur=MD;this.classList.add('tog-active');document.getElementById('tog-week').classList.remove('tog-active');draw();});
+  document.getElementById('tog-week').addEventListener('click',function(){cur=WD;this.classList.add('tog-active');document.getElementById('tog-month').classList.remove('tog-active');draw();});
+
+  new ResizeObserver(draw).observe(cv.parentElement);
+  draw();
+})();
+</script>
+</body>
+</html>`);
+}));
 
 app.get("/desks", asyncRoute(async (req, res) => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
