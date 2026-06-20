@@ -7467,235 +7467,392 @@ app.get("/charts", asyncRoute(async (req, res) => {
     ? `The highest-volume contracting authority by indexed spend was <strong>${escapeHtml(topBuyers[0].buyer)}</strong>, with ${topBuyers[0].cnt} notices totalling £${topBuyers[0].total_val}m over the period (GovRevenue, 2026).${topBuyers.length >= 3 ? ` Alongside ${escapeHtml(topBuyers[1].buyer)} and ${escapeHtml(topBuyers[2].buyer)}, a compact cohort of high-volume authorities drives a disproportionate share of category spend — consistent with the framework-incumbent dynamics documented by the National Audit Office (2023). Buyer concentration data of this resolution transforms undifferentiated market signals into targetable accounts.` : ''}`
     : `Buyer-level data was not resolvable for the observation period; a minimum signal volume across multiple desks is required for statistically robust buyer ranking.`;
 
-  const analysisHtml = hasData ? `
-    <div class="analysis">
-      <div class="analysis-kicker">Market Intelligence Brief &middot; ${reportDate}</div>
-      <h2 class="analysis-h">UK Public-Sector Procurement — Spend Signal Analysis</h2>
-
-      <div class="analysis-section">
-        <div class="analysis-sh"><span>01</span>Overview</div>
-        <div class="analysis-body">
-          <p>GovRevenue's procurement signal intelligence platform (GovRevenue, 2026) aggregated <strong>${totalNotices.toLocaleString()} notices</strong> across 24 active sector desks over the period ${reportMonthRange}, ${srcSplitLabel} (Crown Commercial Service, 2026; Cabinet Office, 2026). Total awarded contract value indexed over the period reached <strong>${fmtBn(totalAnnualM)}</strong>, with a monthly mean of <strong>${fmtBnShort(avgMonthlyM)}</strong>.</p>
-          <p>Open pipeline value — active tenders not yet awarded — stands at <strong>${fmtBnShort(openPipelineM)}</strong> across ${totalOpenCount.toLocaleString()} live notices, representing the immediately addressable commercial opportunity within the UK public sector.</p>
-        </div>
-      </div>
-
-      <div class="analysis-section">
-        <div class="analysis-sh"><span>02</span>Trend &amp; Momentum</div>
-        <div class="analysis-body">
-          <p>Comparing the three-month opening average (${fmtBnShort(first3M)}/month) against the three-month trailing average (${fmtBnShort(last3M)}/month) yields a directional trend of <strong>${trendPct >= 0 ? "+" : ""}${trendPct}%</strong>. ${trendPct > 5 ? `This upward trajectory is consistent with expanding public-sector procurement activity and suggests a market in volume growth. Periods of rising awarded spend typically precede increases in re-let activity as framework terms approach expiry (National Audit Office, 2023).` : trendPct < -5 ? `This contraction may reflect seasonal spend deferral, budget reallocation, or the lagged effect of procurement reform policy initiatives that have extended pre-market engagement phases (Cabinet Office, 2022).` : `The near-flat trajectory suggests spend is running at a stable base rate, with no strong directional signal over the observation period.`}</p>
-          <p>Awarded spend peaked at <strong>${fmtBnShort(peakPoint.total_m)}</strong> in ${peakPoint.label} — a <strong>${peakVsAvgPct}% premium</strong> over the period average — before returning toward trend.</p>
-        </div>
-      </div>
-
-      <div class="analysis-section">
-        <div class="analysis-sh"><span>03</span>Sector Composition</div>
-        <div class="analysis-body">
-          <p>The GovRevenue 24-desk model segments UK public procurement by category, surfacing concentration dynamics not visible in undifferentiated aggregate data (GovRevenue, 2026). ${top3DesksText ? `The three highest-value desks over the period were ${top3DesksText}, collectively representing the dominant share of total tracked spend.` : topDesk ? `The ${escapeHtml(topDesk.label)} desk led at ${fmtBnShort(topDesk.total_m)} (${topDeskSharePct}% of total).` : `Sector breakdown data was insufficient for the period.`}</p>
-          ${topDesk ? `<p>The leading desk alone accounted for approximately ${topDeskSharePct}% of period spend, consistent with Cabinet Office observations that construction, health, and facilities categories structurally dominate UK public contract value (Cabinet Office, 2022). Suppliers with sector alignment to these leading desks are positioned in the highest-volume market segment.</p>` : ''}
-        </div>
-      </div>
-
-      <div class="analysis-section">
-        <div class="analysis-sh"><span>04</span>Buyer Concentration</div>
-        <div class="analysis-body">
-          <p>${topBuyerPara}</p>
-          <p>Buyer intelligence at this resolution — ranking contracting authorities by contract value and notice frequency across sector desks — enables suppliers to prioritise outreach toward the accounts generating the greatest addressable volume, and to identify re-let timing windows that are structurally invisible in undifferentiated procurement feeds (Arrowsmith, 2014).</p>
-        </div>
-      </div>
-
-      <div class="analysis-section">
-        <div class="analysis-sh"><span>05</span>Supplier Implications</div>
-        <div class="analysis-body">
-          <p>The spend signal presented here is a <em>lagging</em> indicator — it reflects notices already published, not forthcoming pipeline. Its analytical value lies in identifying category momentum, buyer concentration, and re-let windows. With <strong>${closing30.toLocaleString()} notices closing within 30 days</strong> and <strong>${closing60.toLocaleString()} within 60 days</strong> (GovRevenue, 2026), the near-term competitive window is material.</p>
-          <p>A rising monthly trend typically precedes parallel open-tender volume within a 60–90 day lag (Arrowsmith, 2014). Firms targeting the public sector are advised to treat the open pipeline (${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders) as the immediate addressable opportunity and the awarded trend as the medium-term direction signal. The GovRevenue desk profiles provide notice-level granularity — buyer watchlists, framework tracking, value banding — to support competitive positioning at the account and category level.</p>
-        </div>
-      </div>
-
-      <div class="analysis-refs">
-        <div class="analysis-refs-label">References</div>
-        <ol>
-          <li>GovRevenue (2026). <em>UK Public Procurement Signal Dataset — 24-desk intelligence feed aggregated from Contracts Finder and Find a Tender</em> [online dataset]. Available at: https://govrevenue-agent-production.up.railway.app/charts [Accessed ${reportDate}].</li>
-          <li>Arrowsmith, S. (2014). <em>The Law of Public and Utilities Procurement</em>. 3rd edn. London: Sweet &amp; Maxwell.</li>
-          <li>Cabinet Office (2022). <em>Transforming Public Procurement</em>. London: HM Government. Available at: https://www.gov.uk/government/publications/transforming-public-procurement</li>
-          <li>Cabinet Office (2026). <em>Find a Tender Service — OCDS release data</em> [online]. Available at: https://www.find-tender.service.gov.uk</li>
-          <li>Crown Commercial Service (2026). <em>Contracts Finder notice dataset</em> [online]. Available at: https://www.contractsfinder.service.gov.uk</li>
-          <li>National Audit Office (2023). <em>Government's management of its commercial relationships</em>. London: NAO. Available at: https://www.nao.org.uk</li>
-        </ol>
-      </div>
-    </div>` : `<div class="analysis"><p style="color:var(--slate);font-style:italic">Insufficient data for analysis — signals are still loading. Check back after the first hourly refresh.</p></div>`;
-
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Spend Signal Chart — GovRevenue</title>
+<title>UK Public Sector Procurement Spend Analysis 2026 — GovRevenue</title>
+<meta name="description" content="Live intelligence on ${fmtBnShort(totalAnnualM)} in UK public procurement. ${totalNotices.toLocaleString()} notices tracked across 24 sector desks. Open pipeline ${fmtBnShort(openPipelineM)}. Updated hourly from Contracts Finder and Find a Tender.">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${fmtBnShort(totalAnnualM)} in UK Public Contracts — Live Procurement Intelligence">
+<meta property="og:description" content="${totalNotices.toLocaleString()} procurement notices tracked. ${fmtBnShort(openPipelineM)} open pipeline. ${closing30} contracts closing in the next 30 days.">
+<meta property="og:url" content="https://govrevenue-agent-production.up.railway.app/charts">
+<link rel="canonical" href="https://govrevenue-agent-production.up.railway.app/charts">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across 24 procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://govrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"GovRevenue","url":"https://govrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
 <style>
-:root{--ink:#0B0F14;--paper:#FAF8F3;--paper-2:#F3EFE6;--accent:#9B2C2C;--green:#14532D;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--serif:"Spectral","Iowan Old Style",Georgia,serif;--sans:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+:root{
+  --void:#05070B;--s1:#0D1117;--s2:#141C25;
+  --glass:rgba(255,255,255,0.04);--gbdr:rgba(255,255,255,0.08);--gbdr-hi:rgba(255,255,255,0.16);
+  --t1:#EDF2F7;--t2:#8BA3BC;--t3:#4A6278;
+  --red:#C41E3A;--grn:#22C55E;--gold:#F59E0B;
+  --chart-bg:#FAF8F3;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth}
+body{background:var(--void);color:var(--t1);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-.wrap{padding:0 40px;max-width:1200px;margin:0 auto}
-header{border-bottom:1px solid var(--line-strong);padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em}.logo b{color:var(--accent)}
-nav.hd-nav{display:flex;gap:28px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:500}
-nav.hd-nav a{color:var(--slate);padding-bottom:3px;border-bottom:1.5px solid transparent;transition:.18s}
-nav.hd-nav a:hover,nav.hd-nav a.active{color:var(--ink);border-color:var(--accent)}
-/* page head */
-.page-head{padding:48px 0 36px;border-bottom:2px solid var(--ink)}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-h1{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px}
-.sub{font-size:14px;color:var(--slate);max-width:52em}
-/* stats strip */
-.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--line-strong);margin-bottom:0}
-.kpi{padding:20px 24px;border-right:1px solid var(--line-strong)}
-.kpi:last-child{border-right:none}
-.kpi-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin-bottom:6px}
-.kpi-value{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1}
-.kpi-sub{font-family:var(--mono);font-size:10px;color:var(--slate);margin-top:3px}
-.kpi.kpi-accent .kpi-value{color:var(--accent)}
-.kpi.kpi-green .kpi-value{color:#14532d}
-/* chart panel */
-.chart-panel{padding:36px 0 0}
-.chart-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-.chart-title-group{}
-.chart-title{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
-.chart-subtitle{font-family:var(--mono);font-size:10.5px;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
-.tog-group{display:flex;gap:0;border:1px solid var(--line-strong)}
-.tog{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 18px;color:var(--slate);background:var(--paper);border:none;cursor:pointer}
-.tog.tog-active{background:var(--ink);color:#fff}
-.chart-legend{display:flex;gap:20px;align-items:center}
-.leg-item{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--slate)}
-.leg-line{width:20px;height:2px;background:var(--accent)}
-.leg-line.green{background:#14532d;border-top:none;border-bottom:2px dashed #14532d;background:transparent}
-.chart-container{position:relative;width:100%;background:#fff;border:1px solid var(--line-strong);padding:0}
+strong{font-weight:700;color:var(--t1)}
+.site-nav{position:sticky;top:0;z-index:100;background:rgba(5,7,11,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--gbdr)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;max-width:1400px;margin:0 auto}
+.nav-logo{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--t1);letter-spacing:-.01em}
+.nav-logo b{color:var(--red)}
+.nav-links{display:flex;gap:28px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.nav-links a{color:var(--t3);transition:color .15s}.nav-links a:hover,.nav-links a.active{color:var(--t1)}
+.nav-cta{background:var(--red);color:#fff;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:8px 20px;border-radius:4px;transition:opacity .15s}.nav-cta:hover{opacity:.85}
+.hero{position:relative;min-height:72vh;display:flex;align-items:center;overflow:hidden;border-bottom:1px solid var(--gbdr)}
+.hero-orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none}
+.orb1{width:640px;height:640px;top:-140px;right:-80px;background:radial-gradient(circle,rgba(196,30,58,0.13) 0%,transparent 70%);animation:fl1 11s ease-in-out infinite}
+.orb2{width:420px;height:420px;bottom:-60px;left:8%;background:radial-gradient(circle,rgba(34,197,94,0.07) 0%,transparent 70%);animation:fl2 15s ease-in-out infinite}
+.orb3{width:320px;height:320px;top:35%;left:42%;background:radial-gradient(circle,rgba(245,158,11,0.05) 0%,transparent 70%);animation:fl1 19s ease-in-out infinite reverse}
+@keyframes fl1{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-44px) scale(1.07)}}
+@keyframes fl2{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(34px) scale(0.94)}}
+.hero-inner{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:108px 48px 88px;width:100%}
+.hero-badge{display:inline-flex;align-items:center;gap:9px;background:rgba(196,30,58,0.1);border:1px solid rgba(196,30,58,0.28);border-radius:20px;padding:5px 18px 5px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--red);margin-bottom:32px}
+.hero-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pdot 2s infinite}
+@keyframes pdot{0%,100%{opacity:1}50%{opacity:.25}}
+.hero-h1{font-family:var(--serif);font-size:clamp(40px,6.5vw,92px);font-weight:600;line-height:1.02;letter-spacing:-.045em;color:var(--t1);margin-bottom:24px;max-width:940px}
+.hero-h1 em{font-style:normal;color:var(--red)}
+.hero-sub{font-size:19px;color:var(--t2);max-width:560px;line-height:1.65;margin-bottom:44px}
+.hero-ctas{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.btn-p{background:var(--red);color:#fff;font-size:14px;font-weight:700;padding:15px 30px;border-radius:6px;transition:opacity .15s}.btn-p:hover{opacity:.88}
+.btn-s{background:var(--glass);border:1px solid var(--gbdr);color:var(--t1);font-size:14px;padding:14px 26px;border-radius:6px;transition:border-color .15s}.btn-s:hover{border-color:var(--gbdr-hi)}
+.kpi-band{padding:60px 0;border-bottom:1px solid var(--gbdr)}
+.kpi-row{max-width:1400px;margin:0 auto;padding:0 48px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.kcard{background:var(--glass);border:1px solid var(--gbdr);border-radius:14px;padding:26px 28px;transition:transform .28s ease,border-color .28s,box-shadow .28s;cursor:default;position:relative;overflow:hidden}
+.kcard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.025) 0%,transparent 55%);pointer-events:none}
+.kcard:hover{transform:perspective(700px) translateY(-7px) rotateX(3deg);border-color:var(--gbdr-hi);box-shadow:0 28px 52px -18px rgba(0,0,0,.55)}
+.kcard-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--t3);margin-bottom:14px;display:block}
+.kcard-val{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.035em;line-height:1;display:block}
+.kcard-val.red{color:var(--red)}.kcard-val.grn{color:var(--grn)}
+.kcard-sub{font-family:var(--mono);font-size:9.5px;color:var(--t3);margin-top:9px;display:block;line-height:1.5}
+.kcard-glow{position:absolute;bottom:-24px;right:-24px;width:90px;height:90px;border-radius:50%;opacity:.18;filter:blur(24px);pointer-events:none}
+.kcard-glow.red{background:var(--red)}.kcard-glow.grn{background:var(--grn)}
+.sec-eye{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--t3);margin-bottom:14px}
+.sec-h{font-family:var(--serif);font-size:clamp(26px,3vw,44px);font-weight:600;letter-spacing:-.03em;line-height:1.1;color:var(--t1)}
+.sec-sub{font-size:16px;color:var(--t2);max-width:50em;margin-top:12px;line-height:1.65}
+.chart-sec{padding:80px 0;border-bottom:1px solid var(--gbdr)}
+.chart-wrap{max-width:1400px;margin:0 auto;padding:0 48px}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:36px;flex-wrap:wrap}
+.tog-grp{display:flex;border:1px solid var(--gbdr);border-radius:6px;overflow:hidden}
+.tog{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:9px 22px;color:var(--t3);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s}
+.tog.tog-active{background:rgba(255,255,255,.1);color:var(--t1)}
+.chart-legend{display:flex;gap:20px;align-items:center;margin-top:10px}
+.leg{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--t3)}
+.leg-line{width:22px;height:2px;background:#9B2C2C}
+.leg-dash{width:22px;height:0;border-bottom:2px dashed #14532d}
+.chart-box{background:var(--chart-bg);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;position:relative}
 canvas#detailChart{display:block;width:100%}
-.chart-tip{position:absolute;background:var(--ink);color:#e8edf3;padding:12px 16px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:210px}
-.tip-label{font-size:12px;font-weight:700;color:#fff;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
-.tip-row{display:flex;align-items:center;gap:6px;margin-top:2px}
+.chart-tip{position:absolute;background:#0D1117;color:#e8edf3;padding:14px 18px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:226px;border:1px solid var(--gbdr);border-radius:8px;box-shadow:0 24px 48px -12px rgba(0,0,0,.65)}
+.tip-label{font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.tip-row{display:flex;align-items:center;gap:7px;margin-top:4px}
 .tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-/* desk breakdown */
-.desk-break{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line-strong);margin:36px 0 0}
-.desk-break-head{grid-column:span 2;padding:14px 20px;border-bottom:1px solid var(--line-strong);background:var(--paper-2);font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
-.desk-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line)}
-.desk-row:last-child{border-bottom:none}
-.desk-row:nth-child(even){border-right:1px solid var(--line)}
-.desk-name{font-size:13px;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.desk-bar-wrap{flex:1;height:6px;background:var(--paper-2);position:relative;overflow:hidden}
-.desk-bar-fill{height:100%;background:var(--accent)}
-.desk-val{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap;width:56px;text-align:right}
-/* analysis */
-.analysis{max-width:680px;margin:64px auto 0;padding-bottom:80px}
-.analysis-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-.analysis-h{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--ink)}
-.analysis-section{display:grid;grid-template-columns:140px 1fr;gap:0 32px;margin-bottom:36px;padding-bottom:36px;border-bottom:1px solid var(--line)}
-.analysis-section:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0}
-.analysis-sh{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);padding-top:5px;line-height:1.4}
-.analysis-sh span{display:block;font-size:18px;font-weight:600;font-family:var(--serif);letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:4px}
-.analysis-body p{font-family:var(--serif);font-size:15.5px;line-height:1.8;color:var(--ink);margin-bottom:0;text-align:justify;hyphens:auto}
-.analysis-body p+p{margin-top:16px}
-.analysis p strong,.analysis-body p strong{color:var(--ink);font-weight:700}
-.analysis-body p em{font-style:italic}
-.analysis-refs{margin-top:36px;padding-top:20px;border-top:1px solid var(--line-strong)}
-.analysis-refs-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
-.analysis-refs ol{padding-left:18px}
-.analysis-refs li{font-size:13px;line-height:1.65;color:var(--slate);margin-bottom:6px}
-.analysis-refs li em{font-style:italic}
-footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--mono);font-size:11px;color:var(--slate)}
-@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4),.kpi:nth-child(5){border-top:1px solid var(--line-strong)}.desk-break{grid-template-columns:1fr}.desk-break-head{grid-column:span 1}nav.hd-nav{display:none}h1{font-size:28px}.analysis-section{grid-template-columns:1fr}.analysis-sh{padding-top:0;margin-bottom:10px}.analysis-sh span{display:inline;font-size:15px;margin-right:6px;margin-bottom:0}}
-@media(max-width:600px){.kpi-strip{grid-template-columns:repeat(2,1fr)}.wrap{padding:0 20px}.page-head{padding:32px 0 24px}}
+.sectors-sec{padding:80px 0;border-bottom:1px solid var(--gbdr)}
+.sectors-wrap{max-width:1400px;margin:0 auto;padding:0 48px}
+.sectors-grid{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid var(--gbdr);border-radius:12px;overflow:hidden;margin-top:40px}
+.sector-head-row{grid-column:span 2;background:var(--s1);padding:13px 24px;border-bottom:1px solid var(--gbdr);font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--t3)}
+.srow{display:flex;align-items:center;gap:14px;padding:15px 24px;border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s}
+.srow:hover{background:var(--glass)}
+.srow:nth-child(odd){border-right:1px solid rgba(255,255,255,.04)}
+.srow:last-child,.srow:nth-last-child(2):nth-child(odd){border-bottom:none}
+.sname{font-size:13px;font-weight:500;color:var(--t1);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbar-wrap{flex:1.5;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.sbar-fill{height:100%;background:linear-gradient(90deg,var(--red),rgba(196,30,58,.45));border-radius:2px;width:0;transition:width .7s ease}
+.sval{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t2);white-space:nowrap;width:62px;text-align:right}
+.brief-sec{padding:100px 0;border-bottom:1px solid var(--gbdr)}
+.brief-wrap{max-width:1160px;margin:0 auto;padding:0 48px}
+.brief-intro{max-width:700px;margin-bottom:80px}
+.brief-art{display:grid;grid-template-columns:100px 1fr;gap:0 52px;padding:64px 0;border-top:1px solid var(--gbdr)}
+.brief-num{font-family:var(--mono);font-size:11px;color:var(--t3);padding-top:3px}
+.brief-num span{display:block;font-family:var(--serif);font-size:60px;font-weight:600;color:rgba(255,255,255,.055);letter-spacing:-.04em;line-height:1;margin-bottom:3px}
+.brief-tag{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--red);margin-bottom:15px}
+.brief-h{font-family:var(--serif);font-size:clamp(20px,2.2vw,30px);font-weight:600;letter-spacing:-.02em;color:var(--t1);margin-bottom:20px;line-height:1.25}
+.brief-body{font-family:var(--serif);font-size:17px;line-height:1.88;color:var(--t2)}
+.brief-body p+p{margin-top:18px}
+.brief-body strong{color:var(--t1)}
+.brief-body em{font-style:italic}
+.pull{margin:28px 0;padding:22px 26px 22px 22px;border-left:3px solid var(--red);background:rgba(196,30,58,0.06);border-radius:0 6px 6px 0}
+.pull p{font-family:var(--serif);font-size:19px;font-style:italic;color:var(--t1);line-height:1.5;letter-spacing:-.01em}
+.brief-refs{margin-top:60px;padding-top:24px;border-top:1px solid var(--gbdr)}
+.nl-sec{padding:100px 0}
+.nl-wrap{max-width:760px;margin:0 auto;padding:0 48px;text-align:center}
+.nl-card{background:var(--glass);border:1px solid var(--gbdr);border-radius:20px;padding:64px 56px;position:relative;overflow:hidden}
+.nl-card::before{content:'';position:absolute;top:-90px;left:50%;transform:translateX(-50%);width:440px;height:440px;background:radial-gradient(circle,rgba(196,30,58,0.11) 0%,transparent 70%);pointer-events:none}
+.nl-eye{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);margin-bottom:16px}
+.nl-h{font-family:var(--serif);font-size:clamp(26px,3.2vw,40px);font-weight:600;letter-spacing:-.03em;color:var(--t1);margin-bottom:14px;line-height:1.15}
+.nl-sub{font-size:16px;color:var(--t2);margin-bottom:38px;max-width:460px;margin-left:auto;margin-right:auto}
+.nl-form{display:flex;max-width:500px;margin:0 auto 16px;border-radius:8px;overflow:hidden;border:1px solid var(--gbdr)}
+.nl-in{flex:1;background:var(--s1);border:none;padding:15px 20px;font-family:var(--sans);font-size:14px;color:var(--t1);outline:none}
+.nl-in::placeholder{color:var(--t3)}
+.nl-btn{background:var(--red);color:#fff;border:none;padding:15px 26px;font-family:var(--mono);font-size:12px;letter-spacing:.09em;text-transform:uppercase;cursor:pointer;white-space:nowrap;font-weight:700;transition:opacity .15s}.nl-btn:hover{opacity:.87}
+.nl-note{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em}
+.nl-proof{display:flex;justify-content:center;gap:36px;margin-top:44px;padding-top:32px;border-top:1px solid var(--gbdr);flex-wrap:wrap}
+.nl-pv{display:block;font-family:var(--serif);font-size:26px;font-weight:600;color:var(--t1);letter-spacing:-.025em}
+.nl-pl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--t3);margin-top:4px}
+.site-foot{border-top:1px solid var(--gbdr);padding:30px 0}
+.foot-inner{max-width:1400px;margin:0 auto;padding:0 48px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.foot-logo{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--t1)}.foot-logo b{color:var(--red)}
+.foot-note{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em}
+.foot-link{font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px}
+.rv{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}.rv.in{opacity:1;transform:none}
+@media(max-width:1100px){
+  .kpi-row{grid-template-columns:repeat(3,1fr)}
+  .hero-inner,.nav-inner,.chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap,.foot-inner{padding-left:32px;padding-right:32px}
+}
+@media(max-width:768px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}.nav-links{display:none}.hero-h1{font-size:36px}
+  .sectors-grid{grid-template-columns:1fr}.sector-head-row{grid-column:1}.srow:nth-child(odd){border-right:none}
+  .brief-art{grid-template-columns:1fr;gap:0}.brief-num{display:none}
+  .nl-card{padding:40px 28px}
+  .hero-inner,.nav-inner,.chart-wrap,.sectors-wrap,.brief-wrap,.foot-inner{padding-left:20px;padding-right:20px}.nl-wrap{padding:0 20px}
+}
+@media(max-width:480px){
+  .kpi-row{grid-template-columns:1fr 1fr}.hero-h1{font-size:28px}
+  .nl-form{flex-direction:column;border-radius:0}.nl-in,.nl-btn{border-radius:6px}
+}
 </style>
 </head>
 <body>
-<header>
-  <a href="/" class="logo">Gov<b>Revenue</b></a>
-  <nav class="hd-nav">
-    <a href="/desks">Desks</a><a href="/signals">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="/articles">Articles</a>
-  </nav>
-</header>
+
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">Gov<b>Revenue</b></a>
+    <div class="nav-links" role="menubar">
+      <a href="/desks" role="menuitem">Desks</a>
+      <a href="/signals" role="menuitem">Signals</a>
+      <a href="/charts" class="active" role="menuitem">Intelligence</a>
+      <a href="/scan" role="menuitem">The Scan</a>
+      <a href="/pricing" role="menuitem">Pricing</a>
+    </div>
+    <a href="/scan" class="nav-cta">Run a scan</a>
+  </div>
+</nav>
+
 <main>
-<div class="wrap">
-  <div class="page-head">
-    <div class="eyebrow">Spend signal &middot; Public record intelligence</div>
-    <h1>UK Public-Sector Procurement — Spend Curve</h1>
-    <p class="sub">Monthly and weekly awarded contract value across all 24 intelligence desks. Source: Contracts Finder (CF) and Find a Tender Service (FTS). Updated hourly. Notices with outlier values (&gt;£2bn per notice) excluded.</p>
-  </div>
-  <div class="kpi-strip">
-    <div class="kpi kpi-accent">
-      <div class="kpi-label">12-month awarded</div>
-      <div class="kpi-value">${fmtBnShort(totalAnnualM)}+</div>
-      <div class="kpi-sub">Total across all desks</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Monthly average</div>
-      <div class="kpi-value">${fmtBnShort(avgMonthlyM)}+</div>
-      <div class="kpi-sub">Mean per month</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Peak month</div>
-      <div class="kpi-value">${fmtBnShort(peakPoint.total_m)}+</div>
-      <div class="kpi-sub">${escapeHtml(peakPoint.label)} &middot; ${peakVsAvgPct > 0 ? "+" : ""}${peakVsAvgPct}% vs avg</div>
-    </div>
-    <div class="kpi kpi-green">
-      <div class="kpi-label">Open pipeline</div>
-      <div class="kpi-value">${fmtBnShort(openPipelineM)}+</div>
-      <div class="kpi-sub">Live tendering value</div>
-    </div>
-    <div class="kpi ${trendPct >= 0 ? "kpi-green" : "kpi-accent"}">
-      <div class="kpi-label">Momentum</div>
-      <div class="kpi-value">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</div>
-      <div class="kpi-sub">3-month avg vs 12mo ago</div>
-    </div>
-  </div>
 
-  <div class="chart-panel">
-    <div class="chart-toolbar">
-      <div class="chart-title-group">
-        <div class="chart-title">Awarded Spend &amp; Open Pipeline</div>
-        <div class="chart-subtitle">Value in £bn &middot; ${escapeHtml(reportMonthRange)} &middot; Contracts Finder + Find a Tender</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:20px">
+<section class="hero" aria-label="UK Procurement Intelligence Overview">
+  <div class="hero-orb orb1" aria-hidden="true"></div>
+  <div class="hero-orb orb2" aria-hidden="true"></div>
+  <div class="hero-orb orb3" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-badge" role="status">
+      <span class="hero-dot" aria-hidden="true"></span>
+      Live procurement intelligence &middot; Updated hourly
+    </div>
+    <h1 class="hero-h1">
+      <em>${fmtBnShort(totalAnnualM)}</em> in UK public contracts.<br>
+      Tracked in real time.
+    </h1>
+    <p class="hero-sub">Every month, UK public bodies spend billions on goods and services. Published in public, searchable, and entirely predictable. This is what that spend looks like when you actually look at it.</p>
+    <div class="hero-ctas">
+      <a href="/scan" class="btn-p">Find your contracts &rarr;</a>
+      <a href="/signals" class="btn-s">Browse open notices</a>
+    </div>
+  </div>
+</section>
+
+<section class="kpi-band" aria-label="Key procurement metrics">
+  <div class="kpi-row">
+    <div class="kcard rv">
+      <span class="kcard-label">12-month awarded</span>
+      <span class="kcard-val red">${fmtBnShort(totalAnnualM)}</span>
+      <span class="kcard-sub">Total across all desks &middot; ${escapeHtml(reportMonthRange)}</span>
+      <div class="kcard-glow red" aria-hidden="true"></div>
+    </div>
+    <div class="kcard rv">
+      <span class="kcard-label">Monthly average</span>
+      <span class="kcard-val">${fmtBnShort(avgMonthlyM)}</span>
+      <span class="kcard-sub">Per month over the period</span>
+    </div>
+    <div class="kcard rv">
+      <span class="kcard-label">Peak month</span>
+      <span class="kcard-val">${fmtBnShort(peakPoint.total_m)}</span>
+      <span class="kcard-sub">${escapeHtml(peakPoint.label)} &middot; ${peakVsAvgPct > 0 ? "+" : ""}${peakVsAvgPct}% vs average</span>
+    </div>
+    <div class="kcard rv">
+      <span class="kcard-label">Open pipeline now</span>
+      <span class="kcard-val grn">${fmtBnShort(openPipelineM)}</span>
+      <span class="kcard-sub">${totalOpenCount.toLocaleString()} live tenders accepting bids</span>
+      <div class="kcard-glow grn" aria-hidden="true"></div>
+    </div>
+    <div class="kcard rv">
+      <span class="kcard-label">Momentum signal</span>
+      <span class="kcard-val ${trendPct >= 0 ? "grn" : "red"}">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
+      <span class="kcard-sub">3-month trailing vs opening period</span>
+    </div>
+  </div>
+</section>
+
+<section class="chart-sec" aria-label="Spend trend chart">
+  <div class="chart-wrap">
+    <div class="chart-head">
+      <div>
+        <div class="sec-eye">Spend Signal &middot; ${escapeHtml(reportMonthRange)}</div>
+        <h2 class="sec-h" style="font-size:clamp(22px,2.6vw,34px)">Awarded spend and open pipeline</h2>
         <div class="chart-legend">
-          <div class="leg-item"><div class="leg-line"></div>Awarded</div>
-          <div class="leg-item"><div class="leg-line green"></div>Open pipeline</div>
-        </div>
-        <div class="tog-group">
-          <button class="tog tog-active" id="tog-month">12 Months</button>
-          <button class="tog" id="tog-week">12 Weeks</button>
+          <div class="leg"><div class="leg-line" aria-hidden="true"></div>Awarded value</div>
+          <div class="leg"><div class="leg-dash" aria-hidden="true"></div>Open pipeline</div>
         </div>
       </div>
+      <div class="tog-grp" role="group" aria-label="Chart period toggle">
+        <button class="tog tog-active" id="tog-month" aria-pressed="true">12 Months</button>
+        <button class="tog" id="tog-week" aria-pressed="false">12 Weeks</button>
+      </div>
     </div>
-    <div class="chart-container">
-      <canvas id="detailChart"></canvas>
-      <div class="chart-tip" id="chartTip"></div>
+    <div class="chart-box">
+      <canvas id="detailChart" role="img" aria-label="UK procurement spend chart"></canvas>
+      <div class="chart-tip" id="chartTip" role="tooltip" aria-live="polite"></div>
+    </div>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:14px;letter-spacing:.04em">Source: Contracts Finder (CF) &middot; Find a Tender Service (FTS) &middot; Notices above &pound;2bn excluded as outliers &middot; Updated hourly</p>
+  </div>
+</section>
+
+${deskBreak.length > 0 ? `
+<section class="sectors-sec rv" aria-label="Sector spend breakdown">
+  <div class="sectors-wrap">
+    <div class="sec-eye">Where the money is concentrated</div>
+    <h2 class="sec-h">Top sectors by awarded spend</h2>
+    <p class="sec-sub">Public procurement is not evenly distributed. These are the categories driving the largest share of UK government contract value right now.</p>
+    <div class="sectors-grid">
+      <div class="sector-head-row">Top desks by awarded value &middot; ${escapeHtml(reportMonthRange)}</div>
+      ${(() => {
+        const maxV = deskBreak[0]?.total_m || 1;
+        return deskBreak.map((d) => {
+          const pct = Math.round((d.total_m / maxV) * 100);
+          return `<div class="srow">
+            <span class="sname" title="${escapeHtml(d.label)}">${escapeHtml(d.label)}</span>
+            <div class="sbar-wrap" aria-hidden="true"><div class="sbar-fill" data-pct="${pct}"></div></div>
+            <span class="sval">${fmtBnShort(d.total_m)}</span>
+          </div>`;
+        }).join("");
+      })()}
     </div>
   </div>
+</section>
+` : ""}
 
-  ${deskBreak.length > 0 ? `
-  <div class="desk-break">
-    <div class="desk-break-head">Top desks by awarded value &middot; ${escapeHtml(reportMonthRange)}</div>
-    ${(() => {
-      const maxVal = deskBreak[0]?.total_m || 1;
-      return deskBreak.map(d => {
-        const pct = Math.round((d.total_m / maxVal) * 100);
-        return `<div class="desk-row">
-          <span class="desk-name">${escapeHtml(d.label)}</span>
-          <div class="desk-bar-wrap"><div class="desk-bar-fill" style="width:${pct}%"></div></div>
-          <span class="desk-val">${fmtBnShort(d.total_m)}+</span>
-        </div>`;
-      }).join("");
-    })()}
-  </div>` : ""}
+<section class="brief-sec" aria-labelledby="brief-heading">
+  <div class="brief-wrap">
+    <div class="brief-intro rv">
+      <div class="sec-eye">Market Intelligence Brief &middot; ${escapeHtml(reportDate)}</div>
+      <h2 class="sec-h" id="brief-heading">What the UK government is buying right now and what it means for your business</h2>
+      <p class="sec-sub">UK public procurement is the most transparent large-scale market in the world. Every major contract is published. Every buyer is named. Every award is a matter of public record. Most companies never look. Here is what the data says.</p>
+    </div>
 
-  ${analysisHtml}
-</div>
+    ${hasData ? `
+    <article>
+
+      <div class="brief-art rv">
+        <div class="brief-num" aria-hidden="true"><span>01</span>Overview</div>
+        <div>
+          <div class="brief-tag">Market Snapshot</div>
+          <h3 class="brief-h">Here is where UK government money is going right now</h3>
+          <div class="brief-body">
+            <p>The UK public sector awarded <strong>${fmtBn(totalAnnualM)}</strong> in contracts over the past 12 months, across ${totalNotices.toLocaleString()} procurement notices tracked in real time from Contracts Finder and Find a Tender. That works out to <strong>${fmtBnShort(avgMonthlyM)} every single month</strong> leaving government and flowing into businesses across every category from construction to digital services.</p>
+            <div class="pull"><p>Right now, ${fmtBnShort(openPipelineM)} in contracts are open and accepting bids. These are not historic deals. They are live opportunities with deadlines this week and next month.</p></div>
+            <p>Across ${totalOpenCount.toLocaleString()} active tenders, the immediately addressable commercial opportunity in UK public sector procurement is concrete and measurable. If your firm is not tracking it systematically, someone else is.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="brief-art rv">
+        <div class="brief-num" aria-hidden="true"><span>02</span>Momentum</div>
+        <div>
+          <div class="brief-tag">Momentum Signal</div>
+          <h3 class="brief-h">Spend is ${trendPct >= 0 ? "rising" : "contracting"} and that matters more than the headline number</h3>
+          <div class="brief-body">
+            <p>The directional trend over this period is <strong>${trendPct >= 0 ? "+" : ""}${trendPct}%</strong>, comparing the three-month opening average against the three-month trailing average. ${trendPct > 5 ? "That is a meaningful upswing. In procurement, rising awarded spend is a leading indicator of future open tenders. Frameworks extend, new lots open, and re-let activity accelerates. The time to position is before the volume peaks, not after." : trendPct < -5 ? "Spend contractions often precede consolidation phases where buyers are preparing larger, longer-term frameworks. Firms that map buyer intent during quiet periods are the ones that win when activity returns." : "Stable spend indicates predictable budget cycles and recurring opportunity windows. That rewards firms who plan six months ahead."}</p>
+            <div class="pull"><p>Awarded spend peaked at ${fmtBnShort(peakPoint.total_m)} in ${escapeHtml(peakPoint.label)} — ${peakVsAvgPct}% above the period average. Spikes like this signal budget-year end activity, framework renewals, or large multi-lot contracts that break into multiple winnable pieces.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brief-art rv">
+        <div class="brief-num" aria-hidden="true"><span>03</span>Sectors</div>
+        <div>
+          <div class="brief-tag">Where the Money Is</div>
+          <h3 class="brief-h">The sectors dominating UK procurement spend</h3>
+          <div class="brief-body">
+            <p>Public procurement is not uniformly distributed. Three sectors consistently account for the majority of UK government contract value. ${top3DesksText ? `Over this period, spend was led by ${top3DesksText}.` : topDesk ? `The leading category was <strong>${escapeHtml(topDesk.label)}</strong> at ${fmtBnShort(topDesk.total_m)}.` : ""}</p>
+            ${topDesk ? `<p>The leading desk alone — <strong>${escapeHtml(topDesk.label)}</strong> — represented approximately <strong>${topDeskSharePct}% of total tracked spend</strong>. If your firm operates in this category, you are in the highest-volume segment of the market. If you do not, the sector data above shows exactly where adjacent opportunity exists.</p>` : ""}
+            <div class="pull"><p>Knowing which sector is growing and which buyer is driving that growth is the difference between chasing tenders and being ready when they drop.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brief-art rv">
+        <div class="brief-num" aria-hidden="true"><span>04</span>Buyers</div>
+        <div>
+          <div class="brief-tag">The Buyer Map</div>
+          <h3 class="brief-h">The contracting authorities spending the most right now</h3>
+          <div class="brief-body">
+            <p>${topBuyers.length > 0 ? `Not all buyers are equal. <strong>${escapeHtml(topBuyers[0].buyer)}</strong> generated ${topBuyers[0].cnt} procurement notices totalling &pound;${topBuyers[0].total_val}m over this period alone.${topBuyers.length >= 3 ? ` Alongside <strong>${escapeHtml(topBuyers[1].buyer)}</strong> and <strong>${escapeHtml(topBuyers[2].buyer)}</strong>, a compact group of high-frequency buyers drives a disproportionate share of total UK public spend.` : ""}` : "Buyer-level intelligence builds as procurement signals accumulate. Once established, it identifies which contracting authorities are most active in your sector."}</p>
+            <p>Buyer behaviour is predictable. A contracting authority that spent heavily this year will re-procure. A buyer that awarded a framework in 2023 is approaching renewal now. Knowing <em>who</em> is buying in your category and when they last procured is the most underutilised competitive advantage in public sector business development.</p>
+            <div class="pull"><p>The public record tells you exactly who is spending, how much, and when they will need to buy again. You just need to know where to look.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brief-art rv">
+        <div class="brief-num" aria-hidden="true"><span>05</span>Act</div>
+        <div>
+          <div class="brief-tag">The Window Right Now</div>
+          <h3 class="brief-h">${closing30.toLocaleString()} contracts are closing in the next 30 days</h3>
+          <div class="brief-body">
+            <p>The near-term window is concrete: <strong>${closing30.toLocaleString()} notices closing within 30 days</strong> and <strong>${closing60.toLocaleString()} within 60 days</strong>. These are live procurement opportunities with published deadlines, buyer contact details, and submission requirements available in public right now.</p>
+            <p>GovRevenue scans this data every hour and scores each notice against your company profile — surfacing the ones worth bidding, the buyers worth calling, and the frameworks worth getting onto before the next round closes. The open pipeline is <strong>${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders</strong>. Your scan takes two minutes.</p>
+            <div class="pull"><p>${closing30.toLocaleString()} open contracts. 30 days. The window is concrete and it is closing.</p></div>
+          </div>
+        </div>
+      </div>
+
+    </article>
+    ` : `<p style="color:var(--t3);font-style:italic;text-align:center;padding:60px 0">Intelligence data is building. Check back after the first hourly refresh.</p>`}
+
+    <div class="brief-refs">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em;line-height:1.9">
+        Sources: Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="nl-sec" aria-labelledby="nl-heading">
+  <div class="nl-wrap">
+    <div class="nl-card">
+      <div class="nl-eye">Weekly procurement intelligence</div>
+      <h2 class="nl-h" id="nl-heading">Get the spend signal before your competitors do</h2>
+      <p class="nl-sub">Every week: the contracts opening in your sector, the buyers spending the most, and the frameworks closing soon. Free. No noise.</p>
+      <form class="nl-form" action="/form-submit" method="post" aria-label="Newsletter sign-up">
+        <input type="hidden" name="_type" value="briefing">
+        <input class="nl-in" type="email" name="email" placeholder="your@email.com" required autocomplete="email" aria-label="Email address">
+        <button type="submit" class="nl-btn">Get the brief</button>
+      </form>
+      <p class="nl-note">No spam. Unsubscribe any time. Weekly only.</p>
+      <div class="nl-proof">
+        <div><span class="nl-pv">${totalNotices.toLocaleString()}+</span><span class="nl-pl">Notices tracked</span></div>
+        <div><span class="nl-pv">24</span><span class="nl-pl">Sector desks</span></div>
+        <div><span class="nl-pv">Hourly</span><span class="nl-pl">Data refresh</span></div>
+        <div><span class="nl-pv">${fmtBnShort(openPipelineM)}</span><span class="nl-pl">Open pipeline</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
-<footer><div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
-  <a href="/">Gov<b style="color:var(--accent)">Revenue</b></a>
-  <span>Public record only &middot; Contracts Finder + Find a Tender &middot; Updated hourly</span>
-  <a href="/scan" style="color:var(--accent)">Run a scan →</a>
-</div></footer>
+
+<footer class="site-foot">
+  <div class="foot-inner">
+    <a href="/" class="foot-logo">Gov<b>Revenue</b></a>
+    <span class="foot-note">Public record only &middot; Contracts Finder + Find a Tender &middot; Updated hourly &middot; ${escapeHtml(reportDate)}</span>
+    <a href="/scan" class="foot-link">Run a scan &rarr;</a>
+  </div>
+</footer>
+
 <script>
 (function(){
   const MD=${JSON.stringify(monthPoints)};
@@ -7734,7 +7891,6 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
     const X=i=>pad.l+(data.length>1?i/(data.length-1):0.5)*cw;
     const Y=v=>pad.t+ch-((v-yMin)/yRange)*ch;
 
-    // Y gridlines + labels
     const yTicks=5;
     for(let i=0;i<=yTicks;i++){
       const v=yMin+(yRange/yTicks)*i;
@@ -7749,18 +7905,15 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       ctx.fillText(fmts(v),pad.l-10,y+4);
     }
 
-    // Vertical gridlines at each data point
     data.forEach((_,i)=>{
       const x=X(i);
       ctx.strokeStyle='#f2ede4';ctx.lineWidth=1;ctx.setLineDash([]);
       ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();
     });
 
-    // X-axis baseline
     ctx.strokeStyle='#ccc';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
 
-    // X labels (rotated)
     ctx.font='10px IBM Plex Mono,monospace';ctx.fillStyle='#5A6B7B';
     data.forEach((d,i)=>{
       const x=X(i);
@@ -7769,12 +7922,10 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       ctx.restore();
     });
 
-    // Y-axis label
     ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);
     ctx.font='9.5px IBM Plex Mono,monospace';ctx.fillStyle='#9aabb7';ctx.textAlign='center';
     ctx.fillText('AWARDED VALUE (£)',0,0);ctx.restore();
 
-    // Series 2: open pipeline dashed green
     const opData=data.filter(d=>d.open_m>0);
     if(opData.length>=2){
       ctx.strokeStyle='#14532d';ctx.lineWidth=1.8;ctx.setLineDash([5,4]);
@@ -7784,36 +7935,29 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       ctx.stroke();ctx.setLineDash([]);
     }
 
-    // Series 1: awarded area fill
     ctx.beginPath();
     data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
     ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();
     ctx.fillStyle='rgba(155,44,44,0.06)';ctx.fill();
 
-    // Series 1: awarded line
     ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2.5;
     ctx.beginPath();
     data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
     ctx.stroke();
 
-    // Peak + trough markers
     const peakI=data.reduce((pi,d,i)=>d.total_m>data[pi].total_m?i:pi,0);
     const validLow=data.filter(d=>d.total_m>0);
     const troughI=validLow.length?data.indexOf(validLow.reduce((l,d)=>d.total_m<l.total_m?d:l)):-1;
 
-    // Dots + per-point value labels + delta labels
     data.forEach((d,i)=>{
       const x=X(i),y=Y(d.total_m);
       const isPeak=i===peakI,isTrough=i===troughI;
-      // dot
       ctx.beginPath();ctx.arc(x,y,isPeak||isTrough?6:3.5,0,7);
       ctx.fillStyle=isPeak?'#9B2C2C':isTrough?'#5A6B7B':'#fff';ctx.fill();
       ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2;ctx.stroke();
-      // value label above dot
       ctx.font=(isPeak?'bold ':'')+'10px IBM Plex Mono,monospace';
       ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
       ctx.fillText(fmts(d.total_m)+'+',x,y-12);
-      // peak / trough label
       if(isPeak){
         ctx.fillStyle='#9B2C2C';ctx.font='bold 9px IBM Plex Mono,monospace';
         ctx.fillText('▲ PEAK',x,y-24);
@@ -7822,7 +7966,6 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
         ctx.fillStyle='#5A6B7B';ctx.font='9px IBM Plex Mono,monospace';
         ctx.fillText('▼ LOW',x,y+20);
       }
-      // delta from previous point
       if(i>0&&data[i-1].total_m>0){
         const delta=d.total_m-data[i-1].total_m;
         const dpct=Math.round(delta/data[i-1].total_m*100);
@@ -7833,7 +7976,6 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       }
     });
 
-    // Open pipeline dots
     data.forEach((d,i)=>{
       if(d.open_m<=0)return;
       ctx.beginPath();ctx.arc(X(i),Y(d.open_m),3,0,7);
@@ -7841,7 +7983,6 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.stroke();
     });
 
-    // Hover crosshair + tooltip
     if(mx!==null){
       const nearI=Math.round((mx-pad.l)/(cw||1)*(data.length-1));
       if(nearI>=0&&nearI<data.length){
@@ -7892,10 +8033,29 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
 
   new ResizeObserver(draw).observe(cv.parentElement);
   draw();
+
+  const bars=document.querySelectorAll('.sbar-fill');
+  if(bars.length){
+    const bo=new IntersectionObserver(es=>es.forEach(e=>{
+      if(e.isIntersecting){e.target.style.width=e.target.dataset.pct+'%';bo.unobserve(e.target);}
+    }),{threshold:.1});
+    bars.forEach(b=>bo.observe(b));
+  }
+
+  const rv=document.querySelectorAll('.rv');
+  const ro=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('in');ro.unobserve(e.target);}
+  }),{threshold:.04,rootMargin:'0px 0px 80px 0px'});
+  rv.forEach(el=>{
+    const rect=el.getBoundingClientRect();
+    if(rect.top<window.innerHeight)el.classList.add('in');
+    else ro.observe(el);
+  });
 })();
 </script>
 </body>
 </html>`);
+
 }));
 
 app.get("/charts/embed", asyncRoute(async (req, res) => {
