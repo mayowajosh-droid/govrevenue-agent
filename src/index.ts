@@ -7175,6 +7175,13 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
     </div>
     <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:#fff;padding:12px 22px;white-space:nowrap;flex-shrink:0">Run a revenue scan →</a>
   </div>
+  <div style="margin:0 0 28px;border:1px solid var(--line-strong);background:var(--paper-2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)">
+      <span>Spend curve &middot; awarded + open pipeline</span>
+      <a href="/charts" style="color:var(--accent);text-decoration:none;font-size:9.5px">Full analysis &rarr;</a>
+    </div>
+    <iframe src="/charts/embed" scrolling="no" frameborder="0" style="width:100%;height:360px;display:block;border:none"></iframe>
+  </div>
   <form class="filter-bar" method="get" action="/signals">
     <select name="cat">
       <option value="">All desks</option>
@@ -7885,6 +7892,187 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
   document.getElementById('tog-month').addEventListener('click',function(){cur=MD;this.classList.add('tog-active');document.getElementById('tog-week').classList.remove('tog-active');draw();});
   document.getElementById('tog-week').addEventListener('click',function(){cur=WD;this.classList.add('tog-active');document.getElementById('tog-month').classList.remove('tog-active');draw();});
 
+  new ResizeObserver(draw).observe(cv.parentElement);
+  draw();
+})();
+</script>
+</body>
+</html>`);
+}));
+
+app.get("/charts/embed", asyncRoute(async (req, res) => {
+  type EmbedPoint = { label: string; total_m: number; open_m: number; notice_count: number; open_count: number };
+  type EmbedDeskRow = { mlabel: string; category: string; total_m: number };
+  const OCAP = 2_000_000_000;
+  let mp: EmbedPoint[] = [], wp: EmbedPoint[] = [];
+  let mdkMap: Record<string, { label: string; total_m: number }[]> = {};
+  let wdkMap: Record<string, { label: string; total_m: number }[]> = {};
+  if (pool) {
+    const [mR, wR, mdR, wdR] = await Promise.all([
+      pool.query<EmbedPoint>(`
+        SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS label,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount>0 AND value_amount<${OCAP})/1e6::numeric,2)::float AS total_m,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%') AND value_amount>0 AND value_amount<${OCAP}),0)/1e6::numeric,2)::float AS open_m,
+               COUNT(*)::int AS notice_count,
+               COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count
+        FROM homepage_signals WHERE notice_date>NOW()-INTERVAL '13 months' AND notice_date<=NOW() AND notice_date IS NOT NULL
+        GROUP BY date_trunc('month',notice_date) ORDER BY date_trunc('month',notice_date)`),
+      pool.query<EmbedPoint>(`
+        SELECT to_char(date_trunc('week', notice_date), 'DD Mon') AS label,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount>0 AND value_amount<${OCAP})/1e6::numeric,2)::float AS total_m,
+               ROUND(COALESCE(SUM(value_amount) FILTER (WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%') AND value_amount>0 AND value_amount<${OCAP}),0)/1e6::numeric,2)::float AS open_m,
+               COUNT(*)::int AS notice_count,
+               COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count
+        FROM homepage_signals WHERE notice_date>NOW()-INTERVAL '14 weeks' AND notice_date<=NOW() AND notice_date IS NOT NULL
+        GROUP BY date_trunc('week',notice_date) ORDER BY date_trunc('week',notice_date)`),
+      pool.query<EmbedDeskRow>(`
+        SELECT to_char(date_trunc('month',notice_date),'Mon ''YY') AS mlabel, category,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount>0 AND value_amount<${OCAP})/1e6::numeric,1)::float AS total_m
+        FROM homepage_signals WHERE notice_date>NOW()-INTERVAL '13 months' AND notice_date IS NOT NULL
+        GROUP BY date_trunc('month',notice_date),category ORDER BY date_trunc('month',notice_date),SUM(value_amount) DESC NULLS LAST`),
+      pool.query<EmbedDeskRow>(`
+        SELECT to_char(date_trunc('week',notice_date),'DD Mon') AS mlabel, category,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount>0 AND value_amount<${OCAP})/1e6::numeric,1)::float AS total_m
+        FROM homepage_signals WHERE notice_date>NOW()-INTERVAL '14 weeks' AND notice_date IS NOT NULL
+        GROUP BY date_trunc('week',notice_date),category ORDER BY date_trunc('week',notice_date),SUM(value_amount) DESC NULLS LAST`),
+    ]);
+    mp = mR.rows.map(r => ({ ...r, total_m: r.total_m||0, open_m: r.open_m||0 }));
+    wp = wR.rows.map(r => ({ ...r, total_m: r.total_m||0, open_m: r.open_m||0 }));
+    for (const r of mdR.rows) { if (!r.total_m||r.total_m<=0) continue; const lbl=DESK_PROFILES.find(d=>d.slug===r.category)?.label||r.category; (mdkMap[r.mlabel]=mdkMap[r.mlabel]||[]).push({label:lbl,total_m:r.total_m}); }
+    for (const r of wdR.rows) { if (!r.total_m||r.total_m<=0) continue; const lbl=DESK_PROFILES.find(d=>d.slug===r.category)?.label||r.category; (wdkMap[r.mlabel]=wdkMap[r.mlabel]||[]).push({label:lbl,total_m:r.total_m}); }
+  }
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--paper:#FAF8F3;--paper-2:#F3EFE6;--ink:#0B0F14;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper-2);height:100%;overflow:hidden}
+.wrap{padding:10px 16px 0}
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.legend{display:flex;gap:14px;align-items:center}
+.leg{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--slate)}
+.leg-l{width:16px;height:2px;background:#9B2C2C}
+.leg-l.g{background:transparent;border-bottom:2px dashed #14532d}
+.tog-group{display:flex;border:1px solid var(--line-strong)}
+.tog{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:5px 12px;background:var(--paper-2);border:none;cursor:pointer;color:var(--slate)}
+.tog.active{background:var(--ink);color:#fff}
+.cv-wrap{position:relative}
+canvas{display:block;width:100%;background:var(--paper-2)}
+.tip{position:absolute;background:var(--ink);color:#e8edf3;padding:10px 14px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:210px}
+.tip-lbl{font-size:12px;font-weight:700;color:#fff;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+.tip-row{display:flex;align-items:center;gap:6px;margin-top:2px}
+.tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="toolbar">
+    <div class="legend">
+      <div class="leg"><div class="leg-l"></div>Awarded</div>
+      <div class="leg"><div class="leg-l g"></div>Open pipeline</div>
+    </div>
+    <div class="tog-group">
+      <button class="tog active" id="t-mo">12 months</button>
+      <button class="tog" id="t-wk">12 weeks</button>
+    </div>
+  </div>
+  <div class="cv-wrap">
+    <canvas id="ec"></canvas>
+    <div class="tip" id="et"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const MD=${JSON.stringify(mp)};
+  const WD=${JSON.stringify(wp)};
+  const MDK=${JSON.stringify(mdkMap)};
+  const WDK=${JSON.stringify(wdkMap)};
+  let cur=MD;
+  const cv=document.getElementById('ec');
+  const tip=document.getElementById('et');
+  let mx=null;
+  function fmt(v){return v>=1000?'£'+(v/1000).toFixed(2)+'bn+':'£'+v.toFixed(0)+'m+';}
+  function fmts(v){return v>=1000?'£'+(v/1000).toFixed(1)+'bn+':'£'+Math.round(v)+'m+';}
+  function draw(){
+    const dpr=window.devicePixelRatio||1;
+    const W=cv.parentElement.clientWidth;
+    const H=300;
+    cv.width=W*dpr;cv.height=H*dpr;
+    cv.style.width=W+'px';cv.style.height=H+'px';
+    const ctx=cv.getContext('2d');
+    ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+    const data=cur;if(!data.length)return;
+    const pad={t:36,r:16,b:72,l:72};
+    const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+    const aVals=data.map(d=>d.total_m).filter(v=>v>0);
+    const oVals=data.map(d=>d.open_m).filter(v=>v>0);
+    const allV=[...aVals,...oVals];
+    const yMax=Math.max(...allV)*1.18||10;
+    const X=i=>pad.l+(data.length>1?i/(data.length-1):0.5)*cw;
+    const Y=v=>pad.t+ch-(v/yMax)*ch;
+    // Y gridlines
+    for(let i=0;i<=4;i++){
+      const v=(yMax/4)*i;const y=Y(v);
+      ctx.strokeStyle=i===0?'#ccc':'#e8e2d8';ctx.lineWidth=i===0?1.5:1;ctx.setLineDash(i===0?[]:[3,3]);
+      ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.setLineDash([]);
+      ctx.font='9.5px IBM Plex Mono,monospace';ctx.fillStyle='#5A6B7B';ctx.textAlign='right';
+      ctx.fillText(v>=1000?'£'+(v/1000).toFixed(1)+'bn':'£'+Math.round(v)+'m',pad.l-6,y+3);
+    }
+    // X labels
+    ctx.font='9px IBM Plex Mono,monospace';ctx.fillStyle='#5A6B7B';
+    data.forEach((d,i)=>{const x=X(i);ctx.save();ctx.translate(x,H-pad.b+8);ctx.rotate(-Math.PI/4);ctx.textAlign='right';ctx.fillText(d.label,0,0);ctx.restore();});
+    // Open pipeline dashed
+    const opData=data.filter(d=>d.open_m>0);
+    if(opData.length>=2){ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();let f=true;data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);f?(ctx.moveTo(x,y),f=false):ctx.lineTo(x,y);}});ctx.stroke();ctx.setLineDash([]);}
+    // Area fill
+    ctx.beginPath();data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
+    ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();ctx.fillStyle='rgba(155,44,44,0.06)';ctx.fill();
+    // Awarded line
+    ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2;ctx.beginPath();data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});ctx.stroke();
+    // Peak marker
+    const peakI=data.reduce((pi,d,i)=>d.total_m>data[pi].total_m?i:pi,0);
+    data.forEach((d,i)=>{
+      const x=X(i),y=Y(d.total_m),isPeak=i===peakI;
+      ctx.beginPath();ctx.arc(x,y,isPeak?5:3,0,7);ctx.fillStyle=isPeak?'#9B2C2C':'#fff';ctx.fill();ctx.strokeStyle='#9B2C2C';ctx.lineWidth=1.8;ctx.stroke();
+      ctx.font=(isPeak?'bold ':'')+'9px IBM Plex Mono,monospace';ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
+      ctx.fillText(fmts(d.total_m),x,y-10);
+      if(isPeak){ctx.fillStyle='#9B2C2C';ctx.font='bold 8px IBM Plex Mono,monospace';ctx.fillText('▲ PEAK',x,y-20);}
+    });
+    // Hover tooltip
+    if(mx!==null){
+      const ni=Math.round((mx-pad.l)/(cw||1)*(data.length-1));
+      if(ni>=0&&ni<data.length){
+        const hx=X(ni);
+        ctx.strokeStyle='rgba(11,15,20,.3)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+        ctx.beginPath();ctx.moveTo(hx,pad.t);ctx.lineTo(hx,H-pad.b);ctx.stroke();ctx.setLineDash([]);
+        const d=data[ni];
+        const delta=ni>0?d.total_m-data[ni-1].total_m:null;
+        const dpct=delta&&data[ni-1].total_m>0?Math.round(delta/data[ni-1].total_m*100):null;
+        tip.style.display='block';
+        tip.style.left=(hx>W*0.65?hx-222:hx+10)+'px';tip.style.top=pad.t+'px';
+        const deskMap=cur===MD?MDK:WDK;
+        const desks=(deskMap[d.label]||[]).slice(0,5);
+        const maxDm=desks.length?desks[0].total_m:1;
+        const deskRows=desks.map(dk=>{
+          const pct=Math.round((dk.total_m/maxDm)*100);
+          const short=dk.label.length>22?dk.label.slice(0,21)+'…':dk.label;
+          return '<div style="margin-top:5px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:9.5px;color:#b0bec8;overflow:hidden;max-width:128px;display:inline-block;text-overflow:ellipsis;white-space:nowrap">'+short+'</span><span style="font-size:9.5px;color:#dde5ec;margin-left:6px;white-space:nowrap">'+fmts(dk.total_m)+'</span></div><div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px"><div style="width:'+pct+'%;height:100%;background:#9B2C2C;border-radius:2px;opacity:.85"></div></div></div>';
+        }).join('');
+        tip.innerHTML='<div class="tip-lbl">'+d.label+'</div>'
+          +'<div class="tip-row"><span class="tip-dot" style="background:#9B2C2C"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
+          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
+          +'<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
+          +(desks.length?'<div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e;margin-bottom:2px">Top 5 desks'+(desks.length<(deskMap[d.label]||[]).length?' of '+(deskMap[d.label]||[]).length:'')+'</div>'+deskRows+'</div>':'');
+      }
+    }else{tip.style.display='none';}
+  }
+  cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();mx=e.clientX-r.left;draw();});
+  cv.addEventListener('mouseleave',()=>{mx=null;draw();});
+  document.getElementById('t-mo').addEventListener('click',function(){cur=MD;this.classList.add('active');document.getElementById('t-wk').classList.remove('active');draw();});
+  document.getElementById('t-wk').addEventListener('click',function(){cur=WD;this.classList.add('active');document.getElementById('t-mo').classList.remove('active');draw();});
   new ResizeObserver(draw).observe(cv.parentElement);
   draw();
 })();
