@@ -7389,7 +7389,6 @@ ${pageShellHeader(null, null)}
       <h1 class="sig-h1">The public record, in real time.</h1>
       <p class="sub">Every contract notice tracked across Contracts Finder and Find a Tender &mdash; updated hourly. 50 per page.</p>
     </div>
-    <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--brand);color:#fff;padding:12px 20px;white-space:nowrap;flex-shrink:0;border-radius:2px">Run a scan &rarr;</a>
   </div>
   <div class="sig-band">
     <div class="chart-frame-wrap">
