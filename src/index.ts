@@ -8,6 +8,10 @@ import { EventEmitter } from "events";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import Stripe from "stripe";
 import * as Sentry from "@sentry/node";
 import { Pool } from "pg";
 import OpenAI from "openai";
@@ -47,6 +51,17 @@ import {
   type ChaseStats as OppChaseStats,
 } from "./lib/opportunityEngine.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
+type UserTier = "free" | "pro" | "agency";
+type UserRecord = {
+  id: string;
+  email: string;
+  password_hash: string;
+  created_at: string;
+  tier: UserTier;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_subscription_status: string | null;
+};
 type ScanRecord = {
   id: string;
   created_at: string;
@@ -62,6 +77,10 @@ type ScanRecord = {
   pdf_storage_etag?: string | null;
   pdf_storage_updated_at?: string | null;
   progress_stage?: string | null;
+  user_id?: string | null;
+  capability_statement?: string | null;
+  outreach_emails?: string | null;
+  frameworks_assessment?: string | null;
 };
 
 type SubscriptionRecord = {
@@ -147,6 +166,7 @@ type HomepageSignal = {
 
 const app = express();
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
@@ -156,6 +176,12 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 // a frontier model writes materially better ones), falling back to OpenAI otherwise.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
+const JWT_SECRET = process.env.JWT_SECRET || "govrevenue-jwt-secret-change-in-prod";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || "";
+const STRIPE_AGENCY_PRICE_ID = process.env.STRIPE_AGENCY_PRICE_ID || "";
+const BASE_URL = process.env.BASE_URL || "https://govrevenue-agent-production.up.railway.app";
 const REDIS_URL = process.env.REDIS_URL || null;
 const RUN_WEB = process.env.RUN_WEB !== "false";
 const RUN_WORKER = process.env.RUN_WORKER !== "false";
@@ -164,6 +190,8 @@ const SENTRY_ENABLED = Boolean(SENTRY_DSN);
 // Opportunity bot: when set, newly-discovered signals are pushed to this Slack
 // (or Discord-compatible) incoming webhook during the hourly refresh.
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
+
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 if (SENTRY_ENABLED) {
   Sentry.init({
@@ -1008,6 +1036,23 @@ async function initDb() {
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_etag TEXT;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS pdf_storage_updated_at TIMESTAMPTZ;`);
   await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS progress_stage TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS user_id TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS capability_statement TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS outreach_emails TEXT;`);
+  await pool.query(`ALTER TABLE scans ADD COLUMN IF NOT EXISTS frameworks_assessment TEXT;`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      tier TEXT NOT NULL DEFAULT 'free',
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      stripe_subscription_status TEXT
+    );
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -1520,6 +1565,91 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
   }
   next();
 }
+
+// ── Auth helpers ─────────────────────────────────────────────────────────────
+
+function signToken(user: Pick<UserRecord, "id" | "email" | "tier">): string {
+  return jwt.sign({ userId: user.id, email: user.email, tier: user.tier }, JWT_SECRET, { expiresIn: "30d" });
+}
+
+function getAuthUser(req: express.Request): { userId: string; email: string; tier: UserTier } | null {
+  const token = req.cookies?.gr_token;
+  if (!token) return null;
+  try {
+    const p = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; tier: string };
+    return { userId: p.userId, email: p.email, tier: p.tier as UserTier };
+  } catch {
+    return null;
+  }
+}
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!getAuthUser(req)) { res.redirect("/login"); return; }
+  next();
+}
+
+async function getUserById(id: string): Promise<UserRecord | null> {
+  if (!pool) return null;
+  const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE id=$1`, [id]);
+  return r.rows[0] || null;
+}
+
+async function getUserByEmail(email: string): Promise<UserRecord | null> {
+  if (!pool) return null;
+  const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE email=$1`, [email]);
+  return r.rows[0] || null;
+}
+
+async function createUser(email: string, password: string): Promise<UserRecord> {
+  const id = makeId();
+  const hash = await bcrypt.hash(password, 10);
+  if (pool) {
+    const r = await pool.query<UserRecord>(
+      `INSERT INTO users (id, email, password_hash, tier) VALUES ($1,$2,$3,'free') RETURNING *`,
+      [id, email.toLowerCase().trim(), hash]
+    );
+    return r.rows[0];
+  }
+  throw new Error("Database required for user accounts");
+}
+
+async function updateUserTier(userId: string, tier: UserTier, stripeCustomerId?: string, stripeSubId?: string, stripeSubStatus?: string) {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE users SET tier=$2, stripe_customer_id=COALESCE($3,stripe_customer_id), stripe_subscription_id=COALESCE($4,stripe_subscription_id), stripe_subscription_status=COALESCE($5,stripe_subscription_status) WHERE id=$1`,
+    [userId, tier, stripeCustomerId ?? null, stripeSubId ?? null, stripeSubStatus ?? null]
+  );
+}
+
+async function updateScanCachedField(id: string, field: "capability_statement" | "outreach_emails" | "frameworks_assessment", value: string) {
+  if (pool) {
+    await pool.query(`UPDATE scans SET ${field}=$2 WHERE id=$1`, [id, value]);
+  }
+}
+
+// ── Auth CSS (shared across login/register/account pages) ────────────────────
+const authCss = `
+  :root{--ink:#0B0F14;--paper:#fffaf3;--cream:#f3eadc;--line:#d2b88f;--gold:#a97932;--green:#1d6b4f;--red:#9b2d20;--serif:"Spectral",Georgia,serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--cream);color:var(--ink);font-family:"Inter","Helvetica Neue",Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  .auth-nav{background:var(--ink);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between}
+  .auth-nav a{color:#fff;text-decoration:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;opacity:.85}
+  .auth-nav a:first-child{font-weight:700;opacity:1}
+  .auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 16px}
+  .auth-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:40px;max-width:420px;width:100%}
+  .auth-card h1{font-family:var(--serif);font-size:26px;margin-bottom:8px}
+  .auth-card p.sub{color:#6f5b50;font-size:14px;margin-bottom:28px}
+  .field{margin-bottom:20px}
+  .field label{display:block;font-size:13px;font-weight:600;letter-spacing:.04em;margin-bottom:6px}
+  .field input{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--paper);color:var(--ink);outline:none}
+  .field input:focus{border-color:var(--gold)}
+  .btn-primary{width:100%;background:var(--ink);color:#fff;border:none;border-radius:6px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.04em}
+  .btn-primary:hover{background:#1e2630}
+  .auth-alt{text-align:center;margin-top:20px;font-size:13px;color:#6f5b50}
+  .auth-alt a{color:var(--gold);font-weight:600;text-decoration:none}
+  .err{background:#fdf0ee;border:1px solid #e5b4ae;color:var(--red);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:20px}
+  .ok{background:#edf7f2;border:1px solid #a8d5be;color:var(--green);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:20px}
+`;
 
 function clientEmailFromInput(input: z.infer<typeof intakeSchema>) {
   return input.clientEmail || input.email || null;
@@ -4515,6 +4645,13 @@ function reportPage(scan: ScanRecord) {
         <a class="btn secondary" href="/api/scans/${scan.id}/data.json">View Data</a>
         <a class="btn secondary" href="/scan/${scan.id}/compare" title="Compare with a previous scan">Compare &uarr;</a>
       </div>
+      ${scan.status === "completed" ? `<div class="action-tools" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px">
+        <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);align-self:center">Next steps →</span>
+        <a class="btn secondary" href="/scan/${scan.id}/capability-statement" style="font-size:13px">Capability statement</a>
+        <a class="btn secondary" href="/scan/${scan.id}/outreach-emails" style="font-size:13px">Outreach emails</a>
+        <a class="btn secondary" href="/scan/${scan.id}/frameworks" style="font-size:13px">Framework pre-qual</a>
+        <a class="btn secondary" href="/account" style="font-size:13px">My account</a>
+      </div>` : ""}
     </div>
 
     <section class="cover">
@@ -5348,6 +5485,10 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
   }
 
   const scan = await createScan(parsed.data);
+  const authUser = getAuthUser(req);
+  if (authUser && pool) {
+    await pool.query(`UPDATE scans SET user_id=$2 WHERE id=$1`, [scan.id, authUser.userId]);
+  }
   await enqueueScan(scan.id, parsed.data);
 
   res.redirect(302, `/scan/${scan.id}`);
@@ -5449,6 +5590,521 @@ app.get("/api/scans/:id/data.json", asyncRoute(async (req, res) => {
     return;
   }
   res.json({ input: scan.input_json ?? null, ...scan.procurement_json });
+}));
+
+// ── Auth routes ──────────────────────────────────────────────────────────────
+
+app.get("/register", (req, res) => {
+  const user = getAuthUser(req);
+  if (user) { res.redirect("/account"); return; }
+  const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create account — GovRevenue</title><style>${authCss}</style></head>
+<body>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/login">Sign in</a></nav>
+<div class="auth-wrap"><div class="auth-card">
+<h1>Create your account</h1>
+<p class="sub">Get scan history, capability statements and buyer outreach tools.</p>
+${err ? `<div class="err">${err}</div>` : ""}
+<form method="POST" action="/register">
+<div class="field"><label>Email address</label><input type="email" name="email" required autocomplete="email" placeholder="you@company.com"></div>
+<div class="field"><label>Password</label><input type="password" name="password" required autocomplete="new-password" placeholder="At least 8 characters" minlength="8"></div>
+<button class="btn-primary" type="submit">Create account</button>
+</form>
+<p class="auth-alt">Already have an account? <a href="/login">Sign in</a></p>
+</div></div></body></html>`);
+});
+
+app.post("/register", asyncRoute(async (req, res) => {
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  const password = String(req.body?.password || "");
+  if (!email || !email.includes("@")) { res.redirect("/register?err=Invalid+email+address"); return; }
+  if (password.length < 8) { res.redirect("/register?err=Password+must+be+at+least+8+characters"); return; }
+  const existing = await getUserByEmail(email);
+  if (existing) { res.redirect("/register?err=An+account+with+that+email+already+exists"); return; }
+  const user = await createUser(email, password);
+  const token = signToken(user);
+  res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
+  res.redirect("/account?welcome=1");
+}));
+
+app.get("/login", (req, res) => {
+  const user = getAuthUser(req);
+  if (user) { res.redirect("/account"); return; }
+  const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
+  const next = req.query.next ? encodeURIComponent(String(req.query.next)) : "";
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in — GovRevenue</title><style>${authCss}</style></head>
+<body>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/register">Create account</a></nav>
+<div class="auth-wrap"><div class="auth-card">
+<h1>Sign in</h1>
+<p class="sub">Access your scan history and intelligence tools.</p>
+${err ? `<div class="err">${err}</div>` : ""}
+<form method="POST" action="/login${next ? `?next=${next}` : ""}">
+<div class="field"><label>Email address</label><input type="email" name="email" required autocomplete="email"></div>
+<div class="field"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
+<button class="btn-primary" type="submit">Sign in</button>
+</form>
+<p class="auth-alt">No account? <a href="/register">Create one free</a></p>
+</div></div></body></html>`);
+});
+
+app.post("/login", asyncRoute(async (req, res) => {
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  const password = String(req.body?.password || "");
+  const nextUrl = String(req.query.next || "/account");
+  const user = await getUserByEmail(email);
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    res.redirect("/login?err=Incorrect+email+or+password"); return;
+  }
+  const token = signToken(user);
+  res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
+  res.redirect(nextUrl.startsWith("/") ? nextUrl : "/account");
+}));
+
+app.post("/logout", (req, res) => {
+  res.clearCookie("gr_token");
+  res.redirect("/");
+});
+
+// ── Account / dashboard ──────────────────────────────────────────────────────
+
+app.get("/account", requireAuth, asyncRoute(async (req, res) => {
+  const auth = getAuthUser(req)!;
+  const user = await getUserById(auth.userId);
+  if (!user) { res.clearCookie("gr_token"); res.redirect("/login"); return; }
+
+  const welcome = req.query.welcome === "1";
+  const upgraded = req.query.upgraded === "1";
+
+  let userScans: ScanRecord[] = [];
+  if (pool) {
+    const r = await pool.query<ScanRecord>(
+      `SELECT id, created_at, status, company_name, progress_stage FROM scans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
+      [user.id]
+    );
+    userScans = r.rows;
+  }
+
+  const tierBadge: Record<UserTier, string> = { free: "Free", pro: "Pro", agency: "Agency" };
+  const tierColour: Record<UserTier, string> = { free: "#6f5b50", pro: "#a97932", agency: "#1d6b4f" };
+
+  const scanRows = userScans.length ? userScans.map(s => `
+    <tr>
+      <td><a href="/scan/${escapeHtml(s.id)}">${escapeHtml(s.company_name)}</a></td>
+      <td>${new Date(s.created_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" })}</td>
+      <td><span class="badge badge-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
+      <td><a href="/scan/${escapeHtml(s.id)}">View →</a></td>
+    </tr>`).join("") : `<tr><td colspan="4" class="empty">No scans yet. <a href="/scan">Run your first scan →</a></td></tr>`;
+
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My account — GovRevenue</title>
+<style>
+${authCss}
+body{display:block;background:var(--cream)}
+.dash-wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px}
+.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:16px}
+.dash-header h1{font-family:var(--serif);font-size:28px}
+.tier-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--cream);border:1px solid var(--line)}
+.section-head{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6f5b50;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.dash-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:24px;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:8px 0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6f5b50;border-bottom:1px solid var(--line)}
+td{padding:12px 8px 12px 0;border-bottom:1px solid #ede5d8;vertical-align:middle}
+td a{color:var(--gold);text-decoration:none;font-weight:600}
+td:first-child a{color:var(--ink)}
+.empty{color:#6f5b50;padding:24px 0;font-style:italic}
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.badge-completed{background:#edf7f2;color:#1d6b4f}
+.badge-pending,.badge-running{background:#fef9ec;color:#a97932}
+.badge-failed{background:#fdf0ee;color:#9b2d20}
+.billing-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.btn-upgrade{display:inline-block;background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;letter-spacing:.04em}
+.btn-portal{display:inline-block;background:transparent;color:var(--ink);padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--line)}
+.flash{border-radius:6px;padding:12px 16px;font-size:13px;margin-bottom:24px}
+.flash.ok{background:#edf7f2;border:1px solid #a8d5be;color:var(--green)}
+</style>
+</head><body>
+<nav class="auth-nav">
+  <a href="/">GovRevenue</a>
+  <div style="display:flex;gap:20px;align-items:center">
+    <a href="/scan">New scan</a>
+    <a href="/desks">Desks</a>
+    <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;opacity:.85;letter-spacing:.1em;text-transform:uppercase">Sign out</button></form>
+  </div>
+</nav>
+<div class="dash-wrap">
+${welcome ? `<div class="flash ok">Account created. Welcome to GovRevenue.</div>` : ""}
+${upgraded ? `<div class="flash ok">Subscription active. Your account has been upgraded.</div>` : ""}
+<div class="dash-header">
+  <h1>My account</h1>
+  <span class="tier-badge" style="color:${tierColour[user.tier]};border-color:${tierColour[user.tier]}">${tierBadge[user.tier]}</span>
+</div>
+
+<div class="dash-card">
+  <div class="section-head">Subscription</div>
+  <div class="billing-row">
+    <div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px">${user.tier === "free" ? "Free plan" : user.tier === "pro" ? "Pro — £79/month" : "Agency — £249/month"}</div>
+      <div style="font-size:13px;color:#6f5b50">${user.tier === "free" ? "Upgrade to unlock capability statements, outreach emails and framework pre-qualification." : "Full access to all intelligence tools."}</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${user.tier === "free" && stripe ? `<a class="btn-upgrade" href="/billing/checkout?plan=pro">Upgrade to Pro</a>` : ""}
+      ${user.tier !== "free" && user.stripe_customer_id ? `<form method="POST" action="/billing/portal" style="display:inline"><button type="submit" class="btn-portal">Manage billing</button></form>` : ""}
+    </div>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div class="section-head">Your scans</div>
+  <table>
+    <thead><tr><th>Company</th><th>Date</th><th>Status</th><th></th></tr></thead>
+    <tbody>${scanRows}</tbody>
+  </table>
+  <div style="margin-top:20px"><a href="/scan" style="display:inline-block;background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none">+ New scan</a></div>
+</div>
+
+<div class="dash-card">
+  <div class="section-head">Account</div>
+  <div style="font-size:14px;color:#6f5b50">${escapeHtml(user.email)}</div>
+</div>
+</div></body></html>`);
+}));
+
+// ── Stripe billing ────────────────────────────────────────────────────────────
+
+app.get("/billing/checkout", requireAuth, asyncRoute(async (req, res) => {
+  if (!stripe) { res.redirect("/pricing"); return; }
+  const auth = getAuthUser(req)!;
+  const plan = String(req.query.plan || "pro");
+  const priceId = plan === "agency" ? STRIPE_AGENCY_PRICE_ID : STRIPE_PRO_PRICE_ID;
+  if (!priceId) { res.redirect("/pricing?err=Stripe+not+configured"); return; }
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    payment_method_types: ["card"],
+    customer_email: auth.email,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${BASE_URL}/account?upgraded=1`,
+    cancel_url: `${BASE_URL}/pricing`,
+    metadata: { userId: auth.userId, plan },
+  });
+  res.redirect(session.url!);
+}));
+
+app.post("/billing/portal", requireAuth, asyncRoute(async (req, res) => {
+  if (!stripe) { res.redirect("/account"); return; }
+  const auth = getAuthUser(req)!;
+  const user = await getUserById(auth.userId);
+  if (!user?.stripe_customer_id) { res.redirect("/account"); return; }
+  const session = await stripe.billingPortal.sessions.create({
+    customer: user.stripe_customer_id,
+    return_url: `${BASE_URL}/account`,
+  });
+  res.redirect(session.url);
+}));
+
+// Raw body needed for Stripe webhook signature verification
+app.post("/billing/webhook", express.raw({ type: "application/json" }), asyncRoute(async (req, res) => {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) { res.json({ received: true }); return; }
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers["stripe-signature"] as string, STRIPE_WEBHOOK_SECRET);
+  } catch {
+    res.status(400).json({ error: "Webhook signature failed" }); return;
+  }
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.userId;
+    const plan = (session.metadata?.plan || "pro") as UserTier;
+    if (userId) await updateUserTier(userId, plan, session.customer as string, session.subscription as string, "active");
+  } else if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
+    const sub = event.data.object as Stripe.Subscription;
+    if (sub.status !== "active" && sub.status !== "trialing") {
+      if (pool) {
+        const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE stripe_subscription_id=$1`, [sub.id]);
+        if (r.rows[0]) await updateUserTier(r.rows[0].id, "free", undefined, undefined, sub.status);
+      }
+    }
+  }
+  res.json({ received: true });
+}));
+
+// ── Action layer: capability statement ───────────────────────────────────────
+
+app.get("/scan/:id/capability-statement", asyncRoute(async (req, res) => {
+  const regen = req.query.regen === "1";
+  if (regen && pool) await pool.query(`UPDATE scans SET capability_statement=NULL WHERE id=$1`, [req.params.id]);
+  const scan = await getScan(req.params.id);
+  if (!scan || scan.status !== "completed") { res.redirect(`/scan/${req.params.id}`); return; }
+
+  // Serve cached if available
+  if (scan.capability_statement && !regen) {
+    res.type("html").send(scan.capability_statement); return;
+  }
+
+  const data = scan.procurement_json as ProcurementData | null;
+  const edp = scan.report_markdown ? parseEdpFromMarkdown(scan.report_markdown) : null;
+  const topBuyers = (data?.contractsFinder?.awarded || [])
+    .filter(n => n.buyer && n.buyer !== "Not stated" && !isAggregatorBuyer(n.buyer))
+    .sort((a, b) => (b.awardedValue ?? 0) - (a.awardedValue ?? 0))
+    .slice(0, 5).map(n => n.buyer).filter(Boolean).join(", ");
+
+  const prompt = `You are a UK public sector bid consultant writing a one-page capability statement for an SME.
+
+Company: ${escapeHtml(scan.company_name)}
+Services: ${escapeHtml(String(scan.input_json?.mainServices || ""))}
+Target buyers: ${escapeHtml(String(scan.input_json?.idealBuyers || ""))}
+Recommended route: ${escapeHtml(edp?.recommendedRoute || "")}
+Top active buyers in their sector: ${escapeHtml(topBuyers)}
+
+Write a professional, specific capability statement with these sections:
+1. About [Company Name] (2-3 sentences, what they do and for whom)
+2. Our Services (4-6 bullet points, specific to public sector)
+3. Why We Win (3 differentiators framed as buyer value)
+4. Recent Relevant Experience (2-3 placeholder examples in the right format, marked as "[TO FILL]")
+5. Accreditations & Standards (relevant placeholders)
+6. Contact (placeholder)
+
+Write in British English. Be specific, not generic. Frame everything from the buyer's perspective.
+Return clean text/markdown only. No JSON.`;
+
+  let capStatement = "";
+  try {
+    capStatement = await callLlmReport(prompt);
+  } catch (err: any) {
+    capStatement = `Error generating capability statement: ${err?.message}`;
+  }
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capability Statement — ${escapeHtml(scan.company_name)}</title>
+<style>
+${authCss}
+body{display:block;background:var(--cream)}
+.cs-wrap{max-width:800px;margin:0 auto;padding:40px 24px 80px}
+.cs-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.cs-topbar a{color:var(--gold);font-size:13px;font-weight:600;text-decoration:none}
+.cs-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:36px 40px}
+.cs-card h1{font-family:var(--serif);font-size:28px;margin-bottom:4px}
+.cs-card .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6f5b50;margin-bottom:28px}
+.cs-body h2{font-family:var(--serif);font-size:19px;margin-top:28px;margin-bottom:10px;color:var(--ink)}
+.cs-body p{font-size:15px;line-height:1.7;margin-bottom:14px;color:#2a2218}
+.cs-body ul{margin:0 0 14px 20px;padding:0}
+.cs-body li{font-size:15px;line-height:1.7;margin-bottom:6px;color:#2a2218}
+.cs-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.btn-print{background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer;border:none}
+.btn-ghost{background:transparent;color:var(--ink);padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--line)}
+@media print{.cs-topbar,.cs-actions{display:none}.cs-card{border:none;padding:0}}
+</style>
+</head><body>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<div class="cs-wrap">
+<div class="cs-topbar">
+  <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Capability Statement</div></div>
+  <div style="display:flex;gap:10px"><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/outreach-emails">Outreach emails →</a><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/frameworks">Framework pre-qual →</a></div>
+</div>
+<div class="cs-card">
+  <div class="cs-body">${markdownToHtml(capStatement)}</div>
+  <div class="cs-actions">
+    <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+    <a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/capability-statement?regen=1">Regenerate</a>
+  </div>
+</div>
+</div></body></html>`;
+
+  await updateScanCachedField(scan.id, "capability_statement", html);
+  res.type("html").send(html);
+}));
+
+// Force regeneration
+// ── Action layer: outreach emails ────────────────────────────────────────────
+
+app.get("/scan/:id/outreach-emails", asyncRoute(async (req, res) => {
+  const scan = await getScan(req.params.id);
+  if (!scan || scan.status !== "completed") { res.redirect(`/scan/${req.params.id}`); return; }
+
+  let regen = req.query.regen === "1";
+  if (regen && pool) await pool.query(`UPDATE scans SET outreach_emails=NULL WHERE id=$1`, [scan.id]);
+
+  const fresh = await getScan(req.params.id);
+  if (fresh?.outreach_emails && !regen) { res.type("html").send(fresh.outreach_emails); return; }
+
+  const data = scan.procurement_json as ProcurementData | null;
+  const edp = scan.report_markdown ? parseEdpFromMarkdown(scan.report_markdown) : null;
+
+  const topBuyersRaw = (data?.contractsFinder?.awarded || [])
+    .filter(n => n.buyer && n.buyer !== "Not stated" && !isAggregatorBuyer(n.buyer))
+    .sort((a, b) => (b.awardedValue ?? 0) - (a.awardedValue ?? 0))
+    .slice(0, 3);
+
+  const buyerContext = topBuyersRaw.map((n, i) =>
+    `Buyer ${i+1}: ${n.buyer} — contract: "${n.title}", value: ${formatMoney(n.awardedValue ?? null)}`
+  ).join("\n");
+
+  const prompt = `You are a UK public sector business development expert writing cold outreach emails for an SME.
+
+Company: ${scan.company_name}
+Services: ${String(scan.input_json?.mainServices || "")}
+Recommended route: ${edp?.recommendedRoute || "direct award / framework"}
+
+Top 3 buyers who have recently spent money in this sector:
+${buyerContext || "Major public sector buyers in this sector"}
+
+Write 3 separate cold outreach emails, one for each buyer. Each email should:
+- Be addressed to "Dear [Procurement Lead]" (acknowledge we don't have the contact name)
+- Reference the buyer's actual recent spending/contract activity in their sector
+- Be specific about what the company offers and why it fits that buyer's needs
+- Include a clear, low-pressure ask (a 15-minute call or to be added to their supplier list)
+- Be 150-200 words max
+- Sound like it was written by a real person, not a template
+- End with: [Your name] | ${scan.company_name}
+
+Format as:
+## Email 1: [Buyer Name]
+Subject: [Subject line]
+
+[Email body]
+
+---
+
+## Email 2: [Buyer Name]
+...
+
+Write in British English. Be specific and warm, not corporate.`;
+
+  let emailsContent = "";
+  try {
+    emailsContent = await callLlmReport(prompt);
+  } catch (err: any) {
+    emailsContent = `Error generating outreach emails: ${err?.message}`;
+  }
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Outreach Emails — ${escapeHtml(scan.company_name)}</title>
+<style>
+${authCss}
+body{display:block;background:var(--cream)}
+.oe-wrap{max-width:800px;margin:0 auto;padding:40px 24px 80px}
+.oe-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.oe-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:36px 40px}
+.oe-body h2{font-family:"Spectral",Georgia,serif;font-size:19px;margin-top:32px;margin-bottom:4px;color:var(--ink);padding-bottom:8px;border-bottom:1px solid var(--line)}
+.oe-body h2:first-child{margin-top:0}
+.oe-body p{font-size:15px;line-height:1.7;margin-bottom:12px;color:#2a2218;white-space:pre-wrap}
+.oe-body hr{border:none;border-top:1px dashed var(--line);margin:24px 0}
+.oe-body strong{font-weight:700}
+.oe-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.btn-copy{background:var(--ink);color:#fff;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;border:none;cursor:pointer}
+.btn-ghost{background:transparent;color:var(--ink);padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--line)}
+.note{background:var(--cream);border:1px solid var(--line);border-radius:6px;padding:14px 16px;font-size:13px;color:#6f5b50;margin-bottom:24px}
+</style>
+</head><body>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<div class="oe-wrap">
+<div class="oe-topbar">
+  <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Buyer Outreach Emails</div></div>
+  <div style="display:flex;gap:10px"><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/capability-statement">Capability statement →</a><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/frameworks">Framework pre-qual →</a></div>
+</div>
+<div class="oe-card">
+<div class="note">These emails are drafted based on your scan data. Find the right contact at each buyer on LinkedIn or their procurement portal before sending. Edit freely — they're a starting point.</div>
+<div class="oe-body">${markdownToHtml(emailsContent)}</div>
+<div class="oe-actions">
+  <a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/outreach-emails?regen=1">Regenerate</a>
+</div>
+</div>
+</div></body></html>`;
+
+  await updateScanCachedField(scan.id, "outreach_emails", html);
+  res.type("html").send(html);
+}));
+
+// ── Action layer: framework pre-qualification ─────────────────────────────────
+
+app.get("/scan/:id/frameworks", asyncRoute(async (req, res) => {
+  const scan = await getScan(req.params.id);
+  if (!scan || scan.status !== "completed") { res.redirect(`/scan/${req.params.id}`); return; }
+
+  let regen = req.query.regen === "1";
+  if (regen && pool) await pool.query(`UPDATE scans SET frameworks_assessment=NULL WHERE id=$1`, [scan.id]);
+
+  const fresh = await getScan(req.params.id);
+  if (fresh?.frameworks_assessment && !regen) { res.type("html").send(fresh.frameworks_assessment); return; }
+
+  const edp = scan.report_markdown ? parseEdpFromMarkdown(scan.report_markdown) : null;
+  const sector = resolveSectorFromScan(scan).label;
+
+  const prompt = `You are a UK public sector procurement specialist helping an SME identify relevant frameworks.
+
+Company: ${scan.company_name}
+Services: ${String(scan.input_json?.mainServices || "")}
+Sector: ${sector}
+Recommended route: ${edp?.recommendedRoute || ""}
+Target buyers: ${String(scan.input_json?.idealBuyers || "")}
+
+Identify 5-8 real, currently open UK public sector frameworks or Dynamic Purchasing Systems (DPS) that this company should apply to join.
+
+For each framework, provide:
+- Framework name and managing body (e.g. Crown Commercial Service, ESPO, YPO, Scape, etc.)
+- Reference number if known (e.g. RM6187)
+- What it covers
+- Who can use it (council, NHS, etc.)
+- Typical contract values
+- Eligibility requirements (turnover, accreditations, experience)
+- Whether the company likely qualifies based on their profile
+- Next steps to apply
+
+Format as a structured table first (Name | Body | Covers | Open to | Min turnover | Likely qualify), then detailed notes for each.
+
+Focus on frameworks that are currently accepting new suppliers or have regular refresh windows.
+Be specific — name real frameworks, not placeholder ones. Write in British English.`;
+
+  let frameworksContent = "";
+  try {
+    frameworksContent = await callLlmReport(prompt);
+  } catch (err: any) {
+    frameworksContent = `Error generating framework assessment: ${err?.message}`;
+  }
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Framework Pre-Qualification — ${escapeHtml(scan.company_name)}</title>
+<style>
+${authCss}
+body{display:block;background:var(--cream)}
+.fw-wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px}
+.fw-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.fw-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:36px 40px}
+.fw-body h2{font-family:"Spectral",Georgia,serif;font-size:19px;margin-top:32px;margin-bottom:10px;color:var(--ink)}
+.fw-body h2:first-child{margin-top:0}
+.fw-body p{font-size:15px;line-height:1.7;margin-bottom:12px;color:#2a2218}
+.fw-body ul{margin:0 0 14px 20px}
+.fw-body li{font-size:15px;line-height:1.7;margin-bottom:6px}
+.fw-body table{width:100%;border-collapse:collapse;margin-bottom:28px;font-size:14px}
+.fw-body th{text-align:left;padding:8px;background:var(--cream);border:1px solid var(--line);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.fw-body td{padding:8px;border:1px solid var(--line);vertical-align:top}
+.fw-body hr{border:none;border-top:1px dashed var(--line);margin:24px 0}
+.fw-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.btn-ghost{background:transparent;color:var(--ink);padding:10px 20px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--line)}
+.note{background:#fef9ec;border:1px solid #e8d18a;border-radius:6px;padding:14px 16px;font-size:13px;color:#7a5c00;margin-bottom:24px}
+</style>
+</head><body>
+<nav class="auth-nav"><a href="/">GovRevenue</a><a href="/scan/${escapeHtml(scan.id)}">← Back to scan</a></nav>
+<div class="fw-wrap">
+<div class="fw-topbar">
+  <div><div style="font-size:20px;font-weight:700">${escapeHtml(scan.company_name)}</div><div style="font-size:13px;color:#6f5b50;margin-top:4px">Framework Pre-Qualification</div></div>
+  <div style="display:flex;gap:10px"><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/capability-statement">Capability statement →</a><a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/outreach-emails">Outreach emails →</a></div>
+</div>
+<div class="fw-card">
+<div class="note">Framework windows open and close — verify each one directly with the managing body before applying. Reference numbers let you find them on Contracts Finder or the managing body's portal.</div>
+<div class="fw-body">${markdownToHtml(frameworksContent)}</div>
+<div class="fw-actions">
+  <a class="btn-ghost" href="/scan/${escapeHtml(scan.id)}/frameworks?regen=1">Regenerate</a>
+</div>
+</div>
+</div></body></html>`;
+
+  await updateScanCachedField(scan.id, "frameworks_assessment", html);
+  res.type("html").send(html);
 }));
 
 app.get("/pricing", (_req, res) => {
