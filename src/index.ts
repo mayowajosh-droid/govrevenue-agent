@@ -5536,7 +5536,58 @@ app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
   res.json({ count24h, hero: heroOut, ticker });
 }));
 
+function briefingResultHtml(title: string, sub: string, ok: boolean): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} &mdash; GovRevenue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--base:#06090F;--border:#1E2A3A;--ink:#E9EEF5;--ink-dim:#8893A4;--brand:#A0522D;--brand-hot:#B8673A;--pos:#22C55E}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--base);color:var(--ink);font-family:"Inter",-apple-system,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;background-image:radial-gradient(120% 80% at 78% -10%, rgba(59,130,246,.07), transparent 60%),radial-gradient(90% 60% at 0% 0%, rgba(160,82,45,.06), transparent 55%)}
+.card{max-width:480px;width:100%;background:linear-gradient(180deg,#111A26,#0B1018);border:1px solid var(--border);border-radius:12px;padding:40px;text-align:center}
+.badge{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:${ok ? "var(--pos)" : "var(--brand-hot)"};margin-bottom:18px}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em;color:#fff;margin-bottom:12px}
+p{color:var(--ink-dim);font-size:15px;line-height:1.6;margin-bottom:26px}
+.act{display:inline-flex;gap:8px;align-items:center;background:var(--brand);color:#fff;font-weight:600;font-size:14px;text-decoration:none;padding:11px 20px;border-radius:4px;transition:background .15s}
+.act:hover{background:var(--brand-hot)}
+</style></head>
+<body><div class="card">
+<div class="badge">${ok ? "Briefing &middot; subscribed" : "Briefing"}</div>
+<h1>${escapeHtml(title)}</h1>
+<p>${escapeHtml(sub)}</p>
+<a class="act" href="/">Back to GovRevenue</a>
+</div></body></html>`;
+}
+
 app.post("/form-submit", asyncRoute(async (req, res) => {
+  // Newsletter / briefing sign-up forms (desk page, /charts, articles) post here with
+  // a hidden _type=briefing. Capture the email instead of running the scan intake schema.
+  if (req.body?._type === "briefing") {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      res.status(400).type("html").send(briefingResultHtml("That email doesn’t look right", "Head back and try again with a valid work email.", false));
+      return;
+    }
+    let alreadySubscribed = false;
+    if (pool) {
+      const r = await pool.query(
+        `INSERT INTO briefing_subscribers (id, email, category, created_at)
+         VALUES ($1, $2, NULL, NOW()) ON CONFLICT (email) DO NOTHING`,
+        [makeId(), email]
+      );
+      alreadySubscribed = (r.rowCount ?? 0) === 0;
+    } else {
+      alreadySubscribed = briefMemStore.has(email);
+      if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, created_at: nowIso() });
+    }
+    res.type("html").send(briefingResultHtml(
+      alreadySubscribed ? "You’re already on the list" : "You’re on the list",
+      "We’ll send the weekly spend signal when new public money moves in your sector. No noise.",
+      true
+    ));
+    return;
+  }
+
   const parsed = intakeSchema.safeParse(req.body);
 
   if (!parsed.success) {
