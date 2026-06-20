@@ -7619,22 +7619,22 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
   <div class="kpi-strip">
     <div class="kpi kpi-accent">
       <div class="kpi-label">12-month awarded</div>
-      <div class="kpi-value">${fmtBnShort(totalAnnualM)}</div>
+      <div class="kpi-value">${fmtBnShort(totalAnnualM)}+</div>
       <div class="kpi-sub">Total across all desks</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Monthly average</div>
-      <div class="kpi-value">${fmtBnShort(avgMonthlyM)}</div>
+      <div class="kpi-value">${fmtBnShort(avgMonthlyM)}+</div>
       <div class="kpi-sub">Mean per month</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Peak month</div>
-      <div class="kpi-value">${fmtBnShort(peakPoint.total_m)}</div>
+      <div class="kpi-value">${fmtBnShort(peakPoint.total_m)}+</div>
       <div class="kpi-sub">${escapeHtml(peakPoint.label)} &middot; ${peakVsAvgPct > 0 ? "+" : ""}${peakVsAvgPct}% vs avg</div>
     </div>
     <div class="kpi kpi-green">
       <div class="kpi-label">Open pipeline</div>
-      <div class="kpi-value">${fmtBnShort(openPipelineM)}</div>
+      <div class="kpi-value">${fmtBnShort(openPipelineM)}+</div>
       <div class="kpi-sub">Live tendering value</div>
     </div>
     <div class="kpi ${trendPct >= 0 ? "kpi-green" : "kpi-accent"}">
@@ -7677,7 +7677,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
         return `<div class="desk-row">
           <span class="desk-name">${escapeHtml(d.label)}</span>
           <div class="desk-bar-wrap"><div class="desk-bar-fill" style="width:${pct}%"></div></div>
-          <span class="desk-val">${fmtBnShort(d.total_m)}</span>
+          <span class="desk-val">${fmtBnShort(d.total_m)}+</span>
         </div>`;
       }).join("");
     })()}
@@ -7807,7 +7807,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       // value label above dot
       ctx.font=(isPeak?'bold ':'')+'10px IBM Plex Mono,monospace';
       ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
-      ctx.fillText(fmts(d.total_m),x,y-12);
+      ctx.fillText(fmts(d.total_m)+'+',x,y-12);
       // peak / trough label
       if(isPeak){
         ctx.fillStyle='#9B2C2C';ctx.font='bold 9px IBM Plex Mono,monospace';
@@ -7861,15 +7861,15 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
           return '<div style="margin-top:6px">'
             +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
             +'<span style="font-size:9.5px;color:#b0bec8;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
-            +'<span style="font-size:9.5px;color:#dde5ec;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'</span>'
+            +'<span style="font-size:9.5px;color:#dde5ec;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'+'+'</span>'
             +'</div>'
             +'<div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px">'
             +'<div style="width:'+pct+'%;height:100%;background:#9B2C2C;border-radius:2px;opacity:.85"></div>'
             +'</div></div>';
         }).join('');
         tip.innerHTML='<div class="tip-label">'+d.label+'</div>'
-          +'<div class="tip-row"><span class="tip-dot" style="background:#9B2C2C"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
-          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
+          +'<div class="tip-row"><span class="tip-dot" style="background:#9B2C2C"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'+'+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
+          +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'+'+'</b></div>':'')
           +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
           +(desks.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">'
             +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e;margin-bottom:4px">Top 5 desks'+(totalDesks>5?' of '+totalDesks:'')+'</div>'
