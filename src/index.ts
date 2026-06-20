@@ -4873,6 +4873,7 @@ app.get("/", asyncRoute(async (req, res) => {
        heroSignal!.category.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
     : "Housing maintenance";
   const heroTitle = isLive ? heroSignal!.title.slice(0, 80) : "Responsive maintenance framework — West Midlands";
+  const heroUrl = isLive ? (heroSignal!.source_url || null) : null;
   const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Local Authority Buyer";
   const heroSource = isLive ? heroSignal!.source : "CF";
   const heroDateRaw = isLive ? (heroSignal!.notice_date || null) : null;
@@ -5008,6 +5009,8 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .figure{font-family:var(--mono);font-size:28px;font-weight:500;color:#fff}
 .verdict{display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;background:#9B2C2C26;color:#e08a7a;border:1px solid #9B2C2C66;padding:5px 11px}
 .caveat{padding:12px 18px 16px;font-family:var(--mono);font-size:10.5px;color:#8a949c;line-height:1.5;border-top:1px solid #ffffff14}
+.hc-link{color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.25);transition:text-decoration-color .15s}
+.hc-link:hover{text-decoration-color:rgba(255,255,255,.8)}
 .caveat b{color:#e08a7a}
 .spark{width:100%;height:46px;display:block;margin:2px 0 10px}
 .ticker{background:#070a0e;color:var(--paper);overflow:hidden;border-bottom:1px solid #000}
@@ -5162,7 +5165,7 @@ ${oppCardCss()}
       <div class="rbody">
         <svg class="spark" id="spark" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
         <div class="rrow"><span class="k">Category</span><span class="v" id="hc-cat">${escapeHtml(heroCategory)}<small id="hc-date" data-ts="${escapeHtml(heroDateRaw || "")}">${escapeHtml(heroDate)}</small></span></div>
-        <div class="rrow"><span class="k">Notice</span><span class="v" id="hc-title" style="font-size:14px;line-height:1.3">${escapeHtml(heroTitle)}</span></div>
+        <div class="rrow"><span class="k">Notice</span><span class="v" style="font-size:14px;line-height:1.3">${heroUrl ? `<a id="hc-title" class="hc-link" href="${escapeHtml(heroUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(heroTitle)}</a>` : `<span id="hc-title">${escapeHtml(heroTitle)}</span>`}</span></div>
         <div class="rrow"><span class="k">Buyer</span><span class="v" id="hc-buyer" style="font-size:16px">${escapeHtml(heroBuyer)}</span></div>
         <div class="rrow"><span class="k">Value</span><span class="v" id="hc-val">${heroVal}<small id="hc-status">${escapeHtml(heroStatus)}</small></span></div>
       </div>
@@ -5438,7 +5441,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if(g('hc-cat')&&g('hc-cat').childNodes[0]) g('hc-cat').childNodes[0].nodeValue=h.category;
       const de=g('hc-date');
       if(de){de.dataset.ts=h.date||'';de.textContent=ta(h.date);}
-      if(g('hc-title')) g('hc-title').textContent=h.title;
+      const tEl=g('hc-title');
+      if(tEl){tEl.textContent=h.title;if(tEl.tagName==='A'&&h.url)tEl.setAttribute('href',h.url);}
       if(g('hc-buyer')) g('hc-buyer').textContent=h.buyer;
       if(g('hc-val')&&g('hc-val').childNodes[0]) g('hc-val').childNodes[0].nodeValue=h.val;
       if(g('hc-status')) g('hc-status').textContent=h.status;
@@ -5525,6 +5529,7 @@ app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
           ? `£${(hero.value_amount / 1_000_000).toFixed(1)}m`
           : `£${Math.round(hero.value_amount / 1000)}k`)
       : "Value not stated",
+    url: hero.source_url || null,
     status: hero.status || "unknown",
     caveat: "Source: public procurement record. Confidence varies by notice quality — buyer names taken verbatim, not verified."
   } : null;
@@ -7329,8 +7334,15 @@ app.get("/charts", asyncRoute(async (req, res) => {
   let weekPoints: DetailPoint[] = [];
   let deskBreak: DeskBreak[] = [];
 
+  type BuyerRow = { buyer: string; cnt: string; total_val: string };
+  type SourceRow = { source: string; cnt: string };
+  type PipeRow = { closing_30: string; closing_60: string; open_count: string };
+  let topBuyers: BuyerRow[] = [];
+  let sourceSplit: SourceRow[] = [];
+  let closing30 = 0, closing60 = 0, totalOpenCount = 0;
+
   if (pool) {
-    const [mR, wR, dR] = await Promise.all([
+    const [mR, wR, dR, buyerR, sourceR, pipeR] = await Promise.all([
       pool.query<DetailPoint>(`
         SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS label,
                ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 2)::float AS total_m,
@@ -7356,6 +7368,24 @@ app.get("/charts", asyncRoute(async (req, res) => {
         FROM homepage_signals
         WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date IS NOT NULL AND value_amount > 0 AND value_amount < ${OUTLIER_CAP}
         GROUP BY category ORDER BY SUM(value_amount) DESC LIMIT 6`),
+      pool.query<BuyerRow>(`
+        SELECT buyer,
+               COUNT(*)::text AS cnt,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 1)::text AS total_val
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND buyer IS NOT NULL AND buyer <> '' AND notice_date IS NOT NULL
+        GROUP BY buyer ORDER BY SUM(value_amount) NULLS LAST DESC LIMIT 5`),
+      pool.query<SourceRow>(`
+        SELECT source, COUNT(*)::text AS cnt
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date IS NOT NULL
+        GROUP BY source ORDER BY COUNT(*) DESC`),
+      pool.query<PipeRow>(`
+        SELECT
+          COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '30 days')::text AS closing_30,
+          COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '60 days')::text AS closing_60,
+          COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::text AS open_count
+        FROM homepage_signals WHERE deadline_date IS NOT NULL`),
     ]);
     monthPoints = mR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
     weekPoints = wR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
@@ -7364,6 +7394,10 @@ app.get("/charts", asyncRoute(async (req, res) => {
       total_m: parseFloat(r.total_val) / 1e6,
       count: parseInt(r.cnt),
     }));
+    topBuyers = buyerR.rows;
+    sourceSplit = sourceR.rows;
+    const pR = pipeR.rows[0];
+    if (pR) { closing30 = parseInt(pR.closing_30) || 0; closing60 = parseInt(pR.closing_60) || 0; totalOpenCount = parseInt(pR.open_count) || 0; }
   }
 
   const totalAnnualM = monthPoints.reduce((s, p) => s + p.total_m, 0);
