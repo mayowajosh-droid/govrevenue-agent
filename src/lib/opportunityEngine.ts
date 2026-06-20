@@ -959,62 +959,63 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
 
 export function chaseNowCss(): string {
   return `
-.cnc-section{padding:60px 0;border-top:1px solid var(--line-strong);background:var(--paper)}
-.cnc-inner{padding:0 32px}
-.cnc-head{margin-bottom:24px}
-.cnc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#1d6b4f;display:flex;align-items:center;gap:6px;margin-bottom:10px}
-.cnc-dot{width:6px;height:6px;border-radius:50%;background:#1d6b4f;animation:cnc-pulse 2s ease-in-out infinite;flex-shrink:0}
+.cnc-section{padding:80px 0;background:var(--paper-2)}
+.cnc-inner{max-width:1240px;margin:0 auto;padding:0 48px}
+.cnc-head{margin-bottom:36px}
+.cnc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#1d6b4f;display:flex;align-items:center;gap:7px;margin-bottom:14px}
+.cnc-dot{width:7px;height:7px;border-radius:50%;background:#1d6b4f;animation:cnc-pulse 2s ease-in-out infinite;flex-shrink:0}
 @keyframes cnc-pulse{0%,100%{opacity:1}50%{opacity:.25}}
-.cnc-title{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.015em;margin-bottom:8px}
-.cnc-sub{font-size:15px;color:var(--slate);max-width:38em}
-.cnc-stat-bar{display:flex;background:#fff;border:1px solid var(--line-strong);margin-bottom:24px;flex-wrap:wrap}
-.cnc-stat{flex:1;min-width:120px;padding:14px 20px;border-right:1px solid rgba(15,20,25,.1)}
-.cnc-stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:4px}
-.cnc-stat-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ink)}
-.cnc-stat-val--green{color:#1d6b4f}
-.cnc-mini-chart{flex:2;min-width:200px;padding:14px 20px;border-right:1px solid rgba(15,20,25,.1)}
-.cnc-mini-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:8px}
-.cnc-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.cnc-bar-desk{font-family:var(--mono);font-size:9px;color:var(--slate);width:76px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cnc-bar-track{flex:1;height:6px;background:rgba(15,20,25,.07);position:relative}
-.cnc-bar-fill{position:absolute;left:0;top:0;bottom:0;background:#1d6b4f}
-.cnc-bar-count{font-family:var(--mono);font-size:9px;color:var(--ink);width:20px;text-align:right;flex-shrink:0}
-.cnc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.cnc-card{background:#fff;border:1px solid var(--line-strong);padding:18px 20px 42px;transition:border-color .15s,box-shadow .15s;position:relative;overflow:hidden}
-.cnc-card:hover{border-color:var(--ink);box-shadow:0 6px 24px -8px rgba(11,15,20,.16)}
+.cnc-title{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.025em;margin-bottom:10px;line-height:1.05;color:var(--ink)}
+.cnc-sub{font-size:16px;color:var(--slate);max-width:40em;line-height:1.55}
+.cnc-stat-bar{display:flex;gap:10px;margin-bottom:28px;background:none;border:none;flex-wrap:nowrap}
+.cnc-stat{flex:1;min-width:110px;padding:20px 24px;border:1px solid var(--line-strong);background:#fff;display:flex;flex-direction:column;gap:0}
+.cnc-stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:10px}
+.cnc-stat-val{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--ink);display:block;line-height:1}
+.cnc-stat-val--green{color:#1a5e42}
+.cnc-mini-chart{flex:2;min-width:180px;padding:20px 24px;background:#fff;border:1px solid var(--line-strong)}
+.cnc-mini-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-bottom:12px}
+.cnc-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.cnc-bar-desk{font-family:var(--mono);font-size:9px;color:var(--slate);width:80px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnc-bar-track{flex:1;height:4px;background:rgba(15,20,25,.07);position:relative}
+.cnc-bar-fill{position:absolute;left:0;top:0;bottom:0;background:#1a5e42}
+.cnc-bar-count{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--ink);width:22px;text-align:right;flex-shrink:0}
+.cnc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cnc-card{background:#fff;border:1px solid var(--line-strong);border-top:2px solid transparent;padding:22px 22px 46px;transition:border-top-color .18s,box-shadow .18s;position:relative;overflow:hidden}
+.cnc-card:hover{border-top-color:var(--accent);box-shadow:0 10px 36px -14px rgba(11,15,20,.2)}
 .cnc-card-bg-link{position:absolute;inset:0;z-index:1}
 .cnc-inner-link{position:relative;z-index:2}
-.cnc-card-top{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-.cnc-chip{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:2px;font-weight:600}
-.cnc-chip--open{background:#e8f5f0;color:#1d6b4f;border:1px solid rgba(29,107,79,.3)}
-.cnc-chip--framework{background:#f5f0ff;color:#6b3ab8;border:1px solid rgba(107,58,184,.3)}
-.cnc-chip--desk{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
+.cnc-card-top{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.cnc-chip{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;border-radius:2px;font-weight:600}
+.cnc-chip--open{background:#e6f4ee;color:#1a5e42;border:1px solid rgba(26,94,66,.25)}
+.cnc-chip--framework{background:#f0ebff;color:#5b2fa0;border:1px solid rgba(91,47,160,.25)}
+.cnc-chip--desk{background:rgba(15,20,25,.04);color:var(--slate);border:1px solid var(--line-strong)}
 .cnc-chip--src{background:transparent;color:var(--slate);border:1px solid var(--line-strong)}
-.cnc-card-title{font-family:var(--serif);font-size:14.5px;font-weight:600;line-height:1.35;margin-bottom:6px;color:var(--ink)}
-.cnc-card-title a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-strong)}
-.cnc-card-title a:hover{color:var(--accent)}
-.cnc-card-buyer{font-size:12px;color:var(--slate);margin-bottom:10px}
+.cnc-card-title{font-family:var(--serif);font-size:15px;font-weight:600;line-height:1.38;margin-bottom:7px;color:var(--ink)}
+.cnc-card-title a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(15,20,25,.18)}
+.cnc-card-title a:hover{color:var(--accent);text-decoration-color:var(--accent)}
+.cnc-card-buyer{font-size:12.5px;color:var(--slate);margin-bottom:12px;line-height:1.4}
 .cnc-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .cnc-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink)}
-.cnc-val--dim{color:var(--slate)}
-.cnc-deadline{font-family:var(--mono);font-size:9.5px;padding:2px 8px;border-radius:2px}
-.cnc-deadline--red{background:#fff0f0;color:#c0392b;border:1px solid rgba(192,57,43,.3)}
-.cnc-deadline--amber{background:#fff8e6;color:#a07820;border:1px solid rgba(160,120,32,.3)}
-.cnc-deadline--ok{background:var(--paper-2);color:var(--slate);border:1px solid var(--line-strong)}
-.cnc-val-bar{height:2px;background:rgba(15,20,25,.07);position:absolute;bottom:40px;left:0;right:0}
-.cnc-val-fill{height:100%;background:#1d6b4f}
-.cnc-card-foot{position:absolute;bottom:0;left:0;right:0;padding:9px 20px;border-top:1px solid rgba(15,20,25,.08);display:flex;align-items:center;justify-content:space-between;background:#fff}
+.cnc-val--dim{color:var(--slate);font-weight:400}
+.cnc-deadline{font-family:var(--mono);font-size:9.5px;padding:3px 9px;border-radius:2px;font-weight:600}
+.cnc-deadline--red{background:#fff0f0;color:#b91c1c;border:1px solid rgba(185,28,28,.25)}
+.cnc-deadline--amber{background:#fff8e6;color:#92640a;border:1px solid rgba(146,100,10,.25)}
+.cnc-deadline--ok{background:rgba(15,20,25,.04);color:var(--slate);border:1px solid var(--line-strong)}
+.cnc-val-bar{height:2px;background:rgba(15,20,25,.06);position:absolute;bottom:42px;left:0;right:0}
+.cnc-val-fill{height:100%;background:#1a5e42;transition:width .3s ease}
+.cnc-card-foot{position:absolute;bottom:0;left:0;right:0;padding:10px 22px;border-top:1px solid rgba(15,20,25,.07);display:flex;align-items:center;justify-content:space-between;background:#fff}
 .cnc-fit-cta{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .cnc-fit-cta:hover{color:var(--ink)}
 .cnc-src-link{font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:underline;text-underline-offset:3px}
-.cnc-card-see-all{background:var(--ink);border:1px solid var(--ink);padding:24px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;text-decoration:none;transition:background .15s,border-color .15s}
+.cnc-src-link:hover{color:var(--ink)}
+.cnc-card-see-all{background:var(--ink);border:2px solid var(--ink);padding:28px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;text-decoration:none;transition:background .2s,border-color .2s}
 .cnc-card-see-all:hover{background:var(--accent);border-color:var(--accent)}
-.cnc-see-count{font-family:var(--mono);font-size:40px;font-weight:700;color:#fff;line-height:1}
-.cnc-see-label{font-family:var(--serif);font-size:14px;color:rgba(255,255,255,.65);margin-top:6px;line-height:1.4}
-.cnc-see-cta{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:auto;padding-top:20px}
-.cnc-see-cta:hover{color:#fff}
-@media(max-width:960px){.cnc-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.cnc-grid{grid-template-columns:1fr}.cnc-stat-bar{flex-direction:column}.cnc-mini-chart{border-right:none}.cnc-inner{padding:0 20px}}
+.cnc-see-count{font-family:var(--serif);font-size:48px;font-weight:600;color:#fff;line-height:1;letter-spacing:-.03em}
+.cnc-see-label{font-family:var(--sans);font-size:14px;color:rgba(255,255,255,.6);margin-top:8px;line-height:1.45;font-weight:400}
+.cnc-see-cta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);padding-top:16px;transition:color .15s}
+.cnc-card-see-all:hover .cnc-see-cta{color:#fff}
+@media(max-width:960px){.cnc-grid{grid-template-columns:repeat(2,1fr)}.cnc-stat-bar{flex-wrap:wrap}}
+@media(max-width:600px){.cnc-grid{grid-template-columns:1fr}.cnc-stat-bar{flex-wrap:wrap}.cnc-stat{flex:1 1 calc(50% - 5px)}.cnc-mini-chart{flex:1 1 100%}.cnc-inner{padding:0 20px}.cnc-title{font-size:28px}}
 `;
 }
 
