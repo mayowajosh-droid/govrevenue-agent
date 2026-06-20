@@ -7175,12 +7175,10 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
     </div>
     <a href="/scan" style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:#fff;padding:12px 22px;white-space:nowrap;flex-shrink:0">Run a revenue scan →</a>
   </div>
-  <div style="margin:0 0 28px;border:1px solid var(--line-strong);background:var(--paper-2)">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)">
-      <span>Spend curve &middot; awarded + open pipeline</span>
-      <a href="/charts" style="color:var(--accent);text-decoration:none;font-size:9.5px">Full analysis &rarr;</a>
-    </div>
-    <iframe src="/charts/embed" scrolling="no" frameborder="0" style="width:100%;height:360px;display:block;border:none"></iframe>
+  <div style="margin:0 0 28px;border:1px solid var(--line-strong)">
+    <iframe src="/charts" id="charts-frame" scrolling="no" frameborder="0"
+      style="width:100%;height:2600px;display:block;border:none"
+      onload="try{this.style.height=this.contentDocument.body.scrollHeight+'px'}catch(e){}"></iframe>
   </div>
   <form class="filter-bar" method="get" action="/signals">
     <select name="cat">
