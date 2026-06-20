@@ -9000,14 +9000,14 @@ html{scroll-behavior:smooth}
 .dp-pulse-urgent .dp-pulse-val{color:var(--brand)}
 .dp-pulse-urgent .dp-pulse-label{color:var(--brand-dim)}
 /* Urgency strip */
-.urgency-strip{background:var(--brand-dim);border:1px solid rgba(180,146,78,.25);padding:12px 16px;margin-bottom:16px}
+.urgency-strip{background:var(--brand-dim);border:1px solid rgba(160,82,45,.25);padding:12px 16px;margin-bottom:16px}
 .urgency-strip-head{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:10px;display:flex;align-items:center;gap:4px}
-.urgency-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(180,146,78,.1);text-decoration:none;transition:background .12s;margin:0 -16px;padding-left:16px;padding-right:16px}
+.urgency-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(160,82,45,.1);text-decoration:none;transition:background .12s;margin:0 -16px;padding-left:16px;padding-right:16px}
 .urgency-item:last-child{border-bottom:none;padding-bottom:0}
-.urgency-item:hover{background:rgba(180,146,78,.12)}
+.urgency-item:hover{background:rgba(160,82,45,.12)}
 .urgency-item:hover .urgency-title{color:var(--text)}
 .urgency-title{font-size:12.5px;color:var(--muted);line-height:1.35;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px;transition:color .12s}
-.urgency-badge{font-family:var(--mono);font-size:10px;background:rgba(180,146,78,.2);color:var(--brand);padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
+.urgency-badge{font-family:var(--mono);font-size:10px;background:rgba(160,82,45,.2);color:var(--brand);padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
 /* Analytics section — dark zone continuation */
 .analytics-section{background:var(--base);padding:56px 0;border-bottom:1px solid var(--border)}
 .analytics-inner{padding:0 56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
@@ -9016,7 +9016,7 @@ html{scroll-behavior:smooth}
 .trend-chart{background:var(--surface-2);border:1px solid var(--border-2);padding:28px 24px 0}
 .trend-bars{display:flex;align-items:flex-end;justify-content:space-between;gap:5px;height:140px;border-bottom:1px solid var(--border);padding-bottom:0;overflow:hidden}
 .trend-bar-col{flex:1;max-width:46px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
-.trend-bar{width:100%;background:linear-gradient(to top,rgba(180,146,78,.4),var(--brand));border-radius:2px 2px 0 0;transition:opacity .15s;cursor:default}
+.trend-bar{width:100%;background:linear-gradient(to top,rgba(160,82,45,.4),var(--brand));border-radius:2px 2px 0 0;transition:opacity .15s;cursor:default}
 .trend-bar:hover{opacity:.75}
 .trend-bar-label{font-family:var(--mono);font-size:8.5px;color:var(--faint);text-align:center;padding:10px 0 12px;line-height:1.4}
 .trend-foot{padding:20px 0 28px;display:flex;align-items:baseline;gap:12px}
@@ -9035,7 +9035,7 @@ html{scroll-behavior:smooth}
 .awards-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .awards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .award-card{background:var(--surface-3);border:1px solid var(--border-2);padding:22px;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
-.award-card:hover{border-color:rgba(180,146,78,.3);box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.award-card:hover{border-color:rgba(160,82,45,.3);box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .award-card-buyer{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .award-card-title{font-size:13.5px;font-weight:500;color:var(--text);line-height:1.45;margin-bottom:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1}
 .award-card-meta{display:flex;justify-content:space-between;align-items:baseline}
@@ -9044,7 +9044,7 @@ html{scroll-behavior:smooth}
 .award-card-winner{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--border);padding-top:10px}
 /* Buyer tier & spend bar */
 .bw-tier{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;padding:2px 7px;border-radius:2px;flex-shrink:0}
-.bw-tier-1{background:var(--brand-dim);color:var(--brand);border:1px solid rgba(180,146,78,.25)}
+.bw-tier-1{background:var(--brand-dim);color:var(--brand);border:1px solid rgba(160,82,45,.25)}
 .bw-tier-2{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
 .bw-tier-3{background:rgba(255,255,255,.04);color:var(--faint);border:1px solid rgba(255,255,255,.08)}
 .bw-spend-bar-track{height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin:8px 0 4px}
