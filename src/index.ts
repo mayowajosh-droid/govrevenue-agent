@@ -7337,12 +7337,15 @@ app.get("/charts", asyncRoute(async (req, res) => {
   type BuyerRow = { buyer: string; cnt: string; total_val: string };
   type SourceRow = { source: string; cnt: string };
   type PipeRow = { closing_30: string; closing_60: string; open_count: string };
+  type DeskPointRow = { mlabel: string; category: string; total_m: number };
   let topBuyers: BuyerRow[] = [];
   let sourceSplit: SourceRow[] = [];
   let closing30 = 0, closing60 = 0, totalOpenCount = 0;
+  let monthDeskMap: Record<string, { label: string; total_m: number }[]> = {};
+  let weekDeskMap: Record<string, { label: string; total_m: number }[]> = {};
 
   if (pool) {
-    const [mR, wR, dR, buyerR, sourceR, pipeR] = await Promise.all([
+    const [mR, wR, dR, buyerR, sourceR, pipeR, mdDeskR, wdDeskR] = await Promise.all([
       pool.query<DetailPoint>(`
         SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS label,
                ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 2)::float AS total_m,
@@ -7386,6 +7389,22 @@ app.get("/charts", asyncRoute(async (req, res) => {
           COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '60 days')::text AS closing_60,
           COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::text AS open_count
         FROM homepage_signals WHERE deadline_date IS NOT NULL`),
+      pool.query<DeskPointRow>(`
+        SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS mlabel,
+               category,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 1)::float AS total_m
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date IS NOT NULL
+        GROUP BY date_trunc('month', notice_date), category
+        ORDER BY date_trunc('month', notice_date), SUM(value_amount) DESC NULLS LAST`),
+      pool.query<DeskPointRow>(`
+        SELECT to_char(date_trunc('week', notice_date), 'DD Mon') AS mlabel,
+               category,
+               ROUND(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < ${OUTLIER_CAP}) / 1e6::numeric, 1)::float AS total_m
+        FROM homepage_signals
+        WHERE notice_date > NOW() - INTERVAL '14 weeks' AND notice_date IS NOT NULL
+        GROUP BY date_trunc('week', notice_date), category
+        ORDER BY date_trunc('week', notice_date), SUM(value_amount) DESC NULLS LAST`),
     ]);
     monthPoints = mR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
     weekPoints = wR.rows.map(r => ({ ...r, total_m: r.total_m || 0, open_m: r.open_m || 0 }));
@@ -7398,6 +7417,16 @@ app.get("/charts", asyncRoute(async (req, res) => {
     sourceSplit = sourceR.rows;
     const pR = pipeR.rows[0];
     if (pR) { closing30 = parseInt(pR.closing_30) || 0; closing60 = parseInt(pR.closing_60) || 0; totalOpenCount = parseInt(pR.open_count) || 0; }
+    for (const r of mdDeskR.rows) {
+      if (!r.total_m || r.total_m <= 0) continue;
+      const lbl = DESK_PROFILES.find(d => d.slug === r.category)?.label || r.category;
+      (monthDeskMap[r.mlabel] = monthDeskMap[r.mlabel] || []).push({ label: lbl, total_m: r.total_m });
+    }
+    for (const r of wdDeskR.rows) {
+      if (!r.total_m || r.total_m <= 0) continue;
+      const lbl = DESK_PROFILES.find(d => d.slug === r.category)?.label || r.category;
+      (weekDeskMap[r.mlabel] = weekDeskMap[r.mlabel] || []).push({ label: lbl, total_m: r.total_m });
+    }
   }
 
   const totalAnnualM = monthPoints.reduce((s, p) => s + p.total_m, 0);
@@ -7537,7 +7566,7 @@ h1{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-.02em
 .leg-line.green{background:#14532d;border-top:none;border-bottom:2px dashed #14532d;background:transparent}
 .chart-container{position:relative;width:100%;background:#fff;border:1px solid var(--line-strong);padding:0}
 canvas#detailChart{display:block;width:100%}
-.chart-tip{position:absolute;background:var(--ink);color:#e8edf3;padding:10px 14px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;white-space:nowrap;min-width:160px}
+.chart-tip{position:absolute;background:var(--ink);color:#e8edf3;padding:12px 16px;font-family:var(--mono);font-size:11px;pointer-events:none;display:none;z-index:10;width:210px}
 .tip-label{font-size:12px;font-weight:700;color:#fff;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
 .tip-row{display:flex;align-items:center;gap:6px;margin-top:2px}
 .tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -7666,6 +7695,8 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
 (function(){
   const MD=${JSON.stringify(monthPoints)};
   const WD=${JSON.stringify(weekPoints)};
+  const MDK=${JSON.stringify(monthDeskMap)};
+  const WDK=${JSON.stringify(weekDeskMap)};
   let cur=MD;
   const cv=document.getElementById('detailChart');
   const tip=document.getElementById('chartTip');
@@ -7817,12 +7848,30 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
         const delta=nearI>0?d.total_m-data[nearI-1].total_m:null;
         const dpct=delta&&data[nearI-1].total_m>0?Math.round(delta/data[nearI-1].total_m*100):null;
         tip.style.display='block';
-        const tipLeft=hx>W*0.65?hx-175:hx+12;
+        const tipLeft=hx>W*0.65?hx-222:hx+12;
         tip.style.left=tipLeft+'px';tip.style.top=pad.t+'px';
+        const deskMap=cur===MD?MDK:WDK;
+        const desks=(deskMap[d.label]||[]).slice(0,5);
+        const maxDm=desks.length?desks[0].total_m:1;
+        const deskRows=desks.map(dk=>{
+          const pct=Math.round((dk.total_m/maxDm)*100);
+          const short=dk.label.length>22?dk.label.slice(0,21)+'…':dk.label;
+          return '<div style="margin-top:6px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
+            +'<span style="font-size:9.5px;color:#b0bec8;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
+            +'<span style="font-size:9.5px;color:#dde5ec;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'</span>'
+            +'</div>'
+            +'<div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px">'
+            +'<div style="width:'+pct+'%;height:100%;background:#9B2C2C;border-radius:2px;opacity:.85"></div>'
+            +'</div></div>';
+        }).join('');
         tip.innerHTML='<div class="tip-label">'+d.label+'</div>'
           +'<div class="tip-row"><span class="tip-dot" style="background:#9B2C2C"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
           +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
-          +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>';
+          +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
+          +(desks.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">'
+            +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6a7e8e;margin-bottom:2px">By desk</div>'
+            +deskRows+'</div>':'');
       }
     }else{tip.style.display='none';}
   }
