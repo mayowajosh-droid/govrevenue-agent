@@ -4798,7 +4798,8 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
   res.json({ ok: true, alreadySubscribed });
 }));
 
-app.get("/", asyncRoute(async (_req, res) => {
+app.get("/", asyncRoute(async (req, res) => {
+  const homepageAuth = getAuthUser(req);
   const [count24h, samplePdfUrl, deskSignals, chartResult, chaseSignals, chaseStats] = await Promise.all([
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
@@ -5089,14 +5090,19 @@ ${oppCardCss()}
 <body>
 <div class="topstrip"><div class="wrap">
   <div class="live"><span class="dot"></span> UK public procurement intelligence</div>
-  <div>United Kingdom &middot; Confidential intelligence</div>
+  <div style="display:flex;align-items:center;gap:16px">
+    ${homepageAuth
+      ? `<a href="/account" style="color:#9aabb7;text-decoration:none;font-size:11px;letter-spacing:.1em">Dashboard</a><form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#9aabb7;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:0">Sign out</button></form>`
+      : `<a href="/login" style="color:#9aabb7;text-decoration:none;font-size:11px;letter-spacing:.1em">Sign in</a><a href="/register" style="background:var(--accent);color:var(--paper);padding:5px 12px;border-radius:2px;font-size:11px;letter-spacing:.1em;text-decoration:none">Get started</a>`
+    }
+  </div>
 </div></div>
 <header class="mast"><div class="wrap">
   <div class="logo">Gov<b>Revenue</b></div>
   <nav class="primary">
-    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="#subscribe">Briefing</a>
+    <a href="#desks">Desks</a><a href="#chart">Signals</a><a href="/scan">The Scan</a><a href="/pricing">Pricing</a><a href="#subscribe">Briefing</a>${homepageAuth ? `<a href="/account">Dashboard</a>` : `<a href="/login">Sign in</a>`}
   </nav>
-  <a class="mast-cta" href="/scan">Run a scan</a>
+  ${homepageAuth ? `<a class="mast-cta" href="/account">My dashboard</a>` : `<a class="mast-cta" href="/scan">Run a scan</a>`}
 </div></header>
 <div class="verticals"><div class="wrap">
   ${DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("")}
@@ -6844,7 +6850,7 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
 
   if (!scan) {
-    res.status(404).type("html").send(notFoundHtml("Scan not found"));
+    res.status(404).type("html").send(notFoundHtml("Scan not found", getAuthUser(req)));
     return;
   }
 
@@ -6859,12 +6865,12 @@ app.get("/desks", asyncRoute(async (req, res) => {
       cached: await getDeskCache(profile.slug).catch(() => null),
     }))
   );
-  res.type("html").send(desksPage(entries, page));
+  res.type("html").send(desksPage(entries, page, getAuthUser(req)));
 }));
 
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
 
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
@@ -6874,12 +6880,12 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
     compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   }
 
-  res.type("html").send(deskPage(profile, cached));
+  res.type("html").send(deskPage(profile, cached, getAuthUser(req)));
 }));
 
 app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
 
   let matchCat: DeskCategory | null = null;
   let matchSub: string | null = null;
@@ -6889,7 +6895,7 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
     }
     if (matchCat) break;
   }
-  if (!matchCat || !matchSub) { res.status(404).type("html").send(notFoundHtml("Subcategory not found")); return; }
+  if (!matchCat || !matchSub) { res.status(404).type("html").send(notFoundHtml("Subcategory not found", getAuthUser(req))); return; }
 
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
@@ -6897,32 +6903,32 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
     compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   }
 
-  res.type("html").send(subPage(profile, matchCat, matchSub, cached));
+  res.type("html").send(subPage(profile, matchCat, matchSub, cached, getAuthUser(req)));
 }));
 
 app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   const buyerFilter = typeof req.query.buyer === "string" ? req.query.buyer : null;
-  res.type("html").send(noticesPage(profile, cached, buyerFilter));
+  res.type("html").send(noticesPage(profile, cached, buyerFilter, getAuthUser(req)));
 }));
 
 app.get("/desk/:slug/buyers", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
-  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found")); return; }
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
   const cached = await getDeskCache(profile.slug).catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
-  res.type("html").send(buyersPage(profile, cached));
+  res.type("html").send(buyersPage(profile, cached, getAuthUser(req)));
 }));
 
 app.get("/scan/:id/compare", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
   if (!scan || scan.status !== "completed") {
-    res.status(404).type("html").send(notFoundHtml("Scan not found or not completed"));
+    res.status(404).type("html").send(notFoundHtml("Scan not found or not completed", getAuthUser(req)));
     return;
   }
   const prior = (await getScansByCompany(scan.company_name, scan.id))[0] || null;
@@ -6999,7 +7005,7 @@ function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCateg
   return result;
 }
 
-function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null): string {
+function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null): string {
   const isCompiling = cached === null;
   const data = cached?.data;
 
@@ -7059,10 +7065,6 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     .filter(([buyer]) => !isAggregatorBuyer(buyer))
     .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
     .slice(0, 5);
-
-  const navLinks = DESK_PROFILES.map(d =>
-    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ''}>${escapeHtml(d.label)}</a>`
-  ).join("");
 
   const fmtBig = (v: number) => v >= 1_000_000_000
     ? `£${(v / 1_000_000_000).toFixed(2)}bn`
@@ -7439,6 +7441,12 @@ a{color:inherit;text-decoration:none}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+.gh-auth{display:flex;align-items:center;gap:16px;flex-shrink:0}
+.gh-auth-name{font-family:var(--mono);font-size:10.5px;color:#7a909e;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh-auth-link{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#9aabb7;transition:color .15s}
+.gh-auth-link:hover{color:var(--paper)}
+.gh-auth-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;background:var(--accent);color:var(--paper);padding:6px 14px;border-radius:2px;transition:opacity .15s}
+.gh-auth-cta:hover{opacity:.85}
 /* Masthead */
 .dm-mast{padding:80px 0 72px;border-bottom:1px solid var(--line-strong)}
 .dm-mast-inner{padding:0 56px;display:grid;grid-template-columns:1fr 360px;gap:72px;align-items:start}
@@ -7610,7 +7618,7 @@ a{color:inherit;text-decoration:none}
   .awards-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:760px){
-  .gh-tag,.gh-badge{display:none}
+  .gh-tag,.gh-badge,.gh-auth-name{display:none}
   .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
   .dp-pulse-inner,.analytics-inner,.awards-inner{padding-left:16px;padding-right:16px}
   .dm-mast{padding:40px 0 36px}
@@ -7651,21 +7659,7 @@ ${deskOpportunityCss()}
 </style>
 </head>
 <body>
-<header class="gh">
-  <div class="gh-inner">
-    <div class="gh-top">
-      <div class="gh-brand">
-        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-        <span class="gh-tag">Public-sector revenue intelligence</span>
-      </div>
-      <div class="gh-badge">
-        <span>CF &middot; public record</span>
-        <span>Public record only</span>
-      </div>
-    </div>
-    <nav class="gh-nav">${navLinks}</nav>
-  </div>
-</header>
+${pageShellHeader(profile, authCtx)}
 
 <section class="dm-mast">
   <div class="dm-mast-inner">
@@ -7736,7 +7730,8 @@ function subPage(
   profile: DeskProfile,
   cat: DeskCategory,
   subLabel: string,
-  cached: { data: ProcurementData; cached_at: string } | null
+  cached: { data: ProcurementData; cached_at: string } | null,
+  authCtx?: { email: string; tier: UserTier } | null
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
@@ -7778,10 +7773,6 @@ function subPage(
     .slice(0, 10);
 
   const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
-
-  const navLinks = DESK_PROFILES.map(d =>
-    `<a href="/desk/${d.slug}"${d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
-  ).join("");
 
   const cutoff365sub = Date.now() - 365 * 24 * 3_600_000;
   const recentOpen = allOpen.filter(n => {
@@ -7858,6 +7849,12 @@ a{color:inherit;text-decoration:none}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+.gh-auth{display:flex;align-items:center;gap:16px;flex-shrink:0}
+.gh-auth-name{font-family:var(--mono);font-size:10.5px;color:#7a909e;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh-auth-link{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#9aabb7;transition:color .15s}
+.gh-auth-link:hover{color:var(--paper)}
+.gh-auth-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;background:var(--accent);color:var(--paper);padding:6px 14px;border-radius:2px;transition:opacity .15s}
+.gh-auth-cta:hover{opacity:.85}
 .sub-mast{padding:52px 0 44px;border-bottom:1px solid var(--line-strong)}
 .sub-mast-inner{padding:0 56px}
 .sub-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -7923,7 +7920,7 @@ a{color:inherit;text-decoration:none}
 .dm-foot-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:12px 0 16px;border-top:1px solid var(--line)}
 @media(max-width:1100px){.sub-two-col{grid-template-columns:1fr}}
 @media(max-width:760px){
-  .gh-tag,.gh-badge{display:none}
+  .gh-tag,.gh-badge,.gh-auth-name{display:none}
   .gh-inner,.sub-mast-inner,.sub-body-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
   .sub-mast{padding:32px 0 28px}
   .sub-mast h1{font-size:30px}
@@ -7940,22 +7937,7 @@ a{color:inherit;text-decoration:none}
 </style>
 </head>
 <body>
-
-<header class="gh">
-  <div class="gh-inner">
-    <div class="gh-top">
-      <div class="gh-brand">
-        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-        <span class="gh-tag">Public-sector revenue intelligence</span>
-      </div>
-      <div class="gh-badge">
-        <span>CF &middot; public record</span>
-        <span>Public record only</span>
-      </div>
-    </div>
-    <nav class="gh-nav">${navLinks}</nav>
-  </div>
-</header>
+${pageShellHeader(profile, authCtx)}
 
 <section class="sub-mast">
   <div class="sub-mast-inner">
@@ -8086,6 +8068,12 @@ a{color:inherit;text-decoration:none}
 .gh-nav a.dnav-active{color:var(--paper);border-bottom-color:var(--paper)}
 .gh-badge{text-align:right;flex-shrink:0;line-height:1.4}
 .gh-badge span{font-family:var(--mono);font-size:10.5px;color:#7a909e;display:block}
+.gh-auth{display:flex;align-items:center;gap:16px;flex-shrink:0}
+.gh-auth-name{font-family:var(--mono);font-size:10.5px;color:#7a909e;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh-auth-link{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#9aabb7;transition:color .15s}
+.gh-auth-link:hover{color:var(--paper)}
+.gh-auth-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;background:var(--accent);color:var(--paper);padding:6px 14px;border-radius:2px;transition:opacity .15s}
+.gh-auth-cta:hover{opacity:.85}
 .pg-mast{padding:48px 0 40px;border-bottom:1px solid var(--line-strong)}
 .pg-mast-inner{padding:0 56px}
 .pg-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--slate);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -8113,7 +8101,7 @@ a{color:inherit;text-decoration:none}
 .pg-foot-inner{padding:14px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--slate)}
 .pg-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--slate);padding:10px 0 14px;border-top:1px solid var(--line)}
 @media(max-width:760px){
-  .gh-tag,.gh-badge{display:none}
+  .gh-tag,.gh-badge,.gh-auth-name{display:none}
   .gh-inner,.pg-mast-inner,.pg-body-inner,.pg-foot-inner{padding-left:16px;padding-right:16px}
   .pg-mast{padding:28px 0 24px}
   .pg-mast h1{font-size:26px}
@@ -8125,10 +8113,13 @@ a{color:inherit;text-decoration:none}
 }`;
 }
 
-function pageShellHeader(profile: DeskProfile | null): string {
+function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string; tier: UserTier } | null): string {
   const navLinks = DESK_PROFILES.map(d =>
     `<a href="/desk/${d.slug}"${profile && d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
   ).join("");
+  const authHtml = authCtx
+    ? `<div class="gh-auth"><span class="gh-auth-name">${escapeHtml(authCtx.email)}</span><a href="/account" class="gh-auth-link">Dashboard</a><a href="/logout" class="gh-auth-link">Sign out</a></div>`
+    : `<div class="gh-auth"><a href="/login" class="gh-auth-link">Sign in</a><a href="/register" class="gh-auth-cta">Get started</a></div>`;
   return `<header class="gh">
   <div class="gh-inner">
     <div class="gh-top">
@@ -8136,7 +8127,7 @@ function pageShellHeader(profile: DeskProfile | null): string {
         <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
-      <div class="gh-badge"><span>CF &middot; public record</span><span>Public record only</span></div>
+      ${authHtml}
     </div>
     <nav class="gh-nav">${navLinks}</nav>
   </div>
@@ -8154,7 +8145,7 @@ function pageShellFoot(): string {
 <div class="pg-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:#0F141926">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>`;
 }
 
-function notFoundHtml(message: string): string {
+function notFoundHtml(message: string, authCtx?: { email: string; tier: UserTier } | null): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8164,7 +8155,7 @@ function notFoundHtml(message: string): string {
 <style>${pageShellCss()}</style>
 </head>
 <body>
-${pageShellHeader(null)}
+${pageShellHeader(null, authCtx)}
 <main style="padding:80px 56px">
   <p style="font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:16px">404</p>
   <h1 style="font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px">${escapeHtml(message)}</h1>
@@ -8177,7 +8168,7 @@ ${pageShellFoot()}
 
 // ─── /desks ────────────────────────────────────────────────────────────────────
 
-function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: ProcurementData; cached_at: string } | null }>, page = 1): string {
+function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: ProcurementData; cached_at: string } | null }>, page = 1, authCtx?: { email: string; tier: UserTier } | null): string {
   type DS = {
     profile: DeskProfile;
     openCount: number;
@@ -8271,8 +8262,6 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
       ${pagerLinks}
       ${currentPage < totalPages ? `<a href="/desks?page=${currentPage + 1}" class="dl-pager-btn dl-pager-arrow">Next &rarr;</a>` : `<span class="dl-pager-btn dl-pager-disabled">Next &rarr;</span>`}
     </nav>` : "";
-  const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8341,18 +8330,7 @@ ${pageShellCss()}
 </style>
 </head>
 <body>
-<header class="gh">
-  <div class="gh-inner">
-    <div class="gh-top">
-      <div class="gh-brand">
-        <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
-        <span class="gh-tag">Public-sector revenue intelligence</span>
-      </div>
-      <div class="gh-badge"><span>CF &middot; public record</span><span>Public record only</span></div>
-    </div>
-    <nav class="gh-nav">${navLinks}</nav>
-  </div>
-</header>
+${pageShellHeader(null, authCtx)}
 <section class="dl-hero">
   <div class="dl-hero-inner">
     <div class="dl-eyebrow">All Intelligence Desks</div>
@@ -8387,7 +8365,8 @@ ${pageShellFoot()}
 function noticesPage(
   profile: DeskProfile,
   cached: { data: ProcurementData; cached_at: string } | null,
-  _buyerFilter: string | null = null
+  _buyerFilter: string | null = null,
+  authCtx?: { email: string; tier: UserTier } | null
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
@@ -8453,7 +8432,7 @@ ${noticesBoardCss()}
 </style>
 </head>
 <body>
-${pageShellHeader(profile)}
+${pageShellHeader(profile, authCtx)}
 
 <section class="pg-mast">
   <div class="pg-mast-inner">
@@ -8631,7 +8610,8 @@ ${pageShellFoot()}
 
 function buyersPage(
   profile: DeskProfile,
-  cached: { data: ProcurementData; cached_at: string } | null
+  cached: { data: ProcurementData; cached_at: string } | null,
+  authCtx?: { email: string; tier: UserTier } | null
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
@@ -8743,7 +8723,7 @@ ${pageShellCss()}
 </style>
 </head>
 <body>
-${pageShellHeader(profile)}
+${pageShellHeader(profile, authCtx)}
 
 <section class="pg-mast">
   <div class="pg-mast-inner">
