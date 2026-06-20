@@ -7438,20 +7438,45 @@ app.get("/charts", asyncRoute(async (req, res) => {
       <div class="analysis-kicker">Market Intelligence Brief &middot; ${reportDate}</div>
       <h2 class="analysis-h">UK Public-Sector Procurement — Spend Signal Analysis</h2>
 
-      <h3 class="analysis-sh">1. Overview</h3>
-      <p>GovRevenue's procurement signal intelligence platform (GovRevenue, 2026) aggregated <strong>${totalNotices.toLocaleString()} notices</strong> across 24 active sector desks over the period ${reportMonthRange}, ${srcSplitLabel} (Crown Commercial Service, 2026; Cabinet Office, 2026). Total awarded contract value indexed over the period reached <strong>${fmtBn(totalAnnualM)}</strong>, with a monthly mean of <strong>${fmtBnShort(avgMonthlyM)}</strong>. Open pipeline value — active tenders not yet awarded — stands at <strong>${fmtBnShort(openPipelineM)}</strong> across ${totalOpenCount.toLocaleString()} live notices, representing the immediately addressable commercial opportunity within the UK public sector.</p>
+      <div class="analysis-section">
+        <div class="analysis-sh"><span>01</span>Overview</div>
+        <div class="analysis-body">
+          <p>GovRevenue's procurement signal intelligence platform (GovRevenue, 2026) aggregated <strong>${totalNotices.toLocaleString()} notices</strong> across 24 active sector desks over the period ${reportMonthRange}, ${srcSplitLabel} (Crown Commercial Service, 2026; Cabinet Office, 2026). Total awarded contract value indexed over the period reached <strong>${fmtBn(totalAnnualM)}</strong>, with a monthly mean of <strong>${fmtBnShort(avgMonthlyM)}</strong>.</p>
+          <p>Open pipeline value — active tenders not yet awarded — stands at <strong>${fmtBnShort(openPipelineM)}</strong> across ${totalOpenCount.toLocaleString()} live notices, representing the immediately addressable commercial opportunity within the UK public sector.</p>
+        </div>
+      </div>
 
-      <h3 class="analysis-sh">2. Trend &amp; Momentum</h3>
-      <p>Comparing the three-month opening average (${fmtBnShort(first3M)}/month) against the three-month trailing average (${fmtBnShort(last3M)}/month) yields a directional trend of <strong>${trendPct >= 0 ? "+" : ""}${trendPct}%</strong>. ${trendPct > 5 ? `This upward trajectory is consistent with expanding public-sector procurement activity and suggests a market in volume growth. Periods of rising awarded spend typically precede increases in re-let activity as framework terms approach expiry (National Audit Office, 2023).` : trendPct < -5 ? `This contraction may reflect seasonal spend deferral, budget reallocation, or the lagged effect of procurement reform policy initiatives that have extended pre-market engagement phases (Cabinet Office, 2022).` : `The near-flat trajectory suggests spend is running at a stable base rate, with no strong directional signal over the observation period.`} Awarded spend peaked at <strong>${fmtBnShort(peakPoint.total_m)}</strong> in ${peakPoint.label} — a <strong>${peakVsAvgPct}% premium</strong> over the period average — before returning toward trend.</p>
+      <div class="analysis-section">
+        <div class="analysis-sh"><span>02</span>Trend &amp; Momentum</div>
+        <div class="analysis-body">
+          <p>Comparing the three-month opening average (${fmtBnShort(first3M)}/month) against the three-month trailing average (${fmtBnShort(last3M)}/month) yields a directional trend of <strong>${trendPct >= 0 ? "+" : ""}${trendPct}%</strong>. ${trendPct > 5 ? `This upward trajectory is consistent with expanding public-sector procurement activity and suggests a market in volume growth. Periods of rising awarded spend typically precede increases in re-let activity as framework terms approach expiry (National Audit Office, 2023).` : trendPct < -5 ? `This contraction may reflect seasonal spend deferral, budget reallocation, or the lagged effect of procurement reform policy initiatives that have extended pre-market engagement phases (Cabinet Office, 2022).` : `The near-flat trajectory suggests spend is running at a stable base rate, with no strong directional signal over the observation period.`}</p>
+          <p>Awarded spend peaked at <strong>${fmtBnShort(peakPoint.total_m)}</strong> in ${peakPoint.label} — a <strong>${peakVsAvgPct}% premium</strong> over the period average — before returning toward trend.</p>
+        </div>
+      </div>
 
-      <h3 class="analysis-sh">3. Sector Composition</h3>
-      <p>The GovRevenue 24-desk model segments UK public procurement by category, surfacing concentration dynamics not visible in undifferentiated aggregate data (GovRevenue, 2026). ${top3DesksText ? `The three highest-value desks over the period were ${top3DesksText}, collectively representing the dominant share of total tracked spend.` : topDesk ? `The ${escapeHtml(topDesk.label)} desk led at ${fmtBnShort(topDesk.total_m)} (${topDeskSharePct}% of total).` : `Sector breakdown data was insufficient for the period.`}${topDesk ? ` The leading desk alone accounted for approximately ${topDeskSharePct}% of period spend, consistent with Cabinet Office observations that construction, health, and facilities categories structurally dominate UK public contract value (Cabinet Office, 2022). Suppliers with sector alignment to these leading desks are positioned in the highest-volume market segment.` : ''}</p>
+      <div class="analysis-section">
+        <div class="analysis-sh"><span>03</span>Sector Composition</div>
+        <div class="analysis-body">
+          <p>The GovRevenue 24-desk model segments UK public procurement by category, surfacing concentration dynamics not visible in undifferentiated aggregate data (GovRevenue, 2026). ${top3DesksText ? `The three highest-value desks over the period were ${top3DesksText}, collectively representing the dominant share of total tracked spend.` : topDesk ? `The ${escapeHtml(topDesk.label)} desk led at ${fmtBnShort(topDesk.total_m)} (${topDeskSharePct}% of total).` : `Sector breakdown data was insufficient for the period.`}</p>
+          ${topDesk ? `<p>The leading desk alone accounted for approximately ${topDeskSharePct}% of period spend, consistent with Cabinet Office observations that construction, health, and facilities categories structurally dominate UK public contract value (Cabinet Office, 2022). Suppliers with sector alignment to these leading desks are positioned in the highest-volume market segment.</p>` : ''}
+        </div>
+      </div>
 
-      <h3 class="analysis-sh">4. Buyer Concentration</h3>
-      <p>${topBuyerPara} Buyer intelligence at this resolution — ranking contracting authorities by contract value and notice frequency across sector desks — enables suppliers to prioritise outreach toward the accounts generating the greatest addressable volume, and to identify re-let timing windows that are structurally invisible in undifferentiated procurement feeds (Arrowsmith, 2014).</p>
+      <div class="analysis-section">
+        <div class="analysis-sh"><span>04</span>Buyer Concentration</div>
+        <div class="analysis-body">
+          <p>${topBuyerPara}</p>
+          <p>Buyer intelligence at this resolution — ranking contracting authorities by contract value and notice frequency across sector desks — enables suppliers to prioritise outreach toward the accounts generating the greatest addressable volume, and to identify re-let timing windows that are structurally invisible in undifferentiated procurement feeds (Arrowsmith, 2014).</p>
+        </div>
+      </div>
 
-      <h3 class="analysis-sh">5. Supplier Intelligence Implications</h3>
-      <p>The spend signal presented here is a <em>lagging</em> indicator — it reflects notices already published, not forthcoming pipeline. Its analytical value lies in identifying category momentum, buyer concentration, and re-let windows. With <strong>${closing30.toLocaleString()} notices closing within 30 days</strong> and <strong>${closing60.toLocaleString()} within 60 days</strong> (GovRevenue, 2026), the near-term competitive window is material. A rising monthly trend typically precedes parallel open-tender volume within a 60–90 day lag (Arrowsmith, 2014). Firms targeting the public sector are advised to treat the open pipeline (${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders) as the immediate addressable opportunity and the awarded trend as the medium-term direction signal. The GovRevenue intelligence desk profiles provide notice-level granularity — buyer watchlists, framework tracking, value banding — to support competitive positioning at the account and category level.</p>
+      <div class="analysis-section">
+        <div class="analysis-sh"><span>05</span>Supplier Implications</div>
+        <div class="analysis-body">
+          <p>The spend signal presented here is a <em>lagging</em> indicator — it reflects notices already published, not forthcoming pipeline. Its analytical value lies in identifying category momentum, buyer concentration, and re-let windows. With <strong>${closing30.toLocaleString()} notices closing within 30 days</strong> and <strong>${closing60.toLocaleString()} within 60 days</strong> (GovRevenue, 2026), the near-term competitive window is material.</p>
+          <p>A rising monthly trend typically precedes parallel open-tender volume within a 60–90 day lag (Arrowsmith, 2014). Firms targeting the public sector are advised to treat the open pipeline (${fmtBnShort(openPipelineM)} across ${totalOpenCount.toLocaleString()} active tenders) as the immediate addressable opportunity and the awarded trend as the medium-term direction signal. The GovRevenue desk profiles provide notice-level granularity — buyer watchlists, framework tracking, value banding — to support competitive positioning at the account and category level.</p>
+        </div>
+      </div>
 
       <div class="analysis-refs">
         <div class="analysis-refs-label">References</div>
@@ -7527,19 +7552,24 @@ canvas#detailChart{display:block;width:100%}
 .desk-bar-fill{height:100%;background:var(--accent)}
 .desk-val{font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap;width:56px;text-align:right}
 /* analysis */
-.analysis{max-width:780px;margin:56px auto 0;padding-bottom:80px}
+.analysis{max-width:680px;margin:64px auto 0;padding-bottom:80px}
 .analysis-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-.analysis-h{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--line-strong)}
-.analysis-sh{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin:28px 0 10px}
-.analysis p{font-size:15px;line-height:1.75;color:var(--ink);margin-bottom:14px}
-.analysis p strong{color:var(--ink)}
+.analysis-h{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--ink)}
+.analysis-section{display:grid;grid-template-columns:140px 1fr;gap:0 32px;margin-bottom:36px;padding-bottom:36px;border-bottom:1px solid var(--line)}
+.analysis-section:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.analysis-sh{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);padding-top:5px;line-height:1.4}
+.analysis-sh span{display:block;font-size:18px;font-weight:600;font-family:var(--serif);letter-spacing:0;text-transform:none;color:var(--ink);margin-bottom:4px}
+.analysis-body p{font-family:var(--serif);font-size:15.5px;line-height:1.8;color:var(--ink);margin-bottom:0;text-align:justify;hyphens:auto}
+.analysis-body p+p{margin-top:16px}
+.analysis p strong,.analysis-body p strong{color:var(--ink);font-weight:700}
+.analysis-body p em{font-style:italic}
 .analysis-refs{margin-top:36px;padding-top:20px;border-top:1px solid var(--line-strong)}
 .analysis-refs-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-bottom:12px}
 .analysis-refs ol{padding-left:18px}
 .analysis-refs li{font-size:13px;line-height:1.65;color:var(--slate);margin-bottom:6px}
 .analysis-refs li em{font-style:italic}
 footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--mono);font-size:11px;color:var(--slate)}
-@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4),.kpi:nth-child(5){border-top:1px solid var(--line-strong)}.desk-break{grid-template-columns:1fr}.desk-break-head{grid-column:span 1}nav.hd-nav{display:none}h1{font-size:28px}}
+@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4),.kpi:nth-child(5){border-top:1px solid var(--line-strong)}.desk-break{grid-template-columns:1fr}.desk-break-head{grid-column:span 1}nav.hd-nav{display:none}h1{font-size:28px}.analysis-section{grid-template-columns:1fr}.analysis-sh{padding-top:0;margin-bottom:10px}.analysis-sh span{display:inline;font-size:15px;margin-right:6px;margin-bottom:0}}
 @media(max-width:600px){.kpi-strip{grid-template-columns:repeat(2,1fr)}.wrap{padding:0 20px}.page-head{padding:32px 0 24px}}
 </style>
 </head>
