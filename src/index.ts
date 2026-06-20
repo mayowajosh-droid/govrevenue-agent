@@ -5679,102 +5679,231 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const welcome = req.query.welcome === "1";
   const upgraded = req.query.upgraded === "1";
 
-  let userScans: ScanRecord[] = [];
+  let userScans: any[] = [];
+  let upcomingDeadlines: any[] = [];
+  let hotSectors: any[] = [];
   let recentSignals: any[] = [];
   let totalOpenSignals = 0;
+  let totalOpenValue = 0;
+  let signalsThisWeek = 0;
 
   if (pool) {
-    const [scansRes, signalsRes, countRes] = await Promise.all([
-      pool.query<ScanRecord>(
-        `SELECT id, created_at, status, company_name, input_json, progress_stage FROM scans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
+    const [scansRes, deadlinesRes, hotRes, signalsRes, countRes, statsRes] = await Promise.all([
+      pool.query(
+        `SELECT id, created_at, status, company_name, input_json, progress_stage,
+          CASE WHEN status='completed' THEN SUBSTRING(report_markdown, 1, 5000) ELSE NULL END AS report_snippet
+         FROM scans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,
         [user.id]
       ),
       pool.query(
-        `SELECT id, category, title, buyer, source, source_url, value_amount, status FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%' ORDER BY fetched_at DESC LIMIT 8`
+        `SELECT id, category, title, buyer, source_url, deadline_date, value_amount
+         FROM homepage_signals
+         WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '21 days'
+           AND (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         ORDER BY deadline_date ASC LIMIT 12`
+      ).catch(() => ({ rows: [] as any[] })),
+      pool.query(
+        `SELECT category, COUNT(*) AS cnt FROM homepage_signals
+         WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'
+         GROUP BY category ORDER BY cnt DESC LIMIT 8`
+      ).catch(() => ({ rows: [] as any[] })),
+      pool.query(
+        `SELECT id, category, title, buyer, source, source_url, value_amount, status, deadline_date
+         FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'
+         ORDER BY fetched_at DESC LIMIT 12`
       ).catch(() => ({ rows: [] as any[] })),
       pool.query<{ n: string }>(
         `SELECT COUNT(*) AS n FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'`
-      ).catch(() => ({ rows: [{ n: "0" }] }))
+      ).catch(() => ({ rows: [{ n: "0" }] })),
+      pool.query<{ total_value: string; new_this_week: string }>(
+        `SELECT
+          COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')), 0) AS total_value,
+          COUNT(*) FILTER (WHERE notice_date > NOW() - INTERVAL '7 days') AS new_this_week
+         FROM homepage_signals`
+      ).catch(() => ({ rows: [{ total_value: "0", new_this_week: "0" }] }))
     ]);
     userScans = scansRes.rows;
+    upcomingDeadlines = deadlinesRes.rows;
+    hotSectors = hotRes.rows;
     recentSignals = signalsRes.rows;
     totalOpenSignals = parseInt(countRes.rows[0]?.n || "0", 10);
+    totalOpenValue = parseFloat(statsRes.rows[0]?.total_value || "0");
+    signalsThisWeek = parseInt(statsRes.rows[0]?.new_this_week || "0", 10);
   }
 
-  const completedCount = userScans.filter(s => s.status === "completed").length;
+  const completedCount = userScans.filter((s: any) => s.status === "completed").length;
   const memberSince = new Date(user.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
   const tierLabel: Record<UserTier, string> = { free: "Free", pro: "Pro", agency: "Agency" };
+  const isPaid = user.tier !== "free";
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const signalTagClass = (cat: string): string => {
     if (["social-care", "health", "pharmacy"].some(k => cat.includes(k))) return "bw-tag-health";
     if (["housing", "planning"].some(k => cat.includes(k))) return "bw-tag-housing";
     if (["education", "leisure", "arts"].some(k => cat.includes(k))) return "bw-tag-edu";
     return "bw-tag-other";
   };
+  const gradeColor = (g: string): string => {
+    const g1 = g.trim().toUpperCase();
+    if (g1.startsWith("A")) return "#1d6b4f";
+    if (g1.startsWith("B")) return "#2563ab";
+    if (g1.startsWith("C")) return "#b45309";
+    if (g1.startsWith("D") || g1.startsWith("E")) return "#9b2d20";
+    return "var(--slate)";
+  };
+  const verdictColor = (v: string): string => {
+    const vl = v.toLowerCase();
+    if (vl.includes("strong") || vl.includes("excellent")) return "#1d6b4f";
+    if (vl.includes("possible") || vl.includes("moderate") || vl.includes("good")) return "#2563ab";
+    if (vl.includes("weak") || vl.includes("limited")) return "#b45309";
+    if (vl.includes("not viable") || vl.includes("poor") || vl.includes("avoid")) return "#9b2d20";
+    return "var(--slate)";
+  };
+  const deadlineDaysLeft = (d: string): number =>
+    Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
+  const deadlineLabel = (d: string): string => {
+    const days = deadlineDaysLeft(d);
+    if (days <= 0) return "Closes today";
+    if (days === 1) return "1 day left";
+    if (days <= 7) return `${days} days left`;
+    if (days <= 14) return `${days} days`;
+    return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  };
+  const dlUrgencyClass = (d: string): string => {
+    const days = deadlineDaysLeft(d);
+    if (days <= 7) return "deadline-urgent";
+    if (days <= 14) return "deadline-soon";
+    return "deadline-ok";
+  };
 
-  const scanRows = userScans.length ? userScans.map(s => {
+  // ── Scan table rows ───────────────────────────────────────────────────────
+  const completedScans = userScans.filter((s: any) => s.status === "completed");
+  const scanRows = userScans.length ? userScans.map((s: any) => {
     const isCompleted = s.status === "completed";
-    const isPaid = user.tier !== "free";
     const sectors: string[] = s.input_json?.sectors ?? [];
+    const edp = isCompleted && s.report_snippet
+      ? parseEdpFromMarkdown(String(s.report_snippet))
+      : null;
     const sectorTag = sectors[0]
       ? `<span class="bw-tag bw-tag-other" style="margin-left:6px;vertical-align:middle">${escapeHtml(sectors[0])}</span>`
       : "";
+    const verdictCell = edp?.verdict
+      ? `<span style="font-size:11px;font-weight:600;color:${verdictColor(edp.verdict)}">${escapeHtml(edp.verdict.length > 22 ? edp.verdict.slice(0, 20) + "…" : edp.verdict)}</span>`
+      : `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${isCompleted ? "&#8212;" : "Pending"}</span>`;
+    const gradeCell = edp?.evidenceGrade
+      ? `<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${gradeColor(edp.evidenceGrade)}">${escapeHtml(edp.evidenceGrade)}</span>`
+      : `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">&#8212;</span>`;
     const actionLink = (path: string, label: string): string => {
       if (!isCompleted) return `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">&#8212;</span>`;
-      if (!isPaid) return `<a href="/pricing" title="Upgrade to access" style="font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:none">&#128274; Pro</a>`;
-      return `<a href="/scan/${escapeHtml(s.id)}/${path}" style="font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--accent);text-decoration:none;text-transform:uppercase">${label}</a>`;
+      if (!isPaid) return `<a href="/pricing" title="Upgrade" style="font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:none;opacity:.7">&#128274;</a>`;
+      return `<a href="/scan/${escapeHtml(s.id)}/${path}" style="font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--accent);text-decoration:none;font-weight:600">${label}</a>`;
     };
     return `<tr>
-      <td style="font-weight:600;max-width:200px">
-        <a href="/scan/${escapeHtml(s.id)}" style="color:var(--ink);text-decoration:none">${escapeHtml(s.company_name)}</a>${sectorTag}
+      <td style="font-weight:600;max-width:180px">
+        <a href="/scan/${escapeHtml(s.id)}" style="color:var(--ink);text-decoration:none;font-size:13px">${escapeHtml(s.company_name)}</a>${sectorTag}
       </td>
-      <td style="font-family:var(--mono);font-size:11px;color:var(--slate);white-space:nowrap">${new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-      <td><span class="scan-badge scan-badge-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
-      <td style="text-align:right;white-space:nowrap">
-        ${isCompleted
-          ? `<a href="/scan/${escapeHtml(s.id)}" class="dash-btn">View &rarr;</a>`
-          : `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${escapeHtml(s.status)}</span>`}
-      </td>
-      <td>${actionLink("capability-statement", "Capability")}</td>
-      <td>${actionLink("outreach-emails", "Outreach")}</td>
-      <td>${actionLink("frameworks", "Frameworks")}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--slate);white-space:nowrap">${new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+      <td>${verdictCell}</td>
+      <td style="text-align:center">${gradeCell}</td>
+      <td>${isCompleted ? `<a href="/scan/${escapeHtml(s.id)}" class="dash-btn" style="white-space:nowrap">View &rarr;</a>` : `<span class="scan-badge scan-badge-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span>`}</td>
+      <td>${actionLink("capability-statement", "Cap")}</td>
+      <td>${actionLink("outreach-emails", "Email")}</td>
+      <td>${actionLink("frameworks", "FWK")}</td>
     </tr>`;
-  }).join("") : `<tr><td colspan="7" class="dash-empty">No scans yet &#8212; <a href="/scan" style="color:var(--accent);text-decoration:underline">run your first intelligence scan</a></td></tr>`;
+  }).join("") : `<tr><td colspan="8" class="dash-empty">No scans yet &#8212; <a href="/scan" style="color:var(--accent);text-decoration:underline">run your first intelligence scan</a></td></tr>`;
 
+  // ── Deadline urgency cards ────────────────────────────────────────────────
+  const deadlineCards = upcomingDeadlines.length
+    ? upcomingDeadlines.slice(0, 8).map((d: any) => {
+        const uc = d.deadline_date ? dlUrgencyClass(String(d.deadline_date)) : "deadline-ok";
+        const label = d.deadline_date ? deadlineLabel(String(d.deadline_date)) : "";
+        const deskLabel = DESK_PROFILES.find(p => p.slug === d.category)?.label || d.category;
+        const valNum = d.value_amount != null ? Number(d.value_amount) : null;
+        return `<div class="dl-card ${uc}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px">
+            <span class="bw-tag ${signalTagClass(String(d.category || ""))}">${escapeHtml(deskLabel)}</span>
+            <span class="dl-countdown ${uc}">${escapeHtml(label)}</span>
+          </div>
+          ${d.source_url
+            ? `<a href="${escapeHtml(String(d.source_url))}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;color:var(--ink);text-decoration:none;line-height:1.35;display:block;margin-bottom:4px">${escapeHtml(String(d.title || "").slice(0, 90))}</a>`
+            : `<div style="font-size:12.5px;font-weight:600;line-height:1.35;margin-bottom:4px">${escapeHtml(String(d.title || "").slice(0, 90))}</div>`}
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${d.buyer ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--slate)">${escapeHtml(String(d.buyer).slice(0, 45))}</span>` : ""}
+            ${valNum ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--accent);font-weight:600">${fmtMoney(valNum)}</span>` : ""}
+          </div>
+        </div>`;
+      }).join("")
+    : "";
+
+  // ── Live signals list ─────────────────────────────────────────────────────
   const signalItems = recentSignals.length
-    ? recentSignals.slice(0, 6).map((sig: any) => {
-        const deskProfile = DESK_PROFILES.find(d => d.slug === sig.category);
+    ? recentSignals.map((sig: any) => {
+        const deskLabel = DESK_PROFILES.find(d => d.slug === sig.category)?.label || sig.category;
         const tagCls = signalTagClass(String(sig.category || ""));
         const titleStr = String(sig.title || "");
         const buyerStr = sig.buyer ? String(sig.buyer) : null;
         const valNum = sig.value_amount != null ? Number(sig.value_amount) : null;
         const url = sig.source_url ? String(sig.source_url) : null;
-        return `<div style="padding:12px 0;border-bottom:1px solid var(--line-strong)">
-          <div style="margin-bottom:5px"><span class="bw-tag ${tagCls}">${escapeHtml(deskProfile?.label || sig.category)}</span></div>
+        const dlDays = sig.deadline_date ? deadlineDaysLeft(String(sig.deadline_date)) : null;
+        const dlLbl = sig.deadline_date ? deadlineLabel(String(sig.deadline_date)) : null;
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--line-strong)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:3px">
+            <span class="bw-tag ${tagCls}">${escapeHtml(deskLabel)}</span>
+            ${dlLbl && dlDays !== null && dlDays <= 21 ? `<span style="font-family:var(--mono);font-size:9px;font-weight:700;color:${dlDays <= 7 ? "#9b2d20" : "#b45309"}">${escapeHtml(dlLbl)}</span>` : ""}
+          </div>
           ${url
-            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;line-height:1.35;display:block;margin-bottom:4px">${escapeHtml(titleStr.length > 80 ? titleStr.slice(0, 77) + "…" : titleStr)}</a>`
-            : `<span style="font-size:13px;font-weight:600;color:var(--ink);display:block;line-height:1.35;margin-bottom:4px">${escapeHtml(titleStr.length > 80 ? titleStr.slice(0, 77) + "…" : titleStr)}</span>`}
-          <div style="display:flex;gap:12px;align-items:center">
-            ${buyerStr ? `<span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${escapeHtml(buyerStr.length > 40 ? buyerStr.slice(0, 37) + "…" : buyerStr)}</span>` : ""}
-            ${valNum ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${fmtMoney(valNum)}</span>` : ""}
+            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;color:var(--ink);text-decoration:none;line-height:1.35;display:block;margin-bottom:3px">${escapeHtml(titleStr.length > 75 ? titleStr.slice(0, 72) + "…" : titleStr)}</a>`
+            : `<span style="font-size:12.5px;font-weight:600;color:var(--ink);display:block;line-height:1.35;margin-bottom:3px">${escapeHtml(titleStr.length > 75 ? titleStr.slice(0, 72) + "…" : titleStr)}</span>`}
+          <div style="display:flex;gap:10px">
+            ${buyerStr ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--slate)">${escapeHtml(buyerStr.length > 35 ? buyerStr.slice(0, 32) + "…" : buyerStr)}</span>` : ""}
+            ${valNum ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--accent);font-weight:600">${fmtMoney(valNum)}</span>` : ""}
           </div>
         </div>`;
       }).join("")
-    : `<div style="font-family:var(--mono);font-size:12px;color:var(--slate);padding:24px 0;text-align:center">Loading live signals&hellip;</div>`;
+    : `<div style="font-family:var(--mono);font-size:12px;color:var(--slate);padding:24px 0;text-align:center">Loading&hellip;</div>`;
+
+  // ── Hot sectors ───────────────────────────────────────────────────────────
+  const maxSectorCnt = hotSectors.length > 0 ? Number(hotSectors[0].cnt) : 1;
+  const hotSectorRows = hotSectors.length
+    ? hotSectors.map((hs: any) => {
+        const cnt = Number(hs.cnt);
+        const pct = Math.round((cnt / maxSectorCnt) * 100);
+        const deskLabel = DESK_PROFILES.find(d => d.slug === hs.category)?.label || String(hs.category);
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <a href="/desk/${escapeHtml(String(hs.category))}" style="font-size:12px;font-weight:600;color:var(--ink);text-decoration:none">${escapeHtml(deskLabel)}</a>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--slate)">${cnt}</span>
+          </div>
+          <div style="height:4px;background:var(--paper-2);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div style="font-family:var(--mono);font-size:12px;color:var(--slate)">Loading&hellip;</div>`;
+
+  // ── Compare link (2+ completed scans) ────────────────────────────────────
+  const compareLink = completedScans.length >= 2
+    ? `<a href="/scan/${escapeHtml(completedScans[1].id)}/compare?with=${encodeURIComponent(completedScans[0].id)}" class="dash-btn" style="font-size:9px">Compare latest 2 &rarr;</a>`
+    : "";
 
   const navLinks = DESK_PROFILES.map(d => `<a href="/desk/${d.slug}">${escapeHtml(d.label)}</a>`).join("");
 
+  // ── CSS ───────────────────────────────────────────────────────────────────
   const dashCss = `
+.mkt-strip{background:var(--ink);color:var(--paper);padding:12px 56px;display:flex;gap:40px;align-items:center;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.08)}
+.mkt-stat{display:flex;align-items:baseline;gap:8px;flex-shrink:0}
+.mkt-val{font-family:var(--serif);font-size:22px;font-weight:600}
+.mkt-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#7a909e}
 .dash-grid{display:grid;grid-template-columns:1fr 340px;gap:40px;align-items:start}
 .dash-card{background:var(--paper);border:1px solid var(--line-strong);border-radius:2px;margin-bottom:24px}
-.dash-card-head{padding:14px 20px;border-bottom:1px solid var(--line-strong);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.dash-card-head{padding:14px 20px;border-bottom:1px solid var(--line-strong);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .dash-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)}
 .dash-card-body{padding:20px}
 .scan-table{width:100%;border-collapse:collapse;font-size:13px}
-.scan-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);padding:10px 8px 10px 0;border-bottom:1px solid var(--line-strong);text-align:left;white-space:nowrap}
-.scan-table td{padding:12px 8px 12px 0;border-bottom:1px solid var(--line);vertical-align:middle}
+.scan-table th{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--slate);padding:10px 8px 10px 0;border-bottom:1px solid var(--line-strong);text-align:left;white-space:nowrap}
+.scan-table td{padding:11px 8px 11px 0;border-bottom:1px solid var(--line);vertical-align:middle}
 .scan-table tr:last-child td{border-bottom:none}
-.scan-badge{display:inline-block;padding:2px 8px;border-radius:2px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.scan-badge{display:inline-block;padding:2px 7px;border-radius:2px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
 .scan-badge-completed{background:#e8f5f0;color:var(--green);border:1px solid #1d6b4f33}
 .scan-badge-pending,.scan-badge-running{background:#fef3e2;color:#b45309;border:1px solid #b4530933}
 .scan-badge-failed{background:#fdf0ee;color:#9b2d20;border:1px solid #9b2d2033}
@@ -5802,8 +5931,20 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 .acct-meta{margin-bottom:14px}
 .acct-meta-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-bottom:3px}
 .acct-meta-val{font-size:13px;font-weight:600}
-@media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
-@media(max-width:760px){.scan-table th:nth-child(n+5),.scan-table td:nth-child(n+5){display:none}}
+.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dl-card{padding:12px;border-radius:2px;border-left:4px solid}
+.deadline-urgent{background:#fdf0ee;border-color:#9b2d20}
+.deadline-soon{background:#fff8ed;border-color:#b45309}
+.deadline-ok{background:var(--paper);border-color:var(--line-strong);border:1px solid var(--line-strong);border-left:4px solid var(--line-strong)}
+.dl-countdown{font-family:var(--mono);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;flex-shrink:0}
+.deadline-urgent .dl-countdown{color:#9b2d20}
+.deadline-soon .dl-countdown{color:#b45309}
+.deadline-ok .dl-countdown{color:var(--slate)}
+.sector-shortcuts{display:flex;flex-wrap:wrap;gap:6px}
+.sector-btn{display:inline-block;padding:5px 11px;border:1px solid var(--line-strong);border-radius:2px;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);text-decoration:none;transition:.15s}
+.sector-btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr}.mkt-strip{padding-left:16px;padding-right:16px}}
+@media(max-width:760px){.scan-table th:nth-child(n+4),.scan-table td:nth-child(n+4){display:none}.dl-grid{grid-template-columns:1fr}}
 `;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -5822,6 +5963,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
       <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:10px;color:#7a909e">${escapeHtml(user.email)}</span>
         <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
         <a href="/scan" style="font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;text-decoration:none;padding:5px 11px;border:1px solid rgba(255,255,255,.15);border-radius:2px">+ New scan</a>
         <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#9aabb7;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:0">Sign out</button></form>
@@ -5831,16 +5973,22 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   </div>
 </header>
 
+<div class="mkt-strip">
+  <div class="mkt-stat"><span class="mkt-val">${totalOpenSignals > 0 ? totalOpenSignals.toLocaleString("en-GB") : "&#8212;"}</span><span class="mkt-lbl">Open signals</span></div>
+  ${totalOpenValue > 0 ? `<div class="mkt-stat"><span class="mkt-val">${fmtMoney(totalOpenValue)}</span><span class="mkt-lbl">Total open contract value</span></div>` : ""}
+  <div class="mkt-stat"><span class="mkt-val">${signalsThisWeek}</span><span class="mkt-lbl">New this week</span></div>
+  ${upcomingDeadlines.length > 0 ? `<div class="mkt-stat"><span class="mkt-val" style="color:#e87979">${upcomingDeadlines.length}</span><span class="mkt-lbl">Deadlines &lt;21 days</span></div>` : ""}
+  <div style="margin-left:auto"><a href="/desks" style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9aabb7;text-decoration:none">Browse all desks &rarr;</a></div>
+</div>
+
 <div class="pg-mast">
   <div class="pg-mast-inner">
-    <div class="pg-crumb">
-      <a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span>
-    </div>
+    <div class="pg-crumb"><a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
     <h1>Intelligence Dashboard</h1>
     <div class="pg-stats">
       <div class="pg-stat"><span class="pg-stat-val">${userScans.length}</span><span class="pg-stat-label">Scans run</span></div>
       <div class="pg-stat"><span class="pg-stat-val">${completedCount}</span><span class="pg-stat-label">Reports complete</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${totalOpenSignals > 0 ? totalOpenSignals.toLocaleString("en-GB") : "&#8212;"}</span><span class="pg-stat-label">Live open signals</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${upcomingDeadlines.length > 0 ? upcomingDeadlines.length : "&#8212;"}</span><span class="pg-stat-label">Live deadlines</span></div>
       <div class="pg-stat"><span class="pg-stat-val">${memberSince}</span><span class="pg-stat-label">Member since</span></div>
     </div>
   </div>
@@ -5848,24 +5996,34 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 
 <div class="pg-body">
 <div class="pg-body-inner">
-
 ${welcome ? `<div class="flash-ok">Account created &#8212; welcome to GovRevenue. Run your first intelligence scan to get started.</div>` : ""}
 ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite unlocked.</div>` : ""}
 
 <div class="dash-grid">
 
+  <!-- ── MAIN COLUMN ──────────────────────────────────────────────── -->
   <div>
+
+    ${upcomingDeadlines.length > 0 ? `
     <div class="dash-card">
       <div class="dash-card-head">
-        <span class="dash-card-title">Your intelligence scans</span>
-        <a href="/scan" class="dash-btn">+ New scan</a>
+        <span class="dash-card-title" style="color:#9b2d20">&#9888;&nbsp; Upcoming deadlines</span>
+        <span style="font-family:var(--mono);font-size:10px;color:#9b2d20;font-weight:700">${upcomingDeadlines.length} closing within 21 days</span>
       </div>
-      <div style="padding:0 20px">
-        <table class="scan-table">
+      <div class="dash-card-body"><div class="dl-grid">${deadlineCards}</div></div>
+    </div>
+    ` : ""}
+
+    <div class="dash-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">Intelligence scan history</span>
+        <div style="display:flex;gap:8px;align-items:center">${compareLink}<a href="/scan" class="dash-btn">+ New scan</a></div>
+      </div>
+      <div style="padding:0 20px;overflow-x:auto">
+        <table class="scan-table" style="min-width:620px">
           <thead><tr>
-            <th>Company</th><th>Date</th><th>Status</th>
-            <th style="text-align:right">Report</th>
-            <th>Capability</th><th>Outreach</th><th>Frameworks</th>
+            <th>Company / Sector</th><th>Date</th><th>Verdict</th><th style="text-align:center">Grade</th>
+            <th>Report</th><th>Cap</th><th>Email</th><th>FWK</th>
           </tr></thead>
           <tbody>${scanRows}</tbody>
         </table>
@@ -5873,35 +6031,58 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
     </div>
 
     <div class="dash-card">
-      <div class="dash-card-head"><span class="dash-card-title">What&rsquo;s in your intelligence suite</span></div>
+      <div class="dash-card-head">
+        <span class="dash-card-title">Intelligence tools</span>
+        ${!isPaid ? `<a href="/pricing" class="dash-btn" style="color:var(--accent);border-color:var(--accent)">Unlock with Pro &rarr;</a>` : ""}
+      </div>
       <div class="dash-card-body">
-        <div class="tools-grid">
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Capability Statement</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">LLM-generated statement tailored to your company profile and sector. Ready for PQQ and framework applications.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Capability Statement</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">LLM-generated 2-page statement tailored to your profile and sector. PQQ and framework-ready.</div>
+            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
           </div>
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Buyer Outreach Emails</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">3 personalised emails to your top-ranked buyers. Introduce your firm and request pre-market engagement meetings.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Buyer Outreach Emails</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">3 personalised emails to top-ranked buyers from your scan. Introduce your firm, request pre-market meetings.</div>
+            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
           </div>
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px">Framework Pre-Qualification</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">Identifies open frameworks in your sector, assesses your eligibility, and produces a prioritised application checklist.${user.tier === "free" ? `<br><br><a href="/pricing" style="color:var(--accent);text-decoration:underline;font-weight:600">Upgrade to access &rarr;</a>` : ""}</div>
+          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Framework Pre-Qualification</div>
+            <div style="font-size:12px;color:var(--slate);line-height:1.5">Identifies open frameworks, assesses your eligibility, produces a prioritised application checklist.</div>
+            ${!isPaid ? `<div style="margin-top:8px"><a href="/pricing" style="font-family:var(--mono);font-size:9px;color:var(--accent);text-decoration:none;font-weight:700;text-transform:uppercase">Unlock &rarr;</a></div>` : ""}
           </div>
-          <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px;background:var(--paper-2)">
-            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:6px">Scan Comparison</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.5">Compare two scans to track how verdict, evidence grade and buyer landscape have shifted over time. Available on all plans.</div>
+        </div>
+        ${completedScans.length >= 2 ? `
+        <div style="margin-top:10px;padding:14px;background:var(--paper-2);border:1px solid var(--line-strong);border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:3px">Scan Comparison</div>
+            <div style="font-size:12px;color:var(--slate)">Track how verdict, grade and buyer landscape have shifted between your scans.</div>
           </div>
+          ${compareLink}
+        </div>` : ""}
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-card-head"><span class="dash-card-title">Launch a targeted sector scan</span></div>
+      <div class="dash-card-body">
+        <div style="font-size:12px;color:var(--slate);margin-bottom:14px;line-height:1.5">Click any sector to pre-fill the scan form with that desk&rsquo;s context &#8212; your profile against their live procurement data.</div>
+        <div class="sector-shortcuts">
+          ${DESK_PROFILES.map(d => `<a href="/scan?desk=${escapeHtml(d.slug)}" class="sector-btn">${escapeHtml(d.label)}</a>`).join("")}
         </div>
       </div>
     </div>
+
   </div>
 
+  <!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
   <div>
+
     <div class="dash-card">
       <div class="dash-card-head"><span class="dash-card-title">Account</span></div>
       <div class="dash-card-body">
-        <div class="acct-meta"><div class="acct-meta-label">Email</div><div class="acct-meta-val" style="word-break:break-all">${escapeHtml(user.email)}</div></div>
+        <div class="acct-meta"><div class="acct-meta-label">Email</div><div class="acct-meta-val" style="word-break:break-all;font-size:12px">${escapeHtml(user.email)}</div></div>
         <div class="acct-meta">
           <div class="acct-meta-label">Plan</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
@@ -5923,51 +6104,49 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
       <p>Free accounts run scans and read reports. Pro turns every scan into action with three intelligence tools.</p>
       <ul>
         <li>Capability statement generator</li>
-        <li>Buyer outreach email kit</li>
+        <li>Buyer outreach email kit (3 per scan)</li>
         <li>Framework pre-qualification checker</li>
         <li>Unlimited scan history</li>
-        <li>Weekly opportunity alerts</li>
+        <li>Weekly opportunity alert emails</li>
+        <li>Evidence grade tracking</li>
       </ul>
       <a href="/billing/checkout?plan=pro" class="btn-upgrade">Upgrade to Pro &mdash; &pound;79/month</a>
+      <div style="margin-top:10px"><a href="/billing/checkout?plan=agency" style="font-family:var(--mono);font-size:9px;color:#7a909e;text-decoration:underline;letter-spacing:.05em">Agency plan &pound;249/month (unlimited users) &rarr;</a></div>
     </div>
     ` : ""}
 
     <div class="dash-card">
       <div class="dash-card-head">
-        <span class="dash-card-title">Live market signals</span>
-        ${totalOpenSignals > 0 ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600">${totalOpenSignals.toLocaleString("en-GB")} open</span>` : ""}
+        <span class="dash-card-title">Hot sectors right now</span>
+        <a href="/desks" style="font-family:var(--mono);font-size:9.5px;color:var(--accent);text-decoration:none;text-transform:uppercase;letter-spacing:.06em">All 24 &rarr;</a>
+      </div>
+      <div class="dash-card-body">${hotSectorRows}</div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">Live open signals</span>
+        ${totalOpenSignals > 0 ? `<span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600">${totalOpenSignals.toLocaleString("en-GB")}</span>` : ""}
       </div>
       <div style="padding:0 20px">
         ${signalItems}
-        <div style="padding:14px 0 6px"><a href="/desks" class="dash-btn">Browse all 24 desks &rarr;</a></div>
+        <div style="padding:14px 0 6px"><a href="/desks" class="dash-btn">Browse all desks &rarr;</a></div>
       </div>
     </div>
 
     <div class="dash-card">
-      <div class="dash-card-head"><span class="dash-card-title">Quick navigation</span></div>
+      <div class="dash-card-head"><span class="dash-card-title">Quick access</span></div>
       <div class="dash-card-body">
         <div class="tools-grid">
-          <a href="/scan" class="tool-card">
-            <span class="tool-card-title">New scan</span>
-            <span class="tool-card-desc">Submit a company profile and run an intelligence scan</span>
-          </a>
-          <a href="/desks" class="tool-card">
-            <span class="tool-card-title">Sector desks</span>
-            <span class="tool-card-desc">Browse 24 desk pages with live procurement signals</span>
-          </a>
-          <a href="/pricing" class="tool-card">
-            <span class="tool-card-title">Pricing</span>
-            <span class="tool-card-desc">Compare Free, Pro and Agency plans</span>
-          </a>
-          <a href="/" class="tool-card">
-            <span class="tool-card-title">Home</span>
-            <span class="tool-card-desc">GovRevenue homepage with live market signals</span>
-          </a>
+          <a href="/scan" class="tool-card"><span class="tool-card-title">New scan</span><span class="tool-card-desc">Run an intelligence scan for any company</span></a>
+          <a href="/desks" class="tool-card"><span class="tool-card-title">Sector desks</span><span class="tool-card-desc">24 live desks with procurement signals</span></a>
+          <a href="/pricing" class="tool-card"><span class="tool-card-title">Pricing</span><span class="tool-card-desc">Free, Pro &amp; Agency plans compared</span></a>
+          <a href="/" class="tool-card"><span class="tool-card-title">Home</span><span class="tool-card-desc">Homepage with live market signals</span></a>
         </div>
       </div>
     </div>
-  </div>
 
+  </div>
 </div>
 </div>
 </div>
