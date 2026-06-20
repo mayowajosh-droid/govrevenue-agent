@@ -5160,9 +5160,13 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .hero .wrap,.chartband .wrap,.product .wrap{grid-template-columns:1fr;gap:32px}
   .hero h1{font-size:38px}
   #globe-canvas{opacity:.3}
-  .hero-grad{background:linear-gradient(180deg,var(--base) 70%,var(--base))}
+  .hero-grad{background:none}
   .desk-grid{grid-template-columns:1fr}
   footer.hp-foot .wrap{grid-template-columns:1fr 1fr}
+}
+@media(max-width:760px){
+  .gh-tag,.gh-live,.gh-auth-name{display:none}
+  .gh-inner{padding-left:16px;padding-right:16px}
 }
 @media(max-width:480px){
   .wrap{padding:0 16px}
@@ -7246,7 +7250,7 @@ td{padding:11px 10px;font-size:13px;vertical-align:top}
 .pg-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 auto}
 .empty{padding:72px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 @media(max-width:900px){.stat-block{padding:14px 16px}.stat-value{font-size:20px}h1.sig-h1{font-size:22px}.page-head{flex-direction:column;align-items:flex-start}}
-@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.sig-buyer,.sig-dl,.sig-src{display:none}}
+@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}}
 </style>
 </head>
 <body>
