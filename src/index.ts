@@ -5151,6 +5151,10 @@ app.get("/", asyncRoute(async (req, res) => {
 .gh-auth-link:hover{color:var(--text)}
 .gh-auth-cta{display:inline-flex;align-items:center;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:9px 16px;letter-spacing:.01em;transition:opacity .15s}
 .gh-auth-cta:hover{opacity:.85}
+.gh-main-nav{display:flex;align-items:center;flex:1;padding:0 8px;overflow-x:auto;scrollbar-width:none}
+.gh-main-nav::-webkit-scrollbar{display:none}
+.gh-main-nav a{font-size:13px;font-weight:500;color:var(--text-mid);padding:0 11px;height:60px;display:flex;align-items:center;white-space:nowrap;transition:color .15s}
+.gh-main-nav a:hover{color:var(--text)}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -5286,7 +5290,7 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   footer.hp-foot .wrap{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
-  .gh-tag,.gh-live,.gh-auth-name{display:none}
+  .gh-tag,.gh-live,.gh-auth-name,.gh-main-nav{display:none}
   .gh-inner{padding-left:16px;padding-right:16px}
 }
 @media(max-width:480px){
@@ -9560,6 +9564,10 @@ a{color:inherit;text-decoration:none}
 .gh-auth-link:hover{color:var(--text)}
 .gh-auth-cta{display:inline-flex;align-items:center;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:9px 16px;letter-spacing:.01em;transition:opacity .15s}
 .gh-auth-cta:hover{opacity:.85}
+.gh-main-nav{display:flex;align-items:center;flex:1;padding:0 8px;overflow-x:auto;scrollbar-width:none}
+.gh-main-nav::-webkit-scrollbar{display:none}
+.gh-main-nav a{font-size:13px;font-weight:500;color:var(--text-mid,#B0BAC8);padding:0 11px;height:60px;display:flex;align-items:center;white-space:nowrap;transition:color .15s}
+.gh-main-nav a:hover{color:var(--text)}
 /* ── page masthead ── */
 .pg-mast{padding:40px 0 32px;border-bottom:1px solid var(--border-2);background:var(--base)}
 .pg-mast-inner{padding:0 32px;max-width:1200px;margin:0 auto}
@@ -9592,7 +9600,7 @@ a{color:inherit;text-decoration:none}
 .pg-foot-inner{padding:16px 32px;max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:10.5px;color:rgba(236,230,214,.55)}
 .pg-copy{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:rgba(236,230,214,.3);padding:10px 0 14px;background:#081710}
 @media(max-width:760px){
-  .gh-tag,.gh-live,.gh-auth-name{display:none}
+  .gh-tag,.gh-live,.gh-auth-name,.gh-main-nav{display:none}
   .gh-inner,.pg-mast-inner,.pg-body-inner,.pg-foot-inner{padding-left:16px;padding-right:16px}
   .pg-mast{padding:24px 0 20px}
   .pg-mast h1{font-size:24px}
@@ -9605,6 +9613,9 @@ a{color:inherit;text-decoration:none}
 }
 
 function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string; tier: UserTier } | null): string {
+  const navLinks = DESK_PROFILES.map(d =>
+    `<a href="/desk/${d.slug}"${profile && d.slug === profile.slug ? ' class="dnav-active"' : ""}>${escapeHtml(d.label)}</a>`
+  ).join("");
   const authHtml = authCtx
     ? `<div class="gh-auth"><span class="gh-auth-name">${escapeHtml(authCtx.email)}</span><a href="/account" class="gh-auth-link">Dashboard</a><a href="/logout" class="gh-auth-link">Sign out</a></div>`
     : `<div class="gh-auth"><a href="/login" class="gh-auth-link">Sign in</a><a href="/scan" class="gh-auth-cta">Run a scan</a></div>`;
@@ -9615,15 +9626,18 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
         <div class="gh-dot"></div>
         <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
       </div>
+      <nav class="gh-main-nav">
+        <a href="/desks">Desks</a>
+        <a href="/signals">Signals</a>
+        <a href="/charts">Intelligence</a>
+        <a href="/articles">Articles</a>
+        <a href="/scan">The Scan</a>
+        <a href="/pricing">Pricing</a>
+      </nav>
       ${authHtml}
     </div>
     <nav class="gh-nav">
-      <a href="/desks"${profile ? ' class="dnav-active"' : ""}>Desks</a>
-      <a href="/signals">Signals</a>
-      <a href="/charts">Intelligence</a>
-      <a href="/articles">Articles</a>
-      <a href="/scan">The Scan</a>
-      <a href="/pricing">Pricing</a>
+      ${navLinks}
     </nav>
   </div>
 </header>`;
