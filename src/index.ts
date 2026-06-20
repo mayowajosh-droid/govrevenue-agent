@@ -4876,9 +4876,17 @@ app.get("/", asyncRoute(async (req, res) => {
   const heroBuyer = isLive ? (heroSignal!.buyer || "Buyer not stated") : "Local Authority Buyer";
   const heroSource = isLive ? heroSignal!.source : "CF";
   const heroDateRaw = isLive ? (heroSignal!.notice_date || null) : null;
-  const heroDate = heroDateRaw
-    ? new Date(heroDateRaw).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    : "date not stated";
+  const heroDate = (() => {
+    if (!heroDateRaw) return "date not stated";
+    const ms = Date.now() - new Date(heroDateRaw).getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins} min${mins !== 1 ? "s" : ""} ago`;
+    const h = Math.floor(mins / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
+  })();
   const heroStatus = isLive ? (heroSignal!.status || "unknown") : "illustrative";
   const heroVal = isLive && heroSignal!.value_amount && heroSignal!.value_amount > 0
     ? (heroSignal!.value_amount >= 1_000_000
@@ -5153,7 +5161,7 @@ ${oppCardCss()}
       <div class="rhead"><span class="t" id="hc-type">${isLive ? "Live signal" : "Illustrative signal"}</span><span class="src" id="hc-src">${escapeHtml(heroSource)} &middot; public record</span></div>
       <div class="rbody">
         <svg class="spark" id="spark" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
-        <div class="rrow"><span class="k">Category</span><span class="v" id="hc-cat">${escapeHtml(heroCategory)}<small id="hc-date">${escapeHtml(heroDate)}</small></span></div>
+        <div class="rrow"><span class="k">Category</span><span class="v" id="hc-cat">${escapeHtml(heroCategory)}<small id="hc-date" data-ts="${escapeHtml(heroDateRaw || "")}">${escapeHtml(heroDate)}</small></span></div>
         <div class="rrow"><span class="k">Notice</span><span class="v" id="hc-title" style="font-size:14px;line-height:1.3">${escapeHtml(heroTitle)}</span></div>
         <div class="rrow"><span class="k">Buyer</span><span class="v" id="hc-buyer" style="font-size:16px">${escapeHtml(heroBuyer)}</span></div>
         <div class="rrow"><span class="k">Value</span><span class="v" id="hc-val">${heroVal}<small id="hc-status">${escapeHtml(heroStatus)}</small></span></div>
@@ -5406,6 +5414,21 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(reduce) return;
   function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
   function g(id){return document.getElementById(id);}
+  function ta(isoStr){
+    if(!isoStr) return '—';
+    const m=Math.floor((Date.now()-new Date(isoStr).getTime())/60000);
+    if(m<1) return 'just now';
+    if(m<60) return m+' min'+(m!==1?'s':'')+' ago';
+    const h=Math.floor(m/60);
+    if(h<24) return h+'h ago';
+    return Math.floor(h/24)+'d ago';
+  }
+  function refreshDate(){
+    const el=g('hc-date');
+    if(el&&el.dataset.ts) el.textContent=ta(el.dataset.ts);
+  }
+  refreshDate();
+  const dateT=setInterval(refreshDate,30000);
   function poll(){
     fetch('/api/signals/latest').then(function(r){return r.ok?r.json():null;}).then(function(d){
       if(!d||!d.hero) return;
@@ -5413,7 +5436,8 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if(g('hc-type')) g('hc-type').textContent=h.type;
       if(g('hc-src')) g('hc-src').textContent=h.src+' · public record';
       if(g('hc-cat')&&g('hc-cat').childNodes[0]) g('hc-cat').childNodes[0].nodeValue=h.category;
-      if(g('hc-date')) g('hc-date').textContent=h.date;
+      const de=g('hc-date');
+      if(de){de.dataset.ts=h.date||'';de.textContent=ta(h.date);}
       if(g('hc-title')) g('hc-title').textContent=h.title;
       if(g('hc-buyer')) g('hc-buyer').textContent=h.buyer;
       if(g('hc-val')&&g('hc-val').childNodes[0]) g('hc-val').childNodes[0].nodeValue=h.val;
@@ -5423,7 +5447,7 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }).catch(function(){});
   }
   const t=setInterval(poll,75000);
-  window.addEventListener('pagehide',function(){clearInterval(t);});
+  window.addEventListener('pagehide',function(){clearInterval(t);clearInterval(dateT);});
 })();
 </script>
 </body>
@@ -5493,9 +5517,7 @@ app.get("/api/signals/latest", asyncRoute(async (_req, res) => {
     type: "Live signal",
     src: hero.source,
     category: CATEGORY_LABELS[hero.category] || hero.category,
-    date: hero.notice_date
-      ? new Date(hero.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-      : "date not stated",
+    date: hero.notice_date || null,
     title: hero.title.slice(0, 80),
     buyer: hero.buyer || "Buyer not stated",
     val: hero.value_amount && hero.value_amount > 0
