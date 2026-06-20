@@ -7175,7 +7175,7 @@ app.get("/signals", asyncRoute(async (req, res) => {
 h1.sig-h1{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin-bottom:6px;color:var(--text)}
 .sub{font-size:13.5px;color:var(--muted)}
 /* chart frame */
-.chart-frame-wrap{margin:0 0 24px;border:1px solid var(--border-2);background:var(--surface)}
+.chart-frame-wrap{margin:0 0 24px;border:1px solid var(--border-2);background:var(--surface);max-width:900px}
 /* filters */
 .filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:0}
 .filter-bar select{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);padding:8px 32px 8px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238893A4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
@@ -8117,7 +8117,7 @@ body{background:var(--paper-2);overflow:hidden;padding-bottom:12px}
 .legend{display:flex;gap:14px;align-items:center}
 .leg{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--slate)}
 .leg-l{width:16px;height:2px;background:var(--accent)}
-.leg-l.g{background:transparent;border-bottom:2px dashed #1d6b4f}
+.leg-l.g{background:transparent;border-bottom:2px dashed #1d6b4f;}
 .tog-group{display:flex;border:1px solid var(--border-2)}
 .tog{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:5px 12px;background:var(--paper-2);border:none;cursor:pointer;color:var(--slate)}
 .tog.active{background:#102A1E;color:#ECE6D6}
@@ -8180,25 +8180,25 @@ canvas{display:block;width:100%;background:var(--paper-2)}
       const v=(yMax/4)*i;const y=Y(v);
       ctx.strokeStyle=i===0?'#ccc':'#e8e2d8';ctx.lineWidth=i===0?1.5:1;ctx.setLineDash(i===0?[]:[3,3]);
       ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.setLineDash([]);
-      ctx.font='9.5px IBM Plex Mono,monospace';ctx.fillStyle='#5A6B7B';ctx.textAlign='right';
+      ctx.font='9.5px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';ctx.textAlign='right';
       ctx.fillText(v>=1000?'£'+(v/1000).toFixed(1)+'bn':'£'+Math.round(v)+'m',pad.l-6,y+3);
     }
     // X labels
     ctx.font='9px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';
     data.forEach((d,i)=>{const x=X(i);ctx.save();ctx.translate(x,H-pad.b+8);ctx.rotate(-Math.PI/4);ctx.textAlign='right';ctx.fillText(d.label,0,0);ctx.restore();});
-    // Open pipeline dashed
-    const opData=data.filter(d=>d.open_m>0);
-    if(opData.length>=2){ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();let pw=false;data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);pw?ctx.lineTo(x,y):ctx.moveTo(x,y);pw=true;}else{pw=false;}});ctx.stroke();ctx.setLineDash([]);}
-    // Area fill
+    // Area fill (drawn first so everything else sits on top)
     ctx.beginPath();data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
     ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();ctx.fillStyle='rgba(180,146,78,0.08)';ctx.fill();
     // Awarded line
     ctx.strokeStyle='#B4924E';ctx.lineWidth=2;ctx.beginPath();data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});ctx.stroke();
-    // Peak marker
+    // Open pipeline dashed (drawn on top of area fill so it's always visible)
+    const opData=data.filter(d=>d.open_m>0);
+    if(opData.length>=2){ctx.strokeStyle='#1d6b4f';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();let pw=false;data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);pw?ctx.lineTo(x,y):ctx.moveTo(x,y);pw=true;}else{pw=false;}});ctx.stroke();ctx.setLineDash([]);}
+    // Dots + peak marker
     const peakI=data.reduce((pi,d,i)=>d.total_m>data[pi].total_m?i:pi,0);
     data.forEach((d,i)=>{
       const x=X(i),y=Y(d.total_m),isPeak=i===peakI;
-      ctx.beginPath();ctx.arc(x,y,isPeak?5:3,0,7);ctx.fillStyle=isPeak?'#B4924E':'#FBF9F3';ctx.fill();ctx.strokeStyle='#B4924E';ctx.lineWidth=1.8;ctx.stroke();
+      ctx.beginPath();ctx.arc(x,y,isPeak?5:3,0,Math.PI*2);ctx.fillStyle=isPeak?'#B4924E':'#FBF9F3';ctx.fill();ctx.strokeStyle='#B4924E';ctx.lineWidth=1.8;ctx.stroke();
       if(isPeak){ctx.font='600 9px "Spline Sans Mono",monospace';ctx.fillStyle='#B4924E';ctx.textAlign='center';ctx.fillText(fmts(d.total_m),x,y-10);ctx.font='600 8px "Spline Sans Mono",monospace';ctx.fillText('▲ PEAK',x,y-20);}
     });
     // Hover tooltip
@@ -8224,7 +8224,7 @@ canvas{display:block;width:100%;background:var(--paper-2)}
         tip.innerHTML='<div class="tip-lbl">'+d.label+'</div>'
           +'<div class="tip-row"><span class="tip-dot" style="background:#B4924E"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
           +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#14532d"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'</b></div>':'')
-          +'<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.15);font-size:10px;color:#8a9aaa">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
+          +'<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(236,230,214,.2);font-size:10px;color:#9AA093">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
           +(desks.length?'<div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(236,230,214,.2)"><div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#9AA093;margin-bottom:2px">Top 5 desks'+(desks.length<(deskMap[d.label]||[]).length?' of '+(deskMap[d.label]||[]).length:'')+'</div>'+deskRows+'</div>':'');
       }
     }else{tip.style.display='none';}
