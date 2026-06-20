@@ -7177,8 +7177,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
   </div>
   <div style="margin:0 0 28px;border:1px solid var(--line-strong)">
     <iframe src="/charts/embed" id="charts-frame" scrolling="no" frameborder="0"
-      style="width:100%;height:560px;display:block;border:none"
-      onload="try{this.style.height=this.contentDocument.body.scrollHeight+'px'}catch(e){}"></iframe>
+      style="width:100%;height:380px;display:block;border:none"></iframe>
   </div>
   <form class="filter-bar" method="get" action="/signals">
     <select name="cat">
@@ -8107,7 +8106,8 @@ app.get("/charts/embed", asyncRoute(async (req, res) => {
 <style>
 :root{--paper:#FAF8F3;--paper-2:#F3EFE6;--ink:#0B0F14;--accent:#9B2C2C;--slate:#5A6B7B;--line:#1f262e1a;--line-strong:#0F141926;--mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--paper-2);height:100%;overflow:hidden}
+html{background:var(--paper-2)}
+body{background:var(--paper-2);overflow:hidden;padding-bottom:12px}
 .wrap{padding:10px 16px 0}
 .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .legend{display:flex;gap:14px;align-items:center}
@@ -8184,7 +8184,7 @@ canvas{display:block;width:100%;background:var(--paper-2)}
     data.forEach((d,i)=>{const x=X(i);ctx.save();ctx.translate(x,H-pad.b+8);ctx.rotate(-Math.PI/4);ctx.textAlign='right';ctx.fillText(d.label,0,0);ctx.restore();});
     // Open pipeline dashed
     const opData=data.filter(d=>d.open_m>0);
-    if(opData.length>=2){ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();let f=true;data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);f?(ctx.moveTo(x,y),f=false):ctx.lineTo(x,y);}});ctx.stroke();ctx.setLineDash([]);}
+    if(opData.length>=2){ctx.strokeStyle='#14532d';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();let pw=false;data.forEach((d,i)=>{if(d.open_m>0){const x=X(i),y=Y(d.open_m);pw?ctx.lineTo(x,y):ctx.moveTo(x,y);pw=true;}else{pw=false;}});ctx.stroke();ctx.setLineDash([]);}
     // Area fill
     ctx.beginPath();data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
     ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();ctx.fillStyle='rgba(155,44,44,0.06)';ctx.fill();
@@ -8195,9 +8195,7 @@ canvas{display:block;width:100%;background:var(--paper-2)}
     data.forEach((d,i)=>{
       const x=X(i),y=Y(d.total_m),isPeak=i===peakI;
       ctx.beginPath();ctx.arc(x,y,isPeak?5:3,0,7);ctx.fillStyle=isPeak?'#9B2C2C':'#fff';ctx.fill();ctx.strokeStyle='#9B2C2C';ctx.lineWidth=1.8;ctx.stroke();
-      ctx.font=(isPeak?'bold ':'')+'9px IBM Plex Mono,monospace';ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
-      ctx.fillText(fmts(d.total_m),x,y-10);
-      if(isPeak){ctx.fillStyle='#9B2C2C';ctx.font='bold 8px IBM Plex Mono,monospace';ctx.fillText('▲ PEAK',x,y-20);}
+      if(isPeak){ctx.font='bold 9px IBM Plex Mono,monospace';ctx.fillStyle='#9B2C2C';ctx.textAlign='center';ctx.fillText(fmts(d.total_m),x,y-10);ctx.font='bold 8px IBM Plex Mono,monospace';ctx.fillText('▲ PEAK',x,y-20);}
     });
     // Hover tooltip
     if(mx!==null){
