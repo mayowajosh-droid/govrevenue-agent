@@ -5176,7 +5176,10 @@ ${oppCardCss()}
     </div>
     <div class="chartwrap">
       <div class="ch-head">
-        <span class="lab">UK public-sector awarded${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
+        <div>
+          <span class="lab">UK public-sector awarded${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
+          <span class="lab" style="display:block;font-size:10px;opacity:.6;margin-top:2px">Monthly totals &middot; rolling 12 months</span>
+        </div>
         <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
@@ -5355,7 +5358,7 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function draw(){
     ctx.clearRect(0,0,r.width,r.height);
     ctx.strokeStyle='#0f14140f';ctx.lineWidth=1;ctx.font='10px monospace';ctx.fillStyle='#5A6B7B';
-    for(const g of [${chartTick1},${chartTick2}]){const y=Y(g);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(r.width-pad.r,y);ctx.stroke();ctx.fillText(g+'m',6,y+3);}
+    for(const g of [${chartTick1},${chartTick2}]){const y=Y(g);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(r.width-pad.r,y);ctx.stroke();ctx.fillText(g>=1000?'£'+(g/1000).toFixed(1)+'bn':'£'+g+'m',6,y+3);}
     const upto=prog*(data.length-1);
     ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
     for(let i=1;i<=Math.floor(upto);i++) ctx.lineTo(X(i),Y(data[i]));
