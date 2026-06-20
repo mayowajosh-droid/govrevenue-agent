@@ -7678,7 +7678,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
     // Peak + trough markers
     const peakI=data.reduce((pi,d,i)=>d.total_m>data[pi].total_m?i:pi,0);
     const validLow=data.filter(d=>d.total_m>0);
-    const troughI=validLow.length?data.indexOf(validLow.reduce((l,d)=>d.total_m<l.total_m?d:l)):−1;
+    const troughI=validLow.length?data.indexOf(validLow.reduce((l,d)=>d.total_m<l.total_m?d:l)):-1;
 
     // Dots + per-point value labels + delta labels
     data.forEach((d,i)=>{
@@ -7689,7 +7689,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
       ctx.fillStyle=isPeak?'#9B2C2C':isTrough?'#5A6B7B':'#fff';ctx.fill();
       ctx.strokeStyle='#9B2C2C';ctx.lineWidth=2;ctx.stroke();
       // value label above dot
-      ctx.font=(isPeak?'bold ':'')+\"10px IBM Plex Mono,monospace\";
+      ctx.font=(isPeak?'bold ':'')+'10px IBM Plex Mono,monospace';
       ctx.fillStyle=isPeak?'#9B2C2C':'#0B0F14';ctx.textAlign='center';
       ctx.fillText(fmts(d.total_m),x,y-12);
       // peak / trough label
@@ -7697,7 +7697,7 @@ footer{border-top:1px solid var(--line-strong);padding:28px 0;font-family:var(--
         ctx.fillStyle='#9B2C2C';ctx.font='bold 9px IBM Plex Mono,monospace';
         ctx.fillText('▲ PEAK',x,y-24);
       }
-      if(isTrough&&isTrough!==isPeak){
+      if(isTrough&&troughI!==peakI){
         ctx.fillStyle='#5A6B7B';ctx.font='9px IBM Plex Mono,monospace';
         ctx.fillText('▼ LOW',x,y+20);
       }
