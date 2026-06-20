@@ -5176,7 +5176,7 @@ ${oppCardCss()}
     </div>
     <div class="chartwrap">
       <div class="ch-head">
-        <span class="lab">UK public-sector awarded &middot; &pound;m${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
+        <span class="lab">UK public-sector awarded${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
         <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart"></canvas>
