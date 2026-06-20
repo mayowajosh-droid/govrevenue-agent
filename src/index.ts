@@ -7211,11 +7211,16 @@ h1.sig-h1{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:
 .filter-bar button:hover{background:var(--brand-hot)}
 .filter-clear{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:underline;padding:4px 0}
 .sig-count{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-left:auto;white-space:nowrap}
+/* wrap constraint */
+.wrap{max-width:960px;margin:0 auto;padding:0 32px}
 /* table */
 .tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:900px}
+table{width:100%;border-collapse:collapse;min-width:780px}
 thead{background:var(--surface-2)}
 thead th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:10px;border-bottom:1px solid var(--border-2);text-align:left;white-space:nowrap}
+table th:nth-child(1){width:110px}
+table th:nth-child(6),table th:nth-child(7){padding-left:6px;padding-right:6px}
+table td:nth-child(6),table td:nth-child(7){padding-left:6px;padding-right:6px}
 tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
 tbody tr:hover{background:var(--surface-2)}
 tbody tr.row-urgent{background:rgba(239,68,68,.05)}
@@ -7250,7 +7255,7 @@ td{padding:11px 10px;font-size:13px;vertical-align:top}
 .pg-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 auto}
 .empty{padding:72px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 @media(max-width:900px){.stat-block{padding:14px 16px}.stat-value{font-size:20px}h1.sig-h1{font-size:22px}.page-head{flex-direction:column;align-items:flex-start}}
-@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}}
+@media(max-width:600px){.stats-strip{flex-wrap:wrap}.stat-block{flex:1 1 50%}.wrap{padding:0 16px}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}}
 </style>
 </head>
 <body>
