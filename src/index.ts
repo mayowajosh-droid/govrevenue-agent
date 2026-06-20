@@ -5003,7 +5003,7 @@ nav.primary a:hover{color:var(--ink);border-color:var(--accent)}
 .caveat b{color:#e08a7a}
 .spark{width:100%;height:46px;display:block;margin:2px 0 10px}
 .ticker{background:#070a0e;color:var(--paper);overflow:hidden;border-bottom:1px solid #000}
-.ticker .row{display:flex;gap:48px;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:11px 0;animation:scroll 90s linear infinite;width:max-content}
+.ticker .row{display:flex;gap:48px;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:11px 0;animation:scroll 160s linear infinite;width:max-content}
 .ticker .row span b{color:var(--accent-2);font-weight:600;margin-right:8px}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .chartband{background:var(--paper);border-bottom:1px solid var(--line-strong);padding:74px 0}
