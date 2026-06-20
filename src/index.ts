@@ -7510,12 +7510,12 @@ strong{font-weight:700;color:var(--t1)}
 .orb3{width:320px;height:320px;top:35%;left:42%;background:radial-gradient(circle,rgba(245,158,11,0.05) 0%,transparent 70%);animation:fl1 19s ease-in-out infinite reverse}
 @keyframes fl1{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-44px) scale(1.07)}}
 @keyframes fl2{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(34px) scale(0.94)}}
-.hero-inner{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:108px 48px 88px;width:100%}
+.hero-inner{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:72px 48px 56px;width:100%}
 .hero-badge{display:inline-flex;align-items:center;gap:9px;background:rgba(196,30,58,0.1);border:1px solid rgba(196,30,58,0.28);border-radius:20px;padding:5px 18px 5px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--red);margin-bottom:32px}
 .hero-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pdot 2s infinite}
 @keyframes pdot{0%,100%{opacity:1}50%{opacity:.25}}
-.hero-h1{font-family:var(--serif);font-size:clamp(40px,6.5vw,92px);font-weight:600;line-height:1.02;letter-spacing:-.045em;color:var(--t1);margin-bottom:24px;max-width:940px}
-.hero-h1 em{font-style:normal;color:var(--red)}
+.hero-h1{font-family:var(--serif);font-size:clamp(28px,4vw,58px);font-weight:600;line-height:1.06;letter-spacing:-.04em;color:var(--t1);margin-bottom:20px;max-width:780px}
+.hero-h1 em{font-style:normal;color:#B85060}
 .hero-sub{font-size:19px;color:var(--t2);max-width:560px;line-height:1.65;margin-bottom:44px}
 .hero-ctas{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .btn-p{background:var(--red);color:#fff;font-size:14px;font-weight:700;padding:15px 30px;border-radius:6px;transition:opacity .15s}.btn-p:hover{opacity:.88}
@@ -7643,7 +7643,7 @@ canvas#detailChart{display:block;width:100%}
       Live procurement intelligence &middot; Updated hourly
     </div>
     <h1 class="hero-h1">
-      <em>${fmtBnShort(totalAnnualM)}</em> in UK public contracts.<br>
+      <em>${fmtBnShort(totalAnnualM)}+</em> in UK public contracts.<br>
       Tracked in real time.
     </h1>
     <p class="hero-sub">Every month, UK public bodies spend billions on goods and services. Published in public, searchable, and entirely predictable. This is what that spend looks like when you actually look at it.</p>
