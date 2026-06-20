@@ -170,6 +170,18 @@ app.use(cookieParser());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
+// Page-view tracker — fire-and-forget, never blocks a request
+app.use((req, _res, next) => {
+  if (pool && req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/admin") && !req.path.startsWith("/billing") && !req.path.includes(".")) {
+    const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 64);
+    pool.query(
+      `INSERT INTO visitor_logs (ip, path, user_agent, referer) VALUES ($1,$2,$3,$4)`,
+      [ip, req.path.slice(0, 200), String(req.headers["user-agent"] || "").slice(0, 300), String(req.headers.referer || req.headers.referrer || "").slice(0, 300)]
+    ).catch(() => {});
+  }
+  next();
+});
+
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 // Report generation uses Claude when ANTHROPIC_API_KEY is set (the report is the product —
@@ -1106,6 +1118,18 @@ async function initDb() {
       cached_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS visitor_logs (
+      id          BIGSERIAL PRIMARY KEY,
+      ip          TEXT,
+      path        TEXT,
+      user_agent  TEXT,
+      referer     TEXT,
+      visited_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_visitor_logs_visited ON visitor_logs (visited_at DESC);`);
 
   console.log("[db] ready");
 }
@@ -8995,99 +9019,648 @@ app.get("/api/scans/:id/report.md", asyncRoute(async (req, res) => {
 }));
 
 app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
-  const scans = await listScans();
   const token = String(req.query.token || "");
-  const reran = req.query.reran ? `<p style="color:#1d6b4f;font-family:monospace;font-size:13px">${escapeHtml(String(req.query.reran))} scan(s) re-queued.</p>` : "";
+  const reranMsg = req.query.reran ? Number(req.query.reran) : 0;
 
-  res.type("html").send(`<!doctype html>
+  const safePool = (sql: string, params?: any[]) =>
+    pool ? pool.query(sql, params).catch(() => ({ rows: [] as any[] })) : Promise.resolve({ rows: [] as any[] });
+
+  const [
+    scansRes, scanStatsRes,
+    usersRes, userStatsRes,
+    signalsStatsRes,
+    subsRes, briefRes,
+    vDaysRes, vPathsRes, vIpsRes, vTodayRes,
+  ] = await Promise.all([
+    safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
+      input_json->>'clientEmail' AS email,
+      input_json->>'email'       AS email2,
+      input_json->>'website'     AS website,
+      input_json->>'location'    AS location,
+      input_json->>'areasServed' AS areas_served,
+      input_json->>'mainServices' AS main_services,
+      input_json->>'secondaryServices' AS secondary_services,
+      input_json->>'teamSize'    AS team_size,
+      input_json->>'certifications' AS certifications,
+      input_json->>'publicSectorExperience' AS ps_experience,
+      input_json->>'idealContractSize'     AS ideal_contract,
+      input_json->>'maximumContractSize'   AS max_contract,
+      input_json->>'frameworkStatus'       AS framework_status,
+      input_json->>'mainGoal'              AS main_goal,
+      input_json->>'biggestConcern'        AS biggest_concern,
+      input_json->>'lastPublicContract'    AS last_public_contract,
+      CASE WHEN status='completed' THEN SUBSTRING(report_markdown,1,5000) ELSE NULL END AS report_snippet
+    FROM scans ORDER BY created_at DESC LIMIT 200`),
+    safePool(`SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status='completed')::int AS completed,
+      COUNT(*) FILTER (WHERE status='failed')::int AS failed,
+      COUNT(*) FILTER (WHERE status IN ('running','pending'))::int AS in_progress,
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS today,
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int  AS this_week,
+      ROUND(100.0*COUNT(*) FILTER (WHERE status='completed')/NULLIF(COUNT(*) FILTER (WHERE status IN ('completed','failed')),0),1) AS success_rate
+    FROM scans`),
+    safePool(`SELECT u.id, u.email, u.created_at, u.tier, u.stripe_customer_id, u.stripe_subscription_status,
+      (SELECT COUNT(*)::int FROM scans WHERE user_id=u.id) AS scan_count
+    FROM users u ORDER BY u.created_at DESC LIMIT 500`),
+    safePool(`SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE tier='free')::int    AS free_count,
+      COUNT(*) FILTER (WHERE tier='pro')::int     AS pro_count,
+      COUNT(*) FILTER (WHERE tier='agency')::int  AS agency_count,
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int AS new_this_week
+    FROM users`),
+    safePool(`SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::int AS open_count,
+      COALESCE(SUM(value_amount) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'),0) AS open_value,
+      COUNT(DISTINCT category)::int AS categories,
+      COUNT(*) FILTER (WHERE notice_date > NOW() - INTERVAL '24 hours')::int AS new_24h,
+      COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW()+INTERVAL '7 days')::int AS closing_7d
+    FROM homepage_signals`),
+    safePool(`SELECT id, scan_id, company_name, email, active, created_at, last_alerted_at,
+      cardinality(alerted_notice_ids) AS alerted_count
+    FROM subscriptions ORDER BY created_at DESC LIMIT 200`),
+    safePool(`SELECT * FROM briefing_subscribers ORDER BY created_at DESC`),
+    safePool(`SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT ip)::int AS unique_ips
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' GROUP BY day ORDER BY day DESC`),
+    safePool(`SELECT path, COUNT(*)::int AS visits FROM visitor_logs
+    WHERE visited_at > NOW() - INTERVAL '7 days' GROUP BY path ORDER BY visits DESC LIMIT 15`),
+    safePool(`SELECT ip, COUNT(*)::int AS visits, MAX(visited_at) AS last_seen
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != ''
+    GROUP BY ip ORDER BY visits DESC LIMIT 30`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours'`),
+  ]);
+
+  const ss   = (scanStatsRes.rows[0]  as any) || {};
+  const us   = (userStatsRes.rows[0]  as any) || {};
+  const sigs = (signalsStatsRes.rows[0] as any) || {};
+  const vToday = (vTodayRes.rows[0]   as any) || { total: 0, unique_ips: 0 };
+  const users         = usersRes.rows  as any[];
+  const subscriptions = subsRes.rows   as any[];
+  const briefing      = briefRes.rows  as any[];
+  const vDays  = vDaysRes.rows  as any[];
+  const vPaths = vPathsRes.rows as any[];
+  const vIps   = vIpsRes.rows   as any[];
+
+  const scans = (scansRes.rows as any[]).map(s => ({
+    ...s,
+    edp: s.report_snippet ? parseEdpFromMarkdown(String(s.report_snippet)) : null,
+    displayEmail: (String(s.email || s.email2 || "")).trim(),
+  }));
+
+  const vColor = (v: string) => {
+    const l = v.toLowerCase();
+    if (l.includes("strong") || l.startsWith("yes")) return "#3ddc84";
+    if (l.includes("possible") || l.includes("conditional")) return "#f59e0b";
+    return "#e87979";
+  };
+  const gColor = (g: string) =>
+    g === "A" ? "#3ddc84" : g === "B" ? "#60a5fa" : g === "C" ? "#f59e0b" : "#e87979";
+
+  // Pre-compute scan-per-day chart (14 days)
+  const days14: string[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days14.push(d.toISOString().slice(0, 10));
+  }
+  const scansByDay = new Map<string, number>();
+  scans.forEach((s: any) => {
+    const d = String(s.created_at || "").slice(0, 10);
+    if (d) scansByDay.set(d, (scansByDay.get(d) || 0) + 1);
+  });
+  const maxSPerDay = Math.max(1, ...days14.map(d => scansByDay.get(d) || 0));
+  const scanActivityHtml = `<div style="display:flex;align-items:flex-end;gap:3px;height:64px;margin-bottom:6px">
+    ${days14.map(d => {
+      const n = scansByDay.get(d) || 0;
+      const h = n === 0 ? 2 : Math.max(4, Math.round((n / maxSPerDay) * 64));
+      const isToday = d === new Date().toISOString().slice(0, 10);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${n} scans">
+        <div style="width:100%;height:${h}px;background:${isToday ? "#9B2C2C" : "rgba(155,44,44,.38)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
+      </div>`;
+    }).join("")}
+  </div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">${ss.this_week||0} this week &middot; ${ss.today||0} today &middot; ${ss.in_progress||0} in progress</div>`;
+
+  // Visitor daily chart
+  const dayMap = new Map(vDays.map((d: any) => [String(d.day).slice(0, 10), d]));
+  const maxVPerDay = Math.max(1, ...days14.map(d => Number((dayMap.get(d) as any)?.visits || 0)));
+  const visitorChartHtml = vDays.length === 0
+    ? `<div style="padding:20px 0;font-family:var(--mono);font-size:11px;color:var(--muted)">No visitor data yet — tracking starts on first page load after deploy.</div>`
+    : `<div style="display:flex;align-items:flex-end;gap:3px;height:64px;margin-bottom:6px">
+      ${days14.map(d => {
+        const row = dayMap.get(d) as any;
+        const visits = Number(row?.visits || 0);
+        const uips = Number(row?.unique_ips || 0);
+        const h = visits === 0 ? 2 : Math.max(4, Math.round((visits / maxVPerDay) * 64));
+        const isToday = d === new Date().toISOString().slice(0, 10);
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${visits} views, ${uips} IPs">
+          <div style="width:100%;height:${h}px;background:${isToday ? "#2563ab" : "rgba(37,99,171,.4)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  // Top paths
+  const maxPathV = Math.max(1, ...vPaths.map((p: any) => Number(p.visits)));
+  const topPathsHtml = vPaths.length === 0
+    ? `<div style="padding:16px 0;font-family:var(--mono);font-size:11px;color:var(--muted)">No path data yet</div>`
+    : vPaths.map((p: any) => `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${escapeHtml(p.path)}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px;flex-shrink:0">${Number(p.visits).toLocaleString()}</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px">
+          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#2563ab;opacity:.7;border-radius:2px"></div>
+        </div>
+      </div>`).join("");
+
+  // Top IPs
+  const topIpsHtml = vIps.length === 0
+    ? `<div style="padding:16px 0;font-family:var(--mono);font-size:11px;color:var(--muted)">No IP data yet</div>`
+    : `<table class="a-tbl" style="min-width:unset">
+        <thead><tr><th>#</th><th>IP Address</th><th>Visits</th><th>Last Seen</th></tr></thead>
+        <tbody>${vIps.map((ip: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i + 1}</td>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml(ip.ip || "")}</td>
+          <td style="font-family:var(--mono);font-size:12px;text-align:center;font-weight:500">${Number(ip.visits).toLocaleString()}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml(String(ip.last_seen || "").slice(0, 10))}</td>
+        </tr>`).join("")}</tbody>
+      </table>`;
+
+  // Scans rows
+  const scanRowsHtml = scans.length === 0
+    ? `<tr><td colspan="17" style="text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">No scans yet</td></tr>`
+    : scans.map((s: any) => {
+        const verdict = s.edp?.verdict || "";
+        const grade   = s.edp?.evidenceGrade || "";
+        const vC = verdict ? vColor(verdict) : "var(--muted)";
+        const gC = grade   ? gColor(grade)   : "var(--muted)";
+        const emailHtml = s.displayEmail
+          ? `<span style="font-family:var(--mono);font-size:11px">${escapeHtml(s.displayEmail.slice(0, 40))}</span>`
+          : `<span style="color:var(--muted)">—</span>`;
+        const websiteHtml = s.website
+          ? `<a href="${escapeHtml(s.website)}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px;color:#60a5fa">↗</a>`
+          : `<span style="color:var(--muted)">—</span>`;
+        const errHtml = s.error_message
+          ? `<div style="font-family:var(--mono);font-size:9px;color:#e87979;margin-top:2px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(s.error_message)}">${escapeHtml(s.error_message.slice(0, 70))}</div>`
+          : "";
+        const contractRange = [s.ideal_contract, s.max_contract].filter(Boolean).join("–") || "—";
+        return `<tr>
+          <td style="padding:8px 10px"><input type="checkbox" class="row-chk" value="${escapeHtml(s.id)}"></td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">${escapeHtml(String(s.created_at || "").slice(0, 10))}</td>
+          <td style="font-weight:600;max-width:160px"><a href="/scan/${escapeHtml(s.id)}" target="_blank" style="color:var(--text);text-decoration:none" title="${escapeHtml(s.company_name)}">${escapeHtml(s.company_name.slice(0, 28))}</a></td>
+          <td>${emailHtml}</td>
+          <td style="text-align:center">${websiteHtml}</td>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml((s.location || "").slice(0, 28)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-size:11px;max-width:180px;white-space:normal;line-height:1.4">${escapeHtml((s.main_services || "").slice(0, 100)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-family:var(--mono);font-size:11px;text-align:center">${escapeHtml(s.team_size || "—")}</td>
+          <td style="font-family:var(--mono);font-size:11px;max-width:100px">${escapeHtml((s.certifications || "").slice(0, 40)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-size:11px;max-width:120px;white-space:normal;line-height:1.4">${escapeHtml((s.ps_experience || "").slice(0, 70)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml(contractRange.slice(0, 35))}</td>
+          <td style="font-family:var(--mono);font-size:11px;max-width:100px">${escapeHtml((s.framework_status || "").slice(0, 30)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-size:11px;max-width:140px;white-space:normal;line-height:1.4">${escapeHtml((s.main_goal || "").slice(0, 70)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td><span class="pill pill-${escapeHtml(s.status)}">${escapeHtml(s.status)}</span>${errHtml}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:${vC};max-width:130px;white-space:normal;line-height:1.35">${escapeHtml(verdict.slice(0, 45)) || `<span style="color:var(--muted)">—</span>`}</td>
+          <td style="font-family:var(--serif);font-size:20px;font-weight:700;color:${gC};text-align:center">${escapeHtml(grade) || `<span style="color:var(--muted);font-size:14px;font-family:var(--sans)">—</span>`}</td>
+          <td style="white-space:nowrap">
+            <div style="display:flex;gap:4px;align-items:center">
+              <a href="/scan/${escapeHtml(s.id)}" target="_blank" class="a-btn">Open</a>
+              ${s.pdf_storage_url ? `<a href="${escapeHtml(s.pdf_storage_url)}" target="_blank" class="a-btn">PDF</a>` : ""}
+              <form method="POST" action="/admin/scans/${escapeHtml(s.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete ${escapeHtml(s.company_name.replace(/'/g, "\\'"))}?')" style="display:inline">
+                <button type="submit" class="a-btn a-btn-danger">✕</button>
+              </form>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+
+  // Users rows
+  const userRowsHtml = users.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">No users yet</td></tr>`
+    : users.map((u: any) => `<tr>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(u.email)}</td>
+        <td><span class="pill pill-${escapeHtml(u.tier)}">${escapeHtml(u.tier)}</span></td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(u.created_at || "").slice(0, 10))}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;text-align:center">${u.scan_count || 0}</td>
+        <td>${u.stripe_subscription_status ? `<span class="pill ${u.stripe_subscription_status === "active" ? "pill-active" : "pill-inactive"}">${escapeHtml(u.stripe_subscription_status)}</span>` : `<span style="color:var(--muted)">—</span>`}</td>
+        <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((u.stripe_customer_id || "").slice(0, 30)) || `<span style="opacity:.4">—</span>`}</td>
+      </tr>`).join("");
+
+  // Subscription rows
+  const subRowsHtml = subscriptions.length === 0
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No subscriptions yet</td></tr>`
+    : subscriptions.map((s: any) => `<tr>
+        <td style="font-weight:500">${escapeHtml(s.company_name || "")}</td>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(s.email || "")}</td>
+        <td><span class="pill ${s.active ? "pill-active" : "pill-inactive"}">${s.active ? "active" : "paused"}</span></td>
+        <td style="font-family:var(--mono);font-size:12px;text-align:center;font-weight:600">${s.alerted_count || 0}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${s.last_alerted_at ? String(s.last_alerted_at).slice(0, 10) : "—"}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(s.created_at || "").slice(0, 10))}</td>
+        <td><a href="/admin/subscriptions?token=${encodeURIComponent(token)}" class="a-btn" style="font-size:9px">Manage</a></td>
+      </tr>`).join("");
+
+  // Briefing rows
+  const briefRowsHtml = briefing.length === 0
+    ? `<tr><td colspan="3" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No briefing subscribers yet</td></tr>`
+    : briefing.map((b: any) => `<tr>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.email || "")}</td>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(b.category || "All")}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(String(b.created_at || "").slice(0, 10))}</td>
+      </tr>`).join("");
+
+  const totalUserCount = Number(us.total || 0) || 1;
+  const totalFreeCount = Number(us.free_count || 0);
+  const totalProCount  = Number(us.pro_count || 0);
+  const totalAgencyCount = Number(us.agency_count || 0);
+  const activeSubCount = subscriptions.filter((s: any) => s.active).length;
+
+  const envRows: [string, boolean][] = [
+    ["DATABASE_URL",            !!process.env.DATABASE_URL],
+    ["REDIS_URL",               !!process.env.REDIS_URL],
+    ["ANTHROPIC_API_KEY",       !!process.env.ANTHROPIC_API_KEY],
+    ["OPENAI_API_KEY",          !!process.env.OPENAI_API_KEY],
+    ["STRIPE_SECRET_KEY",       !!process.env.STRIPE_SECRET_KEY],
+    ["RESEND_API_KEY",          !!process.env.RESEND_API_KEY],
+    ["COMPANIES_HOUSE_API_KEY", !!process.env.COMPANIES_HOUSE_API_KEY],
+    ["SLACK_WEBHOOK_URL",       !!process.env.SLACK_WEBHOOK_URL],
+    ["SENTRY_DSN",              !!process.env.SENTRY_DSN],
+    ["PDF_STORAGE_ENDPOINT",    !!process.env.PDF_STORAGE_ENDPOINT],
+    ["SAMPLE_PDF_URL",          !!process.env.SAMPLE_PDF_URL],
+    ["BASE_URL",                !!process.env.BASE_URL],
+  ];
+
+  const configRows: [string, string][] = [
+    ["Report provider",  process.env.ANTHROPIC_API_KEY ? "Claude (primary) + OpenAI fallback" : "OpenAI only"],
+    ["Claude model",     process.env.ANTHROPIC_MODEL   || "claude-opus-4-8 (default)"],
+    ["OpenAI model",     process.env.OPENAI_MODEL      || "gpt-4.1-mini (default)"],
+    ["DB backend",       pool ? "PostgreSQL (connected)" : "In-memory (no DATABASE_URL)"],
+    ["Queue backend",    process.env.REDIS_URL ? "BullMQ + Redis" : "In-process queue"],
+    ["Node version",     process.version],
+    ["Server time",      new Date().toISOString().slice(0, 19).replace("T", " ") + " UTC"],
+    ["Uptime",           `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`],
+  ];
+
+  res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Admin — GovRevenue Scans</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GovRevenue — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:32px}
-h1{font-family:'Spectral','Iowan Old Style',Georgia,serif;font-size:28px;margin-bottom:20px}
-#action-bar{display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:36px}
-#sel-count{font-size:13px;font-family:monospace;color:#5A6B7B}
-.btn{font-family:monospace;font-size:12px;letter-spacing:.04em;padding:8px 16px;border:0;cursor:pointer;display:none}
-.btn-delete{background:#9b2d20;color:#fff}
-.btn-rerun{background:#1d6b4f;color:#fff}
-.btn.visible{display:inline-block}
-table{border-collapse:collapse;width:100%;max-width:1200px;background:#fff}
-th,td{padding:10px 12px;border:1px solid #ddd;font-size:13px;text-align:left;vertical-align:middle}
-th{background:#f3efe8;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5A6B7B}
-tr:hover td{background:#faf8f3}
-input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#9B2C2C}
-.status-completed{color:#1d6b4f;font-weight:600}
-.status-failed{color:#9b2d20;font-weight:600}
-.status-running,.status-pending{color:#b45309}
-a{color:#9B2C2C;text-decoration:underline;text-underline-offset:2px}
+:root{
+  --accent:#9B2C2C;--slate:#5A6B7B;--green:#1d6b4f;--gold:#a97932;--blue:#2563ab;
+  --serif:"Spectral","Iowan Old Style",Georgia,serif;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;
+  --bg:#080C10;--surface:#111820;--surface-2:#162030;
+  --border:rgba(255,255,255,.07);--border-2:rgba(255,255,255,.12);
+  --muted:#6b8096;--text:#e8f0f5;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:210px;flex-shrink:0;background:#060A0D;border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.sb-brand{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
+.sb-logo{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--text)}
+.sb-logo b{color:var(--accent)}
+.sb-tag{font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.sb-nav{padding:10px 0;flex:1}
+.sb-link{display:flex;align-items:center;gap:8px;padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-decoration:none!important;transition:all .12s;border-left:2px solid transparent}
+.sb-link:hover{color:var(--text);background:rgba(255,255,255,.04);text-decoration:none}
+.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(155,44,44,.1)}
+.sb-count{margin-left:auto;background:rgba(255,255,255,.08);font-size:9px;padding:1px 5px;border-radius:8px}
+.sb-div{height:1px;background:var(--border);margin:5px 16px}
+.sb-foot{padding:10px 12px;border-top:1px solid var(--border);margin-top:auto}
+.sb-token{font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:7px;letter-spacing:.04em}
+.sb-action{display:block;width:100%;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:4px;transition:.12s;text-decoration:none}
+.sb-action:hover{background:rgba(255,255,255,.1);color:var(--text);text-decoration:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:#060A0D;position:sticky;top:0;z-index:150}
+.topbar-title{font-family:var(--serif);font-size:15px;font-weight:600}
+.topbar-meta{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px;animation:lp 2s infinite}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.25}}
+.section{padding:24px 24px 0}
+.s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.s-eyebrow{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+.s-title{font-family:var(--serif);font-size:20px;font-weight:600;line-height:1.1}
+.s-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px}
+.kpi{background:var(--surface);padding:16px 14px 12px}
+.kpi-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.kpi-val{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1;color:var(--text)}
+.kpi-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px}
+.kpi-green{color:#3ddc84}.kpi-red{color:#e87979}.kpi-gold{color:#f59e0b}.kpi-blue{color:#60a5fa}
+.stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:12px}
+.stat-cell{background:var(--surface-2);padding:12px 14px}
+.stat-val{font-family:var(--serif);font-size:19px;color:var(--text);margin-bottom:2px}
+.stat-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);padding:16px}
+.card-head{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-head-val{color:var(--text);font-size:10.5px;text-transform:none;letter-spacing:0}
+.tier-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.tier-lbl{font-family:var(--mono);font-size:9.5px;width:52px;flex-shrink:0}
+.tier-track{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px}
+.tier-fill{height:100%;border-radius:3px}
+.tier-n{font-family:var(--mono);font-size:9.5px;color:var(--text);width:20px;text-align:right;flex-shrink:0}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border)}
+.scroll-tbl{max-height:480px;overflow-y:auto}
+table.a-tbl{border-collapse:collapse;width:100%;font-size:12px}
+table.a-tbl th{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 11px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface);position:sticky;top:0;z-index:10}
+table.a-tbl td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+table.a-tbl tr:hover td{background:rgba(255,255,255,.02)}
+.pill{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:2px;font-weight:500;border:1px solid}
+.pill-completed{background:#0a2018;color:#3ddc84;border-color:#1d6b4f44}
+.pill-failed{background:#200a0a;color:#e87979;border-color:#9b2d2044}
+.pill-running,.pill-pending{background:#20160a;color:#f59e0b;border-color:#b4530944}
+.pill-free{background:#141e28;color:var(--muted);border-color:rgba(255,255,255,.1)}
+.pill-pro{background:#200a0a;color:#e87979;border-color:#9b2d2044}
+.pill-agency{background:#20160a;color:#f59e0b;border-color:#a9793244}
+.pill-active{background:#0a2018;color:#3ddc84;border-color:#1d6b4f44}
+.pill-inactive{background:#141e28;color:var(--muted);border-color:rgba(255,255,255,.08)}
+.a-btn{display:inline-block;font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.12s;background:none;white-space:nowrap}
+.a-btn:hover{background:rgba(255,255,255,.07);color:var(--text);text-decoration:none}
+.a-btn-danger{border-color:rgba(155,45,45,.4);color:#e87979}
+.a-btn-danger:hover{background:#200a0a}
+.a-btn-ok{border-color:rgba(29,107,79,.4);color:#3ddc84}
+.a-btn-ok:hover{background:#0a2018}
+#sel-bar{display:none;align-items:center;gap:10px;padding:8px 24px;background:rgba(155,44,44,.12);border-bottom:1px solid rgba(155,44,44,.3);position:sticky;top:46px;z-index:140}
+#sel-bar.visible{display:flex}
+.a-alert-ok{padding:9px 16px;background:#0a2018;border:1px solid #1d6b4f44;color:#3ddc84;font-family:var(--mono);font-size:10.5px;margin-bottom:12px;border-radius:2px}
+.env-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.env-key{font-family:var(--mono);font-size:10px;color:var(--muted);width:210px;flex-shrink:0}
+.env-set{color:#3ddc84;font-family:var(--mono);font-size:10px}
+.env-unset{color:var(--muted);opacity:.4;font-family:var(--mono);font-size:10px}
+.env-val{font-family:var(--mono);font-size:10px;color:var(--text)}
+.gap{height:24px}
+input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;cursor:pointer}
 </style>
 </head>
 <body>
-<h1>GovRevenue — Scans</h1>
-${reran}
-<div id="action-bar">
-  <span id="sel-count">0 selected</span>
-  <button class="btn btn-rerun" id="btn-rerun" onclick="bulkAction('rerun')">Re-run selected</button>
-  <button class="btn btn-delete" id="btn-delete" onclick="bulkAction('delete')">Delete selected</button>
+<div class="shell">
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">Gov<b>Revenue</b></div>
+    <div class="sb-tag">Command Centre</div>
+  </div>
+  <nav class="sb-nav">
+    <a href="#overview" class="sb-link active">Overview</a>
+    <a href="#scans" class="sb-link">Scans <span class="sb-count">${ss.total || 0}</span></a>
+    <a href="#users" class="sb-link">Users <span class="sb-count">${us.total || 0}</span></a>
+    <div class="sb-div"></div>
+    <a href="#visitors" class="sb-link">Visitors</a>
+    <a href="#signals" class="sb-link">Signals <span class="sb-count">${sigs.total || 0}</span></a>
+    <div class="sb-div"></div>
+    <a href="#alerts" class="sb-link">Alerts <span class="sb-count">${activeSubCount}</span></a>
+    <a href="#briefing" class="sb-link">Briefing <span class="sb-count">${briefing.length}</span></a>
+    <div class="sb-div"></div>
+    <a href="#system" class="sb-link">System</a>
+  </nav>
+  <div class="sb-foot">
+    <div class="sb-token">Token: ****${escapeHtml(token.slice(-6))}</div>
+    <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')">
+      <button class="sb-action" type="submit">↻ Rebuild signals</button>
+    </form>
+    <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all desk caches?')">
+      <button class="sb-action" type="submit">↻ Rebuild desks</button>
+    </form>
+    <a href="/admin/subscriptions?token=${encodeURIComponent(token)}" class="sb-action">→ Subscriptions</a>
+  </div>
+</aside>
+<div class="main">
+<div class="topbar">
+  <div class="topbar-title">Admin Command Centre</div>
+  <div class="topbar-meta">
+    <span><span class="live-dot"></span>Live</span>
+    <span id="aclock">${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC</span>
+    <a href="/admin/scans?token=${encodeURIComponent(token)}" style="color:var(--muted)">↻ Refresh</a>
+    <a href="/" target="_blank" style="color:var(--muted)">↗ Site</a>
+  </div>
+</div>
+${reranMsg ? `<div class="a-alert-ok" style="margin:10px 24px 0">${reranMsg} scan(s) re-queued.</div>` : ""}
+<div id="sel-bar">
+  <span id="sel-count" style="font-family:var(--mono);font-size:11px">0 selected</span>
+  <button class="a-btn a-btn-ok" onclick="bulkAction('rerun')">↻ Re-run</button>
+  <button class="a-btn a-btn-danger" onclick="bulkAction('delete')">✕ Delete</button>
 </div>
 <form id="bulk-form" method="POST" style="display:none">
   <input type="hidden" name="token" value="${escapeHtml(token)}">
   <div id="bulk-ids"></div>
 </form>
-<table>
-<thead><tr>
-  <th><input type="checkbox" id="chk-all" title="Select all"></th>
-  <th>Created</th><th>Company</th><th>Status</th><th>Open</th><th>Data</th><th>Delete</th>
-</tr></thead>
-<tbody>
-${scans.map(s => `<tr>
-  <td><input type="checkbox" class="row-chk" value="${escapeHtml(s.id)}"></td>
-  <td>${escapeHtml(formatDate(s.created_at))}</td>
-  <td>${escapeHtml(s.company_name)}</td>
-  <td class="status-${escapeHtml(s.status)}">${escapeHtml(s.status)}</td>
-  <td><a href="/scan/${escapeHtml(s.id)}" target="_blank">Open</a></td>
-  <td><a href="/api/scans/${escapeHtml(s.id)}/data.json" target="_blank">Data</a></td>
-  <td><form method="POST" action="/admin/scans/${escapeHtml(s.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this scan?')"><button style="background:#9b2d20;color:#fff;border:0;padding:6px 10px;cursor:pointer;font-size:12px">Delete</button></form></td>
-</tr>`).join("")}
-</tbody>
-</table>
+
+<!-- §1 OVERVIEW -->
+<section class="section" id="overview">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Dashboard</div><div class="s-title">Overview</div></div>
+    <div class="s-sub">${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-lbl">Total Scans</div><div class="kpi-val">${ss.total || 0}</div><div class="kpi-sub"><span class="kpi-green">+${ss.today || 0}</span> today &middot; ${ss.this_week || 0} this week</div></div>
+    <div class="kpi"><div class="kpi-lbl">Success Rate</div><div class="kpi-val ${Number(ss.success_rate || 0) >= 80 ? "kpi-green" : "kpi-red"}">${ss.success_rate || 0}%</div><div class="kpi-sub">${ss.completed || 0} ok &middot; ${ss.failed || 0} failed</div></div>
+    <div class="kpi"><div class="kpi-lbl">Registered Users</div><div class="kpi-val">${us.total || 0}</div><div class="kpi-sub"><span class="kpi-green">+${us.new_this_week || 0}</span> this week</div></div>
+    <div class="kpi"><div class="kpi-lbl">Open Signals</div><div class="kpi-val kpi-red">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div><div class="kpi-sub">${sigs.new_24h || 0} new &middot; ${sigs.closing_7d || 0} closing</div></div>
+    <div class="kpi"><div class="kpi-lbl">Open Value</div><div class="kpi-val" style="font-size:20px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="kpi-sub">${sigs.categories || 0} active desks</div></div>
+    <div class="kpi"><div class="kpi-lbl">Visitors Today</div><div class="kpi-val kpi-blue">${Number(vToday.total || 0).toLocaleString()}</div><div class="kpi-sub">${Number(vToday.unique_ips || 0)} unique IPs</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head">User Breakdown <span class="card-head-val">${us.total || 0} total</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:var(--muted)">Free</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalFreeCount/totalUserCount)}%;background:var(--slate)"></div></div><span class="tier-n">${us.free_count || 0}</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:#e87979">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--accent)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:#f59e0b">Agency</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalAgencyCount/totalUserCount)}%;background:var(--gold)"></div></div><span class="tier-n">${us.agency_count || 0}</span></div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div class="tier-row"><span class="tier-lbl" style="color:#3ddc84;font-size:9px">Alerts</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*activeSubCount/totalUserCount))}%;background:var(--green)"></div></div><span class="tier-n">${activeSubCount}</span></div>
+        <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:#60a5fa;font-size:9px">Briefing</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*briefing.length/totalUserCount))}%;background:var(--blue)"></div></div><span class="tier-n">${briefing.length}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">Scan Activity <span class="card-head-val">Last 14 days</span></div>
+      ${scanActivityHtml}
+    </div>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §2 SCANS -->
+<section class="section" id="scans">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Database</div><div class="s-title">Scan Intelligence</div></div>
+    <div class="s-sub">${scans.length} records &middot; most recent first &middot; all form fields</div>
+  </div>
+  <div class="stat-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:12px">
+    <div class="stat-cell"><div class="stat-val" style="color:#3ddc84">${ss.completed || 0}</div><div class="stat-lbl">Completed</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:#e87979">${ss.failed || 0}</div><div class="stat-lbl">Failed</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:#f59e0b">${ss.in_progress || 0}</div><div class="stat-lbl">In Progress</div></div>
+    <div class="stat-cell"><div class="stat-val">${ss.today || 0}</div><div class="stat-lbl">Today</div></div>
+    <div class="stat-cell"><div class="stat-val">${ss.this_week || 0}</div><div class="stat-lbl">This Week</div></div>
+    <div class="stat-cell"><div class="stat-val">${ss.success_rate || 0}%</div><div class="stat-lbl">Success Rate</div></div>
+  </div>
+  <div class="tbl-wrap scroll-tbl">
+    <table class="a-tbl">
+      <thead><tr>
+        <th><input type="checkbox" id="chk-all"></th>
+        <th>Date</th><th>Company</th><th>Email</th><th>Web</th><th>Location</th>
+        <th>Main Services</th><th>Team</th><th>Certs</th><th>PS Exp</th>
+        <th>Contract</th><th>Framework</th><th>Goal</th>
+        <th>Status</th><th>Verdict</th><th>Grade</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${scanRowsHtml}</tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §3 USERS -->
+<section class="section" id="users">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Database</div><div class="s-title">Registered Users</div></div>
+    <div class="s-sub">${users.length} accounts</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl">
+    <table class="a-tbl">
+      <thead><tr><th>Email</th><th>Tier</th><th>Joined</th><th>Scans</th><th>Stripe Status</th><th>Stripe Customer</th></tr></thead>
+      <tbody>${userRowsHtml}</tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §4 VISITORS -->
+<section class="section" id="visitors">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Analytics</div><div class="s-title">Visitor Intelligence</div></div>
+    <div class="s-sub">HTML page views only &middot; x-forwarded-for IPs &middot; API/admin excluded</div>
+  </div>
+  <div class="stat-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:12px">
+    <div class="stat-cell"><div class="stat-val" style="color:#60a5fa">${Number(vToday.total || 0).toLocaleString()}</div><div class="stat-lbl">Views today</div></div>
+    <div class="stat-cell"><div class="stat-val">${Number(vToday.unique_ips || 0)}</div><div class="stat-lbl">Unique IPs today</div></div>
+    <div class="stat-cell"><div class="stat-val">${vDays.reduce((s: number, d: any) => s + Number(d.visits || 0), 0).toLocaleString()}</div><div class="stat-lbl">Views 14 days</div></div>
+    <div class="stat-cell"><div class="stat-val">${vIps.length}</div><div class="stat-lbl">Distinct IPs 7d</div></div>
+    <div class="stat-cell"><div class="stat-val">${vPaths.length}</div><div class="stat-lbl">Distinct paths 7d</div></div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-head">Daily Traffic <span class="card-head-val">last 14 days</span></div>
+    ${visitorChartHtml}
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="card-head">Top Pages <span class="card-head-val">7 days</span></div>${topPathsHtml}</div>
+    <div class="card"><div class="card-head">Top IPs <span class="card-head-val">7 days</span></div><div class="tbl-wrap scroll-tbl" style="max-height:260px;border:none">${topIpsHtml}</div></div>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §5 SIGNALS -->
+<section class="section" id="signals">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Intelligence</div><div class="s-title">Live Signal Database</div></div>
+    <div class="s-sub">${Number(sigs.total || 0).toLocaleString()} notices indexed</div>
+  </div>
+  <div class="stat-row" style="grid-template-columns:repeat(6,1fr)">
+    <div class="stat-cell"><div class="stat-val" style="color:#3ddc84">${Number(sigs.open_count || 0).toLocaleString()}</div><div class="stat-lbl">Open now</div></div>
+    <div class="stat-cell"><div class="stat-val" style="font-size:16px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="stat-lbl">Open value</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:#e87979">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:#f59e0b">${sigs.closing_7d || 0}</div><div class="stat-lbl">Closing &lt;7d</div></div>
+    <div class="stat-cell"><div class="stat-val">${sigs.categories || 0}</div><div class="stat-lbl">Active desks</div></div>
+    <div class="stat-cell"><div class="stat-val">${Number(sigs.total || 0).toLocaleString()}</div><div class="stat-lbl">Total indexed</div></div>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §6 ALERTS -->
+<section class="section" id="alerts">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Notifications</div><div class="s-title">Weekly Alerts</div></div>
+    <div class="s-sub">${subscriptions.length} total &middot; ${activeSubCount} active</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:0">
+    <table class="a-tbl">
+      <thead><tr><th>Company</th><th>Email</th><th>Status</th><th>Sent</th><th>Last Alert</th><th>Subscribed</th><th></th></tr></thead>
+      <tbody>${subRowsHtml}</tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §7 BRIEFING -->
+<section class="section" id="briefing">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Notifications</div><div class="s-title">Briefing Subscribers</div></div>
+    <div class="s-sub">${briefing.length} subscribers</div>
+  </div>
+  <div class="tbl-wrap">
+    <table class="a-tbl">
+      <thead><tr><th>Email</th><th>Sector</th><th>Joined</th></tr></thead>
+      <tbody>${briefRowsHtml}</tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §8 SYSTEM -->
+<section class="section" id="system">
+  <div class="s-head">
+    <div><div class="s-eyebrow">Infrastructure</div><div class="s-title">System Status</div></div>
+    <div class="s-sub">Uptime ${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s &middot; Node ${process.version}</div>
+  </div>
+  <div class="two-col" style="margin-bottom:12px">
+    <div class="card">
+      <div class="card-head">Environment Variables</div>
+      ${envRows.map(([k, set]) => `<div class="env-row"><span class="env-key">${k}</span><span class="${set ? "env-set" : "env-unset"}">${set ? "✓  Set" : "✗  Not set"}</span></div>`).join("")}
+    </div>
+    <div class="card">
+      <div class="card-head">Runtime Config</div>
+      ${configRows.map(([k, v]) => `<div class="env-row"><span class="env-key">${escapeHtml(k)}</span><span class="env-val">${escapeHtml(v)}</span></div>`).join("")}
+      <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Quick Actions</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild signals</button></form>
+          <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all 24 desk caches?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild desks</button></form>
+          <button class="a-btn a-btn-danger" onclick="bulkDeleteFailed()">✕ Purge failed scans</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div style="height:40px"></div>
+</div><!-- .main -->
+</div><!-- .shell -->
+
 <script>
-const chkAll = document.getElementById('chk-all');
-const selCount = document.getElementById('sel-count');
-const btnRerun = document.getElementById('btn-rerun');
-const btnDelete = document.getElementById('btn-delete');
-
-function getChecked(){ return [...document.querySelectorAll('.row-chk:checked')].map(c=>c.value); }
-
-function updateBar(){
-  const n = getChecked().length;
-  selCount.textContent = n + ' selected';
-  btnRerun.classList.toggle('visible', n > 0);
-  btnDelete.classList.toggle('visible', n > 0);
-}
-
-chkAll.addEventListener('change', function(){
-  document.querySelectorAll('.row-chk').forEach(c=>{ c.checked = this.checked; });
-  updateBar();
-});
-
-document.querySelectorAll('.row-chk').forEach(c => c.addEventListener('change', function(){
-  chkAll.checked = document.querySelectorAll('.row-chk:not(:checked)').length === 0;
-  updateBar();
-}));
-
+setInterval(function(){var el=document.getElementById('aclock');if(el)el.textContent=new Date().toISOString().slice(0,19).replace('T',' ')+' UTC';},1000);
+var sections=document.querySelectorAll('section[id]');
+var navLinks=document.querySelectorAll('.sb-link[href^="#"]');
+function updateNav(){var cur='';sections.forEach(function(s){if(window.scrollY>=s.offsetTop-70)cur=s.id;});navLinks.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+cur);});}
+window.addEventListener('scroll',updateNav);updateNav();
+var chkAll=document.getElementById('chk-all');
+var selBar=document.getElementById('sel-bar');
+var selCount=document.getElementById('sel-count');
+function getChecked(){return[...document.querySelectorAll('.row-chk:checked')].map(function(c){return c.value;});}
+function updateBar(){var n=getChecked().length;selCount.textContent=n+' scan'+(n!==1?'s':'')+' selected';selBar.classList.toggle('visible',n>0);}
+if(chkAll)chkAll.addEventListener('change',function(){document.querySelectorAll('.row-chk').forEach(function(c){c.checked=chkAll.checked;});updateBar();});
+document.querySelectorAll('.row-chk').forEach(function(c){c.addEventListener('change',function(){if(chkAll)chkAll.checked=document.querySelectorAll('.row-chk:not(:checked)').length===0;updateBar();});});
 function bulkAction(action){
-  const ids = getChecked();
-  if (!ids.length) return;
-  if (action === 'delete' && !confirm('Delete ' + ids.length + ' scan(s) permanently?')) return;
-  if (action === 'rerun' && !confirm('Re-run ' + ids.length + ' scan(s)?')) return;
-  const form = document.getElementById('bulk-form');
-  form.action = '/admin/scans/bulk-' + action + '?token=${escapeHtml(token)}';
-  const container = document.getElementById('bulk-ids');
-  container.innerHTML = ids.map(id => '<input type="hidden" name="ids[]" value="' + id + '">').join('');
+  var ids=getChecked();if(!ids.length)return;
+  if(action==='delete'&&!confirm('Permanently delete '+ids.length+' scan(s)?'))return;
+  if(action==='rerun'&&!confirm('Re-run '+ids.length+' scan(s)?'))return;
+  var form=document.getElementById('bulk-form');
+  form.action='/admin/scans/bulk-'+action+'?token=${escapeHtml(token)}';
+  document.getElementById('bulk-ids').innerHTML=ids.map(function(id){return'<input type="hidden" name="ids[]" value="'+id+'">';}).join('');
+  form.submit();
+}
+function bulkDeleteFailed(){
+  var rows=[...document.querySelectorAll('.row-chk')].filter(function(c){var r=c.closest('tr');return r&&r.querySelector('.pill-failed');});
+  if(!rows.length){alert('No failed scans.');return;}
+  if(!confirm('Delete '+rows.length+' failed scan(s)?'))return;
+  var form=document.getElementById('bulk-form');
+  form.action='/admin/scans/bulk-delete?token=${escapeHtml(token)}';
+  document.getElementById('bulk-ids').innerHTML=rows.map(function(c){return'<input type="hidden" name="ids[]" value="'+c.value+'">';}).join('');
   form.submit();
 }
 </script>
