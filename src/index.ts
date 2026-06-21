@@ -2079,12 +2079,13 @@ async function renderArticleImages(articleId: string): Promise<void> {
       console.log(`[article-images] generating ${item.posKey} for article ${articleId} (${imgSize})`);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const photoPrompt = `Photorealistic documentary photograph, sharp focus, natural lighting, no illustration, no painting, no cartoon, no art style. ${item.prompt}`;
       const response = await (openai.images.generate as any)({
         model: "gpt-image-1",
-        prompt: item.prompt,
+        prompt: photoPrompt,
         n: 1,
         size: imgSize,
-        quality: "medium",
+        quality: "high",
       }) as { data?: { b64_json?: string }[] };
 
       const b64 = response.data?.[0]?.b64_json;
@@ -5307,7 +5308,7 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
         </div>
         <div class="al-field al-field-full">
           <label class="al-label">Hero image prompt (DALL-E 3)</label>
-          <input class="al-input" name="hero_prompt" value="${heroPromptEsc}" placeholder="Editorial illustration, semi-realistic, cinematic...">
+          <input class="al-input" name="hero_prompt" value="${heroPromptEsc}" placeholder="Real UK street scene, natural light, documentary photo — e.g. 'An empty council chamber in a grey British town hall, fluorescent lights, 2024'">
         </div>
         ${!isNew ? `<div class="al-field">
           <label class="al-label">Slug</label>
