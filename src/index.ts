@@ -9869,7 +9869,8 @@ html{scroll-behavior:smooth}
   .dm-mast h1{font-size:24px}
   .dm-mast-lede{font-size:14px}
   .dp-panels-inner{grid-template-columns:1fr;border-left:none}
-  .dp-panel{padding:24px 0;border-right:none;border-bottom:1px solid var(--border)}
+  .dp-panel{padding:24px 16px;border-right:none;border-bottom:1px solid var(--border)}
+  .dp-head-row{flex-wrap:wrap;gap:8px}
   .dp-stats{grid-template-columns:1fr 1fr}
   .dp-val{font-size:26px}
   .dp-bar-row{grid-template-columns:1fr 60px}

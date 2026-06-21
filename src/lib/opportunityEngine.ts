@@ -1071,6 +1071,7 @@ export function reportChaseNowCss(): string {
 .chase-ignore-list{margin:0;padding-left:18px;font-size:12.5px;color:#6B6358;line-height:1.8}
 .chase-foot{font-family:var(--mono);font-size:10.5px;color:#9A9490;margin-top:28px;padding-top:18px;border-top:1px solid rgba(0,0,0,.07)}
 @media(max-width:820px){.chase-cards-grid{grid-template-columns:1fr}.chase-now-head,.chase-body{padding-left:22px;padding-right:22px}}
+@media(max-width:480px){.chase-now-head{padding:20px 14px 16px}.chase-body{padding:20px 14px 28px}.chase-group-head{flex-wrap:wrap;gap:6px}.chase-foot{margin-top:16px;padding-top:12px}}
 `;
 }
 
