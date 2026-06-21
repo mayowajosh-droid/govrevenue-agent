@@ -7117,10 +7117,10 @@ app.get("/pricing", (_req, res) => {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
-  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;--surface-3:#1E2A3A;
+  --base:#F8F5EF;--surface:#FFFFFF;--surface-2:#F2EEE6;--surface-3:#EAE5DC;
   --brand:#A0522D;--brand-hot:#B8673A;
-  --text:#E9EEF5;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
-  --border:#1E2A3A;--border-2:#222E40;--border-3:#2A3848;
+  --text:#1A1C18;--text-mid:#3A3C36;--muted:#6B6F65;--faint:#9AA093;
+  --border:rgba(27,28,22,.10);--border-2:rgba(27,28,22,.15);--border-3:rgba(27,28,22,.22);
   --sans:"Libre Franklin",system-ui,sans-serif;
   --serif:"Newsreader",Georgia,serif;
   --mono:"Spline Sans Mono",ui-monospace,monospace;
@@ -7129,7 +7129,7 @@ app.get("/pricing", (_req, res) => {
 body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .wrap{padding:0 32px;max-width:960px;margin:0 auto}
-header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+header{background:rgba(248,245,239,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .logo{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text)}
 .logo-dot{width:9px;height:9px;background:var(--brand);border-radius:50%}
 .logo b{color:var(--brand)}
@@ -7141,7 +7141,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 0 80px}
 .plan{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface);position:relative;transition:border-color .2s,box-shadow .2s;display:flex;flex-direction:column}
-.plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.4)}
+.plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.08)}
 .plan.featured{border-color:rgba(160,82,45,.4);box-shadow:0 0 0 1px rgba(160,82,45,.2)}
 .plan.featured:hover{border-color:rgba(160,82,45,.6)}
 .plan-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;white-space:nowrap;font-weight:600}
@@ -7213,7 +7213,6 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
         <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
       </ul>
       <a href="/checkout?plan=payg" class="btn btn-outline">Get started &rarr;</a>
-      <a href="/scan/sample" class="plan-sample">See a sample report first &rarr;</a>
     </div>
     <div class="plan featured">
       <div class="plan-badge">Most popular</div>
