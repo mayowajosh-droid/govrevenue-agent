@@ -2096,7 +2096,11 @@ async function renderArticleImages(articleId: string): Promise<void> {
         });
         if (stored?.publicUrl) finalUrl = stored.publicUrl;
       }
-      if (!finalUrl) { console.warn(`[article-images] storage not configured, skipping ${item.posKey}`); continue; }
+      // Fallback: store as data URL directly in DB when S3 is not configured
+      if (!finalUrl) {
+        finalUrl = `data:image/png;base64,${b64}`;
+        console.log(`[article-images] no storage configured — using inline data URL for ${item.posKey}`);
+      }
 
       const now = new Date().toISOString();
       if (existing.rows[0]) {
@@ -13354,7 +13358,7 @@ app.get("/admin/articles/test-dalle", requireAdmin, asyncRoute(async (_req, res)
       size: "1024x1024", quality: "medium",
     }) as { data?: { b64_json?: string }[] };
     const b64 = r.data?.[0]?.b64_json;
-    res.json({ ok: !!b64, b64_bytes: b64?.length ?? 0 });
+    res.json({ ok: !!b64, b64_bytes: b64?.length ?? 0, storage_configured: isPdfStorageConfigured() });
   } catch (err: any) {
     res.json({ ok: false, error: err?.message ?? String(err), status: err?.status, code: err?.code });
   }
