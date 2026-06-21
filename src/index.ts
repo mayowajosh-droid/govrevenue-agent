@@ -9620,9 +9620,12 @@ app.get("/scan/:id", asyncRoute(async (req, res) => {
 }));
 
 app.get("/signals", asyncRoute(async (req, res) => {
-  const catFilter = typeof req.query.cat === "string" ? req.query.cat : null;
+  const catFilter = typeof req.query.cat === "string" && req.query.cat ? req.query.cat : null;
   const statusFilter = typeof req.query.status === "string" ? req.query.status : "all";
-  const srcFilter = typeof req.query.src === "string" ? req.query.src : null;
+  const srcFilter = typeof req.query.src === "string" && req.query.src ? req.query.src : null;
+  const qParam = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const sortCol = ["value", "deadline", "published"].includes(String(req.query.sort)) ? String(req.query.sort) : "published";
+  const sortDir = req.query.dir === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
   const PER_PAGE = 50;
   const offset = (page - 1) * PER_PAGE;
@@ -9635,9 +9638,24 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let stats: SigStats = { total: "0", open_cnt: "0", total_val: "0", closing14: "0", closing7: "0" };
   let signals: HomepageSignal[] = [];
   let totalFiltered = 0;
+  let chartPoints: Array<{ label: string; total_bn: number }> = [];
 
   if (pool) {
-    // Stats: deduplicate by (title, buyer, category) — collapses lot-variants of the same notice
+    const conds: string[] = [];
+    const params: (string | number)[] = [];
+    if (catFilter) { params.push(catFilter); conds.push(`category = $${params.length}`); }
+    if (statusFilter === "open") conds.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
+    if (srcFilter) { params.push(srcFilter); conds.push(`source = $${params.length}`); }
+    if (qParam) { params.push(`%${qParam.toLowerCase()}%`); conds.push(`(LOWER(title) LIKE $${params.length} OR LOWER(COALESCE(buyer,'')) LIKE $${params.length})`); }
+    const innerWhere = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+
+    const outerOrderMap: Record<string, string> = {
+      value: `value_amount ${sortDir === "asc" ? "ASC" : "DESC"} NULLS LAST`,
+      deadline: `deadline_date ${sortDir === "asc" ? "ASC" : "DESC"} NULLS LAST`,
+      published: `notice_date ${sortDir === "asc" ? "ASC" : "DESC"} NULLS LAST`,
+    };
+    const outerOrder = outerOrderMap[sortCol] ?? `notice_date DESC NULLS LAST`;
+
     const [statsRow] = (await pool.query<SigStats>(`
       WITH deduped AS (
         SELECT DISTINCT ON (LOWER(title), COALESCE(buyer,''), category)
@@ -9655,14 +9673,6 @@ app.get("/signals", asyncRoute(async (req, res) => {
     `)).rows;
     if (statsRow) stats = statsRow;
 
-    const conds: string[] = [];
-    const params: (string | number)[] = [];
-    if (catFilter) { params.push(catFilter); conds.push(`category = $${params.length}`); }
-    if (statusFilter === "open") conds.push(`(LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')`);
-    if (srcFilter) { params.push(srcFilter); conds.push(`source = $${params.length}`); }
-    const innerWhere = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-
-    // Deduplicate by (title, buyer, category) keeping the row with the earliest deadline (most urgent)
     const countRow = await pool.query<{ n: string }>(
       `SELECT COUNT(*)::text AS n FROM (
          SELECT DISTINCT ON (LOWER(title), COALESCE(buyer,''), category) id
@@ -9680,20 +9690,34 @@ app.get("/signals", asyncRoute(async (req, res) => {
          FROM homepage_signals ${innerWhere}
          ORDER BY LOWER(title), COALESCE(buyer,''), category, deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
        ) deduped
-       ORDER BY notice_date DESC NULLS LAST
+       ORDER BY ${outerOrder}
        LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
       pageParams
     );
     signals = r.rows;
+
+    const chartR = await pool.query<{ label: string; total_bn: number }>(`
+      SELECT to_char(date_trunc('month', notice_date), 'Mon') AS label,
+             ROUND(COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < 2000000000), 0) / 1e9::numeric, 2)::float AS total_bn
+      FROM homepage_signals
+      WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW()
+      GROUP BY date_trunc('month', notice_date)
+      ORDER BY date_trunc('month', notice_date)
+      LIMIT 12
+    `);
+    chartPoints = chartR.rows;
   } else {
     const seen = new Set<string>();
-    const all = [...sigMemStore.values()]
+    let all = [...sigMemStore.values()]
       .filter(s => !catFilter || s.category === catFilter)
       .filter(s => statusFilter !== "open" || /open|active/i.test(s.status || ""))
       .filter(s => !srcFilter || s.source === srcFilter)
+      .filter(s => !qParam || `${s.title} ${s.buyer || ""}`.toLowerCase().includes(qParam.toLowerCase()))
       .sort((a, b) => (a.deadline_date || "9999").localeCompare(b.deadline_date || "9999") || (b.notice_date || "").localeCompare(a.notice_date || ""))
-      .filter(s => { const key = `${s.title.toLowerCase()}|${s.buyer || ""}|${s.category}`; if (seen.has(key)) return false; seen.add(key); return true; })
-      .sort((a, b) => (b.notice_date || "").localeCompare(a.notice_date || ""));
+      .filter(s => { const key = `${s.title.toLowerCase()}|${s.buyer || ""}|${s.category}`; if (seen.has(key)) return false; seen.add(key); return true; });
+    if (sortCol === "value") all.sort((a, b) => (sortDir === "asc" ? 1 : -1) * ((a.value_amount || -1) - (b.value_amount || -1)));
+    else if (sortCol === "deadline") all.sort((a, b) => (sortDir === "asc" ? 1 : -1) * (a.deadline_date || "9999").localeCompare(b.deadline_date || "9999"));
+    else all.sort((a, b) => (sortDir === "asc" ? 1 : -1) * (a.notice_date || "").localeCompare(b.notice_date || ""));
     totalFiltered = all.length;
     signals = all.slice(offset, offset + PER_PAGE);
     const allUniq = new Map<string, HomepageSignal>(); [...sigMemStore.values()].forEach(s => { if (!allUniq.has(s.id)) allUniq.set(s.id, s); });
@@ -9705,6 +9729,42 @@ app.get("/signals", asyncRoute(async (req, res) => {
   const totalVal = parseFloat(stats.total_val) || 0;
   const fmtBigVal = (v: number) => v >= 1_000_000_000 ? `£${(v / 1_000_000_000).toFixed(1)}bn` : v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(0)}m` : `£${Math.round(v / 1000)}k`;
 
+  // Build inline chart SVG from real 12-month awarded data
+  let chartSvgHtml = "";
+  let chartLatestFmt = "";
+  if (chartPoints.length >= 2) {
+    const W = 1000, top = 22, plotH = 188, base = top + plotH;
+    const vals = chartPoints.map(p => p.total_bn);
+    const maxVal = Math.max(...vals);
+    const minVal = Math.min(...vals);
+    const minAdj = Math.max(0, minVal - (maxVal - minVal) * 0.08);
+    const denom = maxVal - minAdj + 0.001;
+    const n = vals.length;
+    const xFn = (i: number) => +(i * (W / (n - 1))).toFixed(1);
+    const yFn = (v: number) => +(top + (1 - (v - minAdj) / denom) * plotH).toFixed(1);
+    const pts = vals.map((v, i) => [xFn(i), yFn(v)] as [number, number]);
+    const linePts = pts.map(p => `${p[0]},${p[1]}`).join(" ");
+    const areaPath = `M0,${base} ${pts.map(p => `L${p[0]},${p[1]}`).join(" ")} L${W},${base} Z`;
+    const lastPt = pts[n - 1];
+    const peakIdx = vals.indexOf(maxVal);
+    const latestBn = vals[n - 1];
+    chartLatestFmt = latestBn >= 1 ? `£${latestBn.toFixed(1)}bn` : `£${Math.round(latestBn * 1000)}m`;
+    const monthLabels = chartPoints.map((p, i) =>
+      `<text x="${xFn(i)}" y="228" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}" font-family="monospace" font-size="10" fill="var(--muted)">${escapeHtml(p.label)}</text>`
+    ).join("");
+    chartSvgHtml = `<svg viewBox="0 0 1000 236" style="width:100%;height:auto;display:block;overflow:visible">
+  <defs><linearGradient id="sgFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity="0.16"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0.01"/></linearGradient></defs>
+  <line x1="0" y1="${top}" x2="${W}" y2="${top}" stroke="var(--border)" stroke-width="1"/>
+  <line x1="0" y1="${top + Math.round(plotH * 0.5)}" x2="${W}" y2="${top + Math.round(plotH * 0.5)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="var(--border-2)" stroke-width="1"/>
+  <path d="${areaPath}" fill="url(#sgFill)"/>
+  <polyline points="${linePts}" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="${xFn(peakIdx)}" cy="${yFn(maxVal)}" r="4" fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
+  <circle cx="${lastPt[0]}" cy="${lastPt[1]}" r="5" fill="var(--brand)"/>
+  ${monthLabels}
+</svg>`;
+  }
+
   const nowMs = Date.now();
   const rows = signals.map(s => {
     const isOpen = /open|active/i.test(s.status || "");
@@ -9712,21 +9772,21 @@ app.get("/signals", asyncRoute(async (req, res) => {
     const isHighVal = (s.value_amount || 0) >= 1_000_000;
     const deadlineMs = s.deadline_date ? new Date(s.deadline_date).getTime() : null;
     const daysLeft = deadlineMs ? Math.ceil((deadlineMs - nowMs) / 86_400_000) : null;
-    let urgencyClass = "";
-    let urgencyBadge = "";
+    let rowClass = "";
+    let deadlineBadge = "";
     if (daysLeft !== null && daysLeft >= 0) {
-      if (daysLeft <= 7) { urgencyClass = "row-urgent"; urgencyBadge = `<span class="dl-badge dl-red">${daysLeft}d left</span>`; }
-      else if (daysLeft <= 14) { urgencyClass = "row-warn"; urgencyBadge = `<span class="dl-badge dl-amber">${daysLeft}d left</span>`; }
-      else { urgencyBadge = `<span class="dl-badge dl-grey">${daysLeft}d</span>`; }
+      if (daysLeft <= 7) { rowClass = "row-urgent"; deadlineBadge = `<span class="dl-badge dl-red">${daysLeft}d left</span>`; }
+      else if (daysLeft <= 14) { rowClass = "row-warn"; deadlineBadge = `<span class="dl-badge dl-amber">${daysLeft}d left</span>`; }
+      else { deadlineBadge = `<span class="dl-badge dl-grey">${daysLeft}d</span>`; }
     }
-    return `<tr class="${urgencyClass}">
+    return `<tr class="${rowClass}">
       <td><a href="/desk/${escapeHtml(s.category)}" class="sig-cat">${escapeHtml(categoryLabel(s.category))}</a></td>
       <td class="sig-title"><a href="${escapeHtml(s.source_url)}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a></td>
       <td class="sig-buyer">${escapeHtml(s.buyer || "—")}</td>
-      <td class="sig-val ${isHighVal ? "sig-val-high" : ""}">${val ? escapeHtml(val) : '<span class="sig-nil">—</span>'}</td>
-      <td><span class="sig-status ${isOpen ? "sig-open" : "sig-awarded"}">${isOpen ? "Open" : "Awarded"}</span></td>
+      <td class="sig-val${isHighVal ? " sig-val-high" : ""}">${val ? escapeHtml(val) : '<span class="sig-nil">—</span>'}</td>
+      <td><span class="sig-status ${isOpen ? "sig-open" : "sig-awarded"}"><span class="sig-status-dot"></span>${isOpen ? "Open" : "Awarded"}</span></td>
       <td class="sig-date">${fmtDate(s.notice_date)}</td>
-      <td class="sig-dl">${urgencyBadge || (s.deadline_date ? fmtDate(s.deadline_date) : '<span class="sig-nil">—</span>')}</td>
+      <td class="sig-dl">${deadlineBadge || (s.deadline_date ? fmtDate(s.deadline_date) : '<span class="sig-nil">—</span>')}</td>
       <td class="sig-src"><span class="src-badge src-${escapeHtml(s.source.toLowerCase())}">${escapeHtml(s.source)}</span></td>
     </tr>`;
   }).join("");
@@ -9741,15 +9801,30 @@ app.get("/signals", asyncRoute(async (req, res) => {
     if (catFilter) base.cat = catFilter;
     if (statusFilter !== "all") base.status = statusFilter;
     if (srcFilter) base.src = srcFilter;
+    if (qParam) base.q = qParam;
+    if (sortCol !== "published") base.sort = sortCol;
+    if (sortDir !== "desc") base.dir = sortDir;
     Object.entries(overrides).forEach(([k, v]) => { if (v !== null) base[k] = String(v); else delete base[k]; });
     const s = new URLSearchParams(base).toString();
     return s ? `/signals?${s}` : "/signals";
   };
 
+  const sortLink = (col: string, label: string) => {
+    const isCurrent = sortCol === col;
+    const nextDir = isCurrent && sortDir === "desc" ? "asc" : "desc";
+    const arrow = isCurrent ? (sortDir === "desc" ? " ↓" : " ↑") : "";
+    const p = new URLSearchParams();
+    if (catFilter) p.set("cat", catFilter);
+    if (statusFilter !== "all") p.set("status", statusFilter);
+    if (srcFilter) p.set("src", srcFilter);
+    if (qParam) p.set("q", qParam);
+    p.set("sort", col); p.set("dir", nextDir);
+    return `<a href="/signals?${p.toString()}" class="sort-th${isCurrent ? " sort-active" : ""}">${label}${arrow}</a>`;
+  };
+
   const pagerLink = (p: number, label: string, disabled = false) =>
-    disabled
-      ? `<span class="pg-link pg-dis">${label}</span>`
-      : `<a href="${qs({ page: p })}" class="pg-link">${label}</a>`;
+    disabled ? `<span class="pg-link pg-dis">${label}</span>`
+             : `<a href="${qs({ page: p })}" class="pg-link">${label}</a>`;
 
   const pager = totalPages <= 1 ? "" : `<div class="pager">
     ${pagerLink(page - 1, "← Prev", page <= 1)}
@@ -9757,7 +9832,8 @@ app.get("/signals", asyncRoute(async (req, res) => {
     ${pagerLink(page + 1, "Next →", page >= totalPages)}
   </div>`;
 
-  const hasFilter = !!(catFilter || statusFilter !== "all" || srcFilter);
+  const hasFilter = !!(catFilter || statusFilter !== "all" || srcFilter || qParam);
+  const liveDesks = DESK_PROFILES.filter(d => d.live).length;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -9767,145 +9843,196 @@ app.get("/signals", asyncRoute(async (req, res) => {
 <title>Live Signals — GovRevenue</title>
 <style>${pageShellCss()}
 /* ── signals page ── */
-.sig-band{display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;margin-bottom:24px}
-.sig-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.sc{background:var(--surface);border:1px solid var(--border-2);padding:18px 16px;display:flex;flex-direction:column;gap:4px}
-.sc-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.sc-val{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--text);line-height:1;margin:6px 0 2px}
-.sc-sub{font-family:var(--mono);font-size:9px;color:var(--faint);line-height:1.35}
-.sc.sc-green .sc-val{color:var(--green)}
-.sc.sc-brand .sc-val{color:var(--brand)}
-.sc.sc-warn .sc-val{color:#b45309}
-/* page head */
-.page-head{padding:36px 0 28px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
-.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
-h1.sig-h1{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin-bottom:6px;color:var(--text)}
-.sub{font-size:13.5px;color:var(--muted)}
-/* chart frame */
-.chart-frame-wrap{border:1px solid var(--border-2);background:var(--surface)}
-/* filters */
-.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:0}
-.filter-bar select{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);padding:8px 32px 8px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238893A4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
-.filter-bar select:focus{outline:none;border-color:var(--brand)}
-.filter-bar button{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:none;background:var(--brand);color:#fff;padding:9px 16px;cursor:pointer;border-radius:2px}
-.filter-bar button:hover{background:var(--brand-hot)}
-.filter-clear{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:underline;padding:4px 0}
-.sig-count{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-left:auto;white-space:nowrap}
-/* wrap constraint */
-.wrap{max-width:1120px;margin:0 auto;padding:0 32px}
-/* table */
-.tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:780px}
-thead{background:var(--surface-2)}
-thead th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:10px;border-bottom:1px solid var(--border-2);text-align:left;white-space:nowrap}
-table th:nth-child(1){width:110px}
-table th:nth-child(6),table th:nth-child(7){padding-left:6px;padding-right:6px}
-table td:nth-child(6),table td:nth-child(7){padding-left:6px;padding-right:6px}
+.sig-outer{max-width:1320px;margin:0 auto;padding:0 48px}
+.sig-hero{padding:32px 0 24px;display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex-wrap:wrap}
+.sig-live-tag{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand)}
+.sig-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:sig-pulse 2.2s infinite;flex-shrink:0}
+@keyframes sig-pulse{0%{box-shadow:0 0 0 0 rgba(47,138,82,.5)}70%{box-shadow:0 0 0 6px rgba(47,138,82,0)}100%{box-shadow:0 0 0 0 rgba(47,138,82,0)}}
+.sig-h1{font-family:var(--serif);font-size:clamp(30px,4vw,54px);font-weight:500;letter-spacing:-.02em;line-height:1.05;color:var(--text);margin:0 0 14px}
+.sig-sub{font-size:17px;line-height:1.55;color:var(--text-mid);margin:0;max-width:600px}
+.sig-cta{display:inline-flex;align-items:center;gap:8px;background:var(--hero-cta);color:#ECE6D6;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.02em;padding:14px 24px;text-decoration:none;white-space:nowrap;flex-shrink:0;transition:opacity .15s}
+.sig-cta:hover{opacity:.85}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:0 0 24px}
+.stat-card{border:1px solid var(--border-2);padding:22px 24px;background:var(--surface)}
+.stat-feature{background:var(--hero-cta);border-color:var(--hero-cta)}
+.stat-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.stat-feature .stat-lbl{color:rgba(180,146,78,.85)}
+.stat-val{font-family:var(--serif);font-size:38px;font-weight:500;letter-spacing:-.02em;line-height:1;color:var(--text)}
+.stat-feature .stat-val{color:#ECE6D6}
+.stat-green{color:var(--green)}
+.stat-red{color:var(--red)}
+.stat-sub{font-size:13px;color:var(--muted);margin-top:8px}
+.stat-feature .stat-sub{color:#8FA193}
+.chart-panel{background:var(--surface);border:1px solid var(--border-2);padding:26px 28px;margin-bottom:20px}
+.chart-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+.chart-hed-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.chart-hed{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text);margin:0;letter-spacing:-.01em}
+.chart-latest-val{font-family:var(--serif);font-size:30px;font-weight:500;color:var(--text);line-height:1;letter-spacing:-.02em;text-align:right}
+.chart-latest-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px;text-align:right}
+.chart-placeholder{height:180px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+.ctrl-card{background:var(--surface);border:1px solid var(--border-2)}
+.ctrl-bar{padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.ctrl-search-wrap{position:relative;flex:1;min-width:200px}
+.ctrl-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--brand);font-size:14px;pointer-events:none}
+.ctrl-search{width:100%;border:1px solid var(--border-2);background:var(--base);border-radius:2px;padding:10px 12px 10px 30px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none}
+.ctrl-search:focus{border-color:var(--brand)}
+.ctrl-select{border:1px solid var(--border-2);background:var(--base);border-radius:2px;padding:10px 28px 10px 12px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238893A4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.ctrl-select:focus{border-color:var(--brand)}
+.ctrl-toggle{display:flex;border:1px solid var(--border-2);border-radius:2px;overflow:hidden}
+.ctrl-toggle button{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:10px 14px;color:var(--muted);border:none;background:var(--base);white-space:nowrap;cursor:pointer;transition:background .12s,color .12s}
+.ctrl-toggle button:hover{color:var(--text)}
+.ctrl-toggle button.t-on{background:var(--hero-cta);color:#ECE6D6}
+.ctrl-meta{padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-wrap:wrap}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border-2);background:var(--surface);margin-top:16px}
+table{width:100%;border-collapse:collapse;min-width:960px}
+thead tr{background:var(--surface-2)}
+thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:13px 14px;border-bottom:1px solid var(--border-2);text-align:left;white-space:nowrap;font-weight:600}
+thead th:nth-child(4){text-align:right}
+.sort-th{color:var(--muted);text-decoration:none}
+.sort-th:hover,.sort-th.sort-active{color:var(--brand)}
 tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:var(--surface-2)}
-tbody tr.row-urgent{background:rgba(239,68,68,.05)}
-tbody tr.row-urgent:hover{background:rgba(239,68,68,.09)}
-tbody tr.row-warn{background:rgba(245,158,11,.03)}
-td{padding:11px 10px;font-size:13px;vertical-align:top}
-.sig-cat{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.1);padding:3px 7px;white-space:nowrap;display:inline-block;border-radius:2px}
-.sig-cat:hover{background:rgba(180,146,78,.18)}
-.sig-title{max-width:320px}
-.sig-title a{color:var(--text);font-weight:500;line-height:1.35;display:block}
+tbody tr.row-urgent{background:rgba(155,45,32,.04)}
+tbody tr.row-urgent:hover{background:rgba(155,45,32,.08)}
+tbody tr.row-warn{background:rgba(180,83,9,.03)}
+td{padding:14px;font-size:14px;vertical-align:top}
+.sig-cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);background:var(--brand-dim);padding:3px 8px;white-space:nowrap;display:inline-block}
+.sig-cat:hover{background:rgba(180,146,78,.22)}
+.sig-title{max-width:360px}
+.sig-title a{color:var(--text);font-weight:500;font-size:14.5px;line-height:1.35;display:block}
 .sig-title a:hover{color:var(--brand);text-decoration:underline}
-.sig-buyer{max-width:180px;font-size:12.5px;color:var(--muted)}
-.sig-val{font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;color:var(--text)}
-.sig-val.sig-val-high{color:#4ade80}
+.sig-buyer{max-width:180px;font-size:13px;color:var(--muted)}
+.sig-val{font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap;text-align:right;color:var(--text)}
+.sig-val-high{color:var(--green)}
 .sig-nil{color:var(--faint)}
-.sig-status{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;white-space:nowrap;display:inline-block;border-radius:2px}
-.sig-open{color:#4ade80;background:rgba(34,197,94,.1)}
+.sig-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.sig-open{color:var(--green);background:rgba(47,138,82,.1)}
 .sig-awarded{color:var(--muted);background:var(--surface-2)}
-.sig-date,.sig-dl{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
-.dl-badge{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;display:inline-block;font-weight:700;border-radius:2px}
-.dl-red{color:#fff;background:#dc2626}
-.dl-amber{color:#fff;background:#d97706}
+.sig-status-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sig-open .sig-status-dot{background:var(--green)}
+.sig-awarded .sig-status-dot{background:var(--muted)}
+.sig-date,.sig-dl{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.dl-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;display:inline-block;font-weight:700}
+.dl-red{color:#fff;background:var(--red)}
+.dl-amber{color:#fff;background:#b45309}
 .dl-grey{color:var(--muted);background:var(--surface-2)}
-.src-badge{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:2px}
-.src-cf{color:#93c5fd;background:rgba(59,130,246,.12)}
-.src-fts{color:#c4b5fd;background:rgba(167,139,250,.12)}
-/* pager */
-.pager{display:flex;align-items:center;gap:14px;padding:24px 0 48px}
-.pg-link{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text);border:1px solid var(--border-2);padding:8px 16px}
+.src-badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border-2)}
+.src-cf{color:var(--muted)}
+.src-fts{color:var(--info)}
+.pager{display:flex;align-items:center;gap:12px;padding:22px 0 48px}
+.pg-link{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text);border:1px solid var(--border-2);padding:9px 18px;transition:background .12s,border-color .12s}
 .pg-link:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
-.pg-dis{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--border);padding:8px 16px;pointer-events:none}
-.pg-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 auto}
-.empty{padding:72px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
-@media(max-width:900px){h1.sig-h1{font-size:22px}.page-head{flex-direction:column;align-items:flex-start}.sig-band{grid-template-columns:1fr}.sig-stats{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.wrap{padding:0 16px}.page-head{padding:24px 0 20px}.sig-stats{grid-template-columns:1fr 1fr}.sig-buyer,.sig-dl,.sig-src{display:none}thead th:nth-child(3),thead th:nth-child(7),thead th:nth-child(8){display:none}.filter-bar{flex-wrap:wrap;gap:8px}.filter-bar select{flex:1 1 calc(50% - 4px);min-width:0}.filter-bar button{flex:0 0 auto}.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.pager{flex-wrap:wrap;gap:10px;padding:20px 0 36px}.pg-info{order:3;width:100%;text-align:center;margin:0}}
+.pg-dis{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--border);padding:9px 18px;pointer-events:none}
+.pg-info{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 auto}
+.empty{padding:64px 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+@media(max-width:980px){.sig-outer{padding:0 26px}.stat-row{grid-template-columns:1fr 1fr}.sig-hero{flex-direction:column;align-items:flex-start;gap:20px}.chart-top{flex-direction:column;gap:12px}.chart-latest-val,.chart-latest-lbl{text-align:left}}
+@media(max-width:600px){.sig-outer{padding:0 16px}.stat-row{grid-template-columns:1fr 1fr}.sig-h1{font-size:28px}.sig-buyer,.sig-dl{display:none}thead th:nth-child(3),thead th:nth-child(7){display:none}.ctrl-bar{gap:8px}.ctrl-search-wrap{flex:1 1 100%}.pager{flex-wrap:wrap;gap:8px;padding:16px 0 32px}.pg-info{order:3;width:100%;text-align:center;margin:0}}
 </style>
 </head>
 <body>
 ${pageShellHeader(null, null)}
 <main>
-<div class="wrap">
-  <div class="page-head">
-    <div class="page-head-left">
-      <div class="eyebrow">Opportunity Radar &middot; Live signals</div>
+<div class="sig-outer">
+
+  <!-- HERO -->
+  <div class="sig-hero">
+    <div>
+      <div class="sig-live-tag"><span class="sig-live-dot"></span>Live procurement signals</div>
       <h1 class="sig-h1">The public record, in real time.</h1>
-      <p class="sub">Every contract notice tracked across Contracts Finder and Find a Tender &mdash; updated hourly. 50 per page.</p>
+      <p class="sig-sub">Every contract notice tracked across <strong>Contracts Finder</strong> and <strong>Find a Tender</strong> &mdash; updated hourly.</p>
+    </div>
+    <a href="/scan" class="sig-cta">Run a revenue scan &rarr;</a>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-lbl">Signals tracked</div>
+      <div class="stat-val">${parseInt(stats.total).toLocaleString()}</div>
+      <div class="stat-sub">Across all ${liveDesks} live desks</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Open / live</div>
+      <div class="stat-val stat-green">${parseInt(stats.open_cnt).toLocaleString()}</div>
+      <div class="stat-sub">Active tenders &amp; opportunities</div>
+    </div>
+    <div class="stat-card stat-feature">
+      <div class="stat-lbl">Total value tracked</div>
+      <div class="stat-val">${fmtBigVal(totalVal)}</div>
+      <div class="stat-sub">Public spend indexed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Closing &le; 7 days</div>
+      <div class="stat-val stat-red">${parseInt(stats.closing7).toLocaleString()}</div>
+      <div class="stat-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</div>
     </div>
   </div>
-  <div class="sig-band">
-    <div class="chart-frame-wrap">
-      <iframe src="/charts/embed" id="charts-frame" scrolling="no" frameborder="0"
-        style="width:100%;height:360px;display:block;border:none"></iframe>
+
+  <!-- CHART PANEL -->
+  <div class="chart-panel">
+    <div class="chart-top">
+      <div>
+        <div class="chart-hed-lbl">UK public-sector awarded &middot; rolling 12 months</div>
+        <h2 class="chart-hed">Track the spend curve before the tender lands</h2>
+      </div>
+      ${chartSvgHtml ? `<div><div class="chart-latest-val">${chartLatestFmt}</div><div class="chart-latest-lbl">latest monthly total</div></div>` : ""}
     </div>
-    <div class="sig-stats">
-      <div class="sc">
-        <span class="sc-lbl">Signals in view</span>
-        <span class="sc-val">${parseInt(stats.total).toLocaleString()}</span>
-        <span class="sc-sub">Deduped across all 24 desks</span>
+    ${chartSvgHtml || `<div class="chart-placeholder">Chart data loading &mdash; updated hourly</div>`}
+  </div>
+
+  <!-- CONTROL BAR -->
+  <div class="ctrl-card">
+    <form method="get" action="/signals" class="ctrl-bar">
+      <input type="hidden" id="statusHid" name="status" value="${escapeHtml(statusFilter)}">
+      <input type="hidden" id="srcHid" name="src" value="${escapeHtml(srcFilter || "")}">
+      ${sortCol !== "published" ? `<input type="hidden" name="sort" value="${escapeHtml(sortCol)}">` : ""}
+      ${sortDir !== "desc" ? `<input type="hidden" name="dir" value="${sortDir}">` : ""}
+      <div class="ctrl-search-wrap">
+        <span class="ctrl-search-icon">⌕</span>
+        <input name="q" type="text" value="${escapeHtml(qParam)}" placeholder="Search notices &amp; buyers&hellip;" class="ctrl-search">
       </div>
-      <div class="sc sc-green">
-        <span class="sc-lbl">Open / live</span>
-        <span class="sc-val">${parseInt(stats.open_cnt).toLocaleString()}</span>
-        <span class="sc-sub">Active tenders &amp; opportunities</span>
+      <select name="cat" class="ctrl-select" onchange="this.form.submit()">
+        <option value="">All desks</option>
+        ${catOptions}
+      </select>
+      <div class="ctrl-toggle">
+        <button type="button" onclick="document.getElementById('statusHid').value='all';this.form.submit()" class="${statusFilter === "all" ? "t-on" : ""}">All</button>
+        <button type="button" onclick="document.getElementById('statusHid').value='open';this.form.submit()" class="${statusFilter === "open" ? "t-on" : ""}">Open only</button>
       </div>
-      <div class="sc sc-brand">
-        <span class="sc-lbl">Value in signals view</span>
-        <span class="sc-val">${fmtBigVal(totalVal)}</span>
-        <span class="sc-sub">Deduped notices, all dates &middot; not 12m awarded</span>
+      <div class="ctrl-toggle">
+        <button type="button" onclick="document.getElementById('srcHid').value='';this.form.submit()" class="${!srcFilter ? "t-on" : ""}">All</button>
+        <button type="button" onclick="document.getElementById('srcHid').value='CF';this.form.submit()" class="${srcFilter === "CF" ? "t-on" : ""}">CF</button>
+        <button type="button" onclick="document.getElementById('srcHid').value='FTS';this.form.submit()" class="${srcFilter === "FTS" ? "t-on" : ""}">FTS</button>
       </div>
-      <div class="sc sc-warn">
-        <span class="sc-lbl">Closing within 7 days</span>
-        <span class="sc-val">${parseInt(stats.closing7).toLocaleString()}</span>
-        <span class="sc-sub">${parseInt(stats.closing14).toLocaleString()} closing within 14 days</span>
-      </div>
+      ${hasFilter ? `<button type="button" onclick="window.location='/signals'" style="background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:0">Reset</button>` : ""}
+    </form>
+    <div class="ctrl-meta">
+      <span>${totalFiltered.toLocaleString()} signals &middot; page ${page} of ${totalPages}</span>
+      <span>Public record only &middot; Contracts Finder + Find a Tender</span>
     </div>
   </div>
-  <form class="filter-bar" method="get" action="/signals">
-    <select name="cat">
-      <option value="">All desks</option>
-      ${catOptions}
-    </select>
-    <select name="status">
-      <option value="all" ${statusFilter === "all" ? "selected" : ""}>All statuses</option>
-      <option value="open" ${statusFilter === "open" ? "selected" : ""}>Open / active only</option>
-    </select>
-    <select name="src">
-      <option value="" ${!srcFilter ? "selected" : ""}>All sources</option>
-      <option value="CF" ${srcFilter === "CF" ? "selected" : ""}>Contracts Finder (CF)</option>
-      <option value="FTS" ${srcFilter === "FTS" ? "selected" : ""}>Find a Tender (FTS)</option>
-    </select>
-    <button type="submit">Apply</button>
-    ${hasFilter ? `<a href="/signals" class="filter-clear">Clear filters</a>` : ""}
-    <span class="sig-count">${totalFiltered.toLocaleString()} signal${totalFiltered !== 1 ? "s" : ""} · page ${page} of ${totalPages}</span>
-  </form>
+
+  <!-- TABLE -->
   <div class="tbl-wrap">
     <table>
       <thead><tr>
-        <th>Desk</th><th>Notice</th><th>Buyer</th><th>Value</th><th>Status</th><th>Published</th><th>Deadline</th><th>Src</th>
+        <th>Desk</th>
+        <th>Notice</th>
+        <th>Buyer</th>
+        <th>${sortLink("value", "Value")}</th>
+        <th>Status</th>
+        <th>${sortLink("published", "Published")}</th>
+        <th>${sortLink("deadline", "Deadline")}</th>
+        <th>Src</th>
       </tr></thead>
       <tbody>
-        ${rows || `<tr><td colspan="8" class="empty">No signals found — try adjusting filters</td></tr>`}
+        ${rows || `<tr><td colspan="8" class="empty">No signals match these filters</td></tr>`}
       </tbody>
     </table>
   </div>
   ${pager}
+
 </div>
 </main>
 ${pageShellFoot()}
@@ -13307,7 +13434,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     signalsStatsRes,
     subsRes, briefRes,
     vDaysRes, vPathsRes, vIpsRes, vTodayRes,
-    ordersRes, articleStatsRes, commentStatsRes,
+    ordersRes, ordersListRes, articleStatsRes, commentStatsRes,
+    webhookRes, auditRes, deskCacheRes,
+    slugRedirectsRes, articleLikesRes, articleAssetsRes, articleRevisionsRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -13338,6 +13467,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       ROUND(100.0*COUNT(*) FILTER (WHERE status='completed')/NULLIF(COUNT(*) FILTER (WHERE status IN ('completed','failed')),0),1) AS success_rate
     FROM scans`),
     safePool(`SELECT u.id, u.email, u.created_at, u.tier, u.stripe_customer_id, u.stripe_subscription_status,
+      u.role, (u.setup_token IS NOT NULL) AS has_setup_token,
       (SELECT COUNT(*)::int FROM scans WHERE user_id=u.id) AS scan_count
     FROM users u ORDER BY u.created_at DESC LIMIT 500`),
     safePool(`SELECT
@@ -13373,15 +13503,35 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       COALESCE(SUM(amount) FILTER(WHERE plan='pro'),0)::int AS pro_pence,
       COALESCE(SUM(amount) FILTER(WHERE plan='agency'),0)::int AS agency_pence
     FROM orders WHERE status='complete'`),
+    safePool(`SELECT o.id, o.user_id, o.plan, o.amount, o.currency, o.status, o.created_at,
+      o.stripe_session_id, o.stripe_payment_intent, u.email AS user_email
+    FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 200`),
     safePool(`SELECT COUNT(*)::int AS total,
       COUNT(*) FILTER(WHERE status='published')::int AS published,
       COUNT(*) FILTER(WHERE status='draft')::int AS draft,
-      COALESCE(SUM(views),0)::int AS total_views
+      COALESCE(SUM(views),0)::int AS total_views,
+      COALESCE(SUM(like_count),0)::int AS total_likes
     FROM articles`),
     safePool(`SELECT COUNT(*)::int AS total,
       COUNT(*) FILTER(WHERE status='pending')::int AS pending,
-      COUNT(*) FILTER(WHERE status='approved')::int AS approved
+      COUNT(*) FILTER(WHERE status='approved')::int AS approved,
+      COUNT(*) FILTER(WHERE status='hidden' OR status='spam')::int AS hidden
     FROM comments`),
+    safePool(`SELECT stripe_event_id, type, status, processed_at FROM webhook_events ORDER BY processed_at DESC LIMIT 100`),
+    safePool(`SELECT id, action, target, meta_json, created_at FROM admin_audit ORDER BY created_at DESC LIMIT 200`),
+    safePool(`SELECT slug, cached_at FROM desk_cache ORDER BY cached_at DESC`),
+    safePool(`SELECT sr.old_slug, sr.article_id, sr.created_at, a.title, a.slug AS new_slug
+    FROM slug_redirects sr LEFT JOIN articles a ON a.id=sr.article_id ORDER BY sr.created_at DESC`),
+    safePool(`SELECT article_id, COUNT(*)::int AS likes FROM article_likes GROUP BY article_id ORDER BY likes DESC`),
+    safePool(`SELECT a.id, a.title, a.slug,
+      COUNT(aa.id)::int AS asset_count,
+      COUNT(aa.id) FILTER(WHERE aa.image_url IS NOT NULL)::int AS rendered_count,
+      MAX(aa.rendered_at) AS last_rendered
+    FROM articles a LEFT JOIN article_assets aa ON aa.article_id=a.id
+    GROUP BY a.id, a.title, a.slug ORDER BY a.updated_at DESC LIMIT 50`),
+    safePool(`SELECT ar.article_id, COUNT(*)::int AS revision_count, MAX(ar.created_at) AS last_edit, a.title
+    FROM article_revisions ar LEFT JOIN articles a ON a.id=ar.article_id
+    GROUP BY ar.article_id, a.title ORDER BY last_edit DESC LIMIT 50`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -13401,9 +13551,22 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     displayEmail: (String(s.email || s.email2 || "")).trim(),
   }));
 
-  const revStats  = (ordersRes.rows[0]     as any) || {};
+  const revStats     = (ordersRes.rows[0]      as any) || {};
+  const ordersList   = ordersListRes.rows       as any[];
   const articleStats = (articleStatsRes.rows[0] as any) || {};
   const commentStats = (commentStatsRes.rows[0] as any) || {};
+  const webhooks     = webhookRes.rows          as any[];
+  const auditLog     = auditRes.rows            as any[];
+  const deskCache    = deskCacheRes.rows        as any[];
+  const slugRedirects    = slugRedirectsRes.rows    as any[];
+  const articleLikeRows  = articleLikesRes.rows     as any[];
+  const articleAssets    = articleAssetsRes.rows     as any[];
+  const articleRevisions = articleRevisionsRes.rows  as any[];
+
+  // Build article-likes lookup map by article_id
+  const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
+  // Build revisions lookup map by article_id
+  const revisionsMap = new Map<string, any>(articleRevisions.map((r: any) => [r.article_id, r]));
 
   const gradeCount: Record<string, number> = {};
   scans.forEach((s: any) => {
@@ -13820,9 +13983,17 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <div class="sb-group">Audience</div>
     <a href="#alerts" class="sb-link">Alerts <span class="sb-count">${activeSubCount}</span></a>
     <a href="#briefing" class="sb-link">Briefing <span class="sb-count">${briefing.length}</span></a>
+    <div class="sb-group">Revenue</div>
+    <a href="#revenue" class="sb-link">Orders <span class="sb-count">${revStats.order_count||0}</span></a>
+    <a href="#webhooks" class="sb-link">Webhooks <span class="sb-count">${webhooks.length}</span></a>
     <div class="sb-group">Content</div>
     <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles <span class="sb-count">${articleStats.total||0}</span></a>
     <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comments${Number(commentStats.pending||0)>0?` <span class="sb-count" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)">${commentStats.pending}</span>`:""}</a>
+    <a href="#assets" class="sb-link">Assets &amp; Revisions</a>
+    <a href="#redirects" class="sb-link">Slug Redirects <span class="sb-count">${slugRedirects.length}</span></a>
+    <div class="sb-group">Admin</div>
+    <a href="#audit" class="sb-link">Audit Log <span class="sb-count">${auditLog.length}</span></a>
+    <a href="#deskcache" class="sb-link">Desk Cache <span class="sb-count">${deskCache.length}</span></a>
     <div class="sb-group">System</div>
     <a href="#system" class="sb-link">System Status <span style="display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9.5px;color:var(--green)"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);animation:lp 2s infinite"></span>OK</span></a>
   </nav>
@@ -14111,7 +14282,182 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 </section>
 <div class="gap"></div>
 
-<!-- §9 SYSTEM -->
+<!-- §9 REVENUE — full orders table -->
+<section class="section" id="revenue">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Stripe</div>
+      <div class="s-title">Orders</div>
+    </div>
+    <div class="s-sub">${revStats.order_count||0} completed &middot; £${((revStats.total_pence||0)/100).toLocaleString("en-GB",{minimumFractionDigits:2})} total revenue</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr>
+        <th>#</th><th>Date</th><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th>Session ID</th><th>Payment Intent</th>
+      </tr></thead>
+      <tbody>${ordersList.length === 0
+        ? `<tr><td colspan="8" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No orders yet</td></tr>`
+        : ordersList.map((o: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i+1}</td>
+          <td style="white-space:nowrap">${adminTime(o.created_at)}</td>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml(o.user_email||o.user_id||"—")}</td>
+          <td><span class="pill pill-${escapeHtml(o.plan)}">${escapeHtml(o.plan)}</span></td>
+          <td style="font-family:var(--mono);font-size:12px;font-weight:700">£${((Number(o.amount)||0)/100).toFixed(2)}</td>
+          <td><span class="pill ${o.status==="complete"?"pill-completed":"pill-pending"}">${escapeHtml(o.status)}</span></td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(o.stripe_session_id||"")}">${escapeHtml((o.stripe_session_id||"—").slice(0,28))}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(o.stripe_payment_intent||"")}">${escapeHtml((o.stripe_payment_intent||"—").slice(0,28))}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §10 WEBHOOKS -->
+<section class="section" id="webhooks">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Stripe</div>
+      <div class="s-title">Webhook Events</div>
+    </div>
+    <div class="s-sub">${webhooks.length} events logged</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr><th>#</th><th>Processed</th><th>Type</th><th>Status</th><th>Event ID</th></tr></thead>
+      <tbody>${webhooks.length === 0
+        ? `<tr><td colspan="5" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No webhook events recorded</td></tr>`
+        : webhooks.map((w: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i+1}</td>
+          <td style="white-space:nowrap">${adminTime(w.processed_at)}</td>
+          <td style="font-family:var(--mono);font-size:11px">${escapeHtml(w.type||"")}</td>
+          <td><span class="pill ${w.status==="processed"?"pill-completed":"pill-pending"}">${escapeHtml(w.status||"")}</span></td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((w.stripe_event_id||"").slice(0,36))}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §11 ASSETS & REVISIONS -->
+<section class="section" id="assets">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">CMS</div>
+      <div class="s-title">Article Assets &amp; Revisions</div>
+    </div>
+    <div class="s-sub">Image render status and edit history per article</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr><th>Article</th><th>Assets</th><th>Rendered</th><th>Last Render</th><th>Revisions</th><th>Last Edit</th><th>Likes</th></tr></thead>
+      <tbody>${articleAssets.length === 0
+        ? `<tr><td colspan="7" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No articles yet</td></tr>`
+        : articleAssets.map((a: any) => {
+            const rev = revisionsMap.get(a.id);
+            const likes = articleLikesMap.get(a.id) || 0;
+            const allRendered = Number(a.asset_count)>0 && Number(a.rendered_count)===Number(a.asset_count);
+            return `<tr>
+              <td style="max-width:240px"><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:600">${escapeHtml(a.title||"Untitled")}</a></td>
+              <td style="font-family:var(--mono);font-size:12px;text-align:center">${a.asset_count||0}</td>
+              <td><span class="pill ${allRendered?"pill-completed":Number(a.rendered_count)>0?"pill-pending":"pill-free"}">${a.rendered_count||0}/${a.asset_count||0}</span></td>
+              <td style="white-space:nowrap">${a.last_rendered ? adminTime(a.last_rendered) : `<span style="color:var(--muted)">—</span>`}</td>
+              <td style="font-family:var(--mono);font-size:12px;text-align:center">${rev?.revision_count||0}</td>
+              <td style="white-space:nowrap">${rev?.last_edit ? adminTime(rev.last_edit) : `<span style="color:var(--muted)">—</span>`}</td>
+              <td style="font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;color:${likes>0?"var(--brand)":"var(--muted)"}">${likes||0}</td>
+            </tr>`;
+          }).join("")}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §12 SLUG REDIRECTS -->
+<section class="section" id="redirects">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">CMS</div>
+      <div class="s-title">Slug Redirects</div>
+    </div>
+    <div class="s-sub">${slugRedirects.length} redirect${slugRedirects.length!==1?"s":""} registered</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr><th>#</th><th>Old Slug</th><th>→ Article</th><th>New Slug</th><th>Created</th></tr></thead>
+      <tbody>${slugRedirects.length === 0
+        ? `<tr><td colspan="5" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No redirects yet</td></tr>`
+        : slugRedirects.map((r: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i+1}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--red)">/articles/${escapeHtml(r.old_slug||"")}</td>
+          <td style="max-width:200px;font-weight:600">${escapeHtml(r.title||r.article_id||"")}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--green)"><a href="/articles/${escapeHtml(r.new_slug||"")}" target="_blank">/articles/${escapeHtml(r.new_slug||"")}</a></td>
+          <td style="white-space:nowrap">${adminTime(r.created_at)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §13 AUDIT LOG -->
+<section class="section" id="audit">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Security</div>
+      <div class="s-title">Admin Audit Log</div>
+    </div>
+    <div class="s-sub">${auditLog.length} entries (last 200)</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr><th>#</th><th>Time</th><th>Action</th><th>Target</th><th>Meta</th></tr></thead>
+      <tbody>${auditLog.length === 0
+        ? `<tr><td colspan="5" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No audit events recorded</td></tr>`
+        : auditLog.map((a: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i+1}</td>
+          <td style="white-space:nowrap">${adminTime(a.created_at)}</td>
+          <td style="font-family:var(--mono);font-size:11px;font-weight:600">${escapeHtml(a.action||"")}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(a.target||"—")}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted-2);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.meta_json ? escapeHtml(JSON.stringify(a.meta_json).slice(0,80)) : "—"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §14 DESK CACHE -->
+<section class="section" id="deskcache">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Infrastructure</div>
+      <div class="s-title">Desk Cache</div>
+    </div>
+    <div class="s-sub">${deskCache.length} desks cached</div>
+  </div>
+  <div class="tbl-wrap scroll-tbl" style="margin-bottom:20px">
+    <table class="a-tbl">
+      <thead><tr><th>#</th><th>Slug</th><th>Cached At</th></tr></thead>
+      <tbody>${deskCache.length === 0
+        ? `<tr><td colspan="3" style="text-align:center;padding:32px;font-family:var(--mono);font-size:12px;color:var(--muted)">No desk caches — run rebuild</td></tr>`
+        : deskCache.map((d: any, i: number) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i+1}</td>
+          <td><a href="/desk/${escapeHtml(d.slug)}" target="_blank" style="font-family:var(--mono);font-size:11px">${escapeHtml(d.slug)}</a></td>
+          <td style="white-space:nowrap">${adminTime(d.cached_at)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+  <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all desk caches?')">
+    <button class="a-btn a-btn-ok" type="submit">↻ Rebuild all desk caches</button>
+  </form>
+</section>
+<div class="gap"></div>
+
+<!-- §15 SYSTEM -->
 <section class="section" id="system">
   <div class="s-head">
     <div>
