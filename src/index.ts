@@ -10126,24 +10126,24 @@ ${pageShellHeader(profile, authCtx)}
 
 <div class="nb-board-wrap">
   <div class="nb-filter-bar">
-    <span class="nb-filter-label">Source:</span>
+    <span class="nb-filter-label">Source</span>
     <button class="nb-filter-btn nb-active" data-src="all">All</button>
     <button class="nb-filter-btn" data-src="CF">Contracts Finder</button>
     <button class="nb-filter-btn" data-src="FTS">Find a Tender</button>
     <span class="nb-filter-sep"></span>
-    <span class="nb-filter-label">Sort by:</span>
+    <span class="nb-filter-label">Sort</span>
     <select class="nb-sort-select" id="nb-sort">
       <option value="default">Best match</option>
-      <option value="deadline">Deadline (soonest)</option>
-      <option value="value">Value (highest)</option>
-      <option value="published">Published (newest)</option>
+      <option value="deadline">Deadline — soonest</option>
+      <option value="value">Value — highest</option>
+      <option value="published">Published — newest</option>
     </select>
-    <span id="nb-count-label" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
+    <span id="nb-count-label" style="margin-left:auto"></span>
     <span class="nb-filter-sep"></span>
-    <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-action-btn">&#128269;&nbsp;Run Fit Check</a>
-    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="nb-action-btn">&#127963;&nbsp;Buyer Intel</a>
+    <a href="/scan?desk=${escapeHtml(profile.slug)}" class="nb-action-btn">Run Fit Check</a>
+    <a href="/desk/${escapeHtml(profile.slug)}/buyers" class="nb-action-btn">Buyer Intel</a>
   </div>
-  <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the desk profile &middot; Run a scan for a personalised fit check</p>
+  <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the ${escapeHtml(profile.label)} desk profile</p>
   ${boardContent}
 </div>
 
