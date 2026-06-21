@@ -3220,15 +3220,38 @@ async function callClaudeReport(prompt: string): Promise<string> {
   });
 }
 
+// Set when Anthropic returns a billing/credit error — skips Claude for the rest of the process lifetime
+// so every scan goes straight to OpenAI without a 150s wait.
+let anthropicBillingFailed = false;
+
+function isAnthropicCreditError(err: any): boolean {
+  const msg: string = (err?.message || String(err)).toLowerCase();
+  const status: number = err?.status ?? err?.statusCode ?? 0;
+  return (
+    msg.includes("credit balance") ||
+    msg.includes("billing") ||
+    msg.includes("payment required") ||
+    msg.includes("your credit") ||
+    status === 402
+  );
+}
+
 async function callLlmReport(prompt: string): Promise<string> {
-  if (anthropic) {
+  if (anthropic && !anthropicBillingFailed) {
     try {
       return await callClaudeReport(prompt);
     } catch (claudeError: any) {
-      captureError(claudeError, {
-        anthropic: { model: ANTHROPIC_MODEL, fellBackToOpenAI: true, error: claudeError?.message || String(claudeError) }
-      });
-      console.error("[report] Claude failed, falling back to OpenAI:", claudeError?.message || claudeError);
+      if (isAnthropicCreditError(claudeError)) {
+        anthropicBillingFailed = true;
+        console.warn("[report] Anthropic credit exhausted — switching all future scans to OpenAI");
+      } else {
+        try {
+          captureError(claudeError, {
+            anthropic: { model: ANTHROPIC_MODEL, fellBackToOpenAI: true, error: claudeError?.message || String(claudeError) }
+          });
+        } catch { /* sentry must not block fallback */ }
+        console.error("[report] Claude failed, falling back to OpenAI:", claudeError?.message || claudeError);
+      }
     }
   }
   return callOpenAiReport(prompt);
@@ -5101,8 +5124,9 @@ app.get("/health", (_req, res) => {
     sentry: SENTRY_ENABLED ? "enabled" : "disabled",
     email: isEmailConfigured() ? "enabled" : "disabled",
     opportunityBot: SLACK_WEBHOOK_URL ? "enabled" : "disabled",
-    reportProvider: anthropic ? "anthropic" : "openai",
-    reportModel: anthropic ? ANTHROPIC_MODEL : OPENAI_MODEL,
+    reportProvider: (anthropic && !anthropicBillingFailed) ? "anthropic" : "openai",
+    reportModel: (anthropic && !anthropicBillingFailed) ? ANTHROPIC_MODEL : OPENAI_MODEL,
+    anthropicBillingFailed,
     model: OPENAI_MODEL
   });
 });
