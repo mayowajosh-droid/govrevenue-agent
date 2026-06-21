@@ -556,7 +556,7 @@ export function winBriefCss(): string {
 .wb-list{margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink)}
 .wb-list li{margin-bottom:2px}
 .wb-caution-list{margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:#8a4820}
-.wb-apply-list{margin:0;padding:0;list-style:none;counter-reset:apply-counter;font-size:13px;line-height:1.7}
+.wb-apply-list{margin:0;padding:0;list-style:none;counter-reset:apply-counter;font-size:13px;line-height:1.7;color:var(--ink)}
 .wb-apply-list li{counter-increment:apply-counter;padding-left:24px;position:relative;margin-bottom:2px}
 .wb-apply-list li::before{content:counter(apply-counter);position:absolute;left:0;font-family:var(--mono);font-size:10px;color:var(--slate);top:4px}
 .wb-caveat{font-family:var(--mono);font-size:10.5px;color:var(--slate);margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
@@ -792,12 +792,13 @@ export function renderChaseNowPanel(
 
   const renderGroup = (title: string, notices: ScoredOpportunity[], showWinBrief: boolean) => {
     if (notices.length === 0) return "";
+    const gridCls = showWinBrief ? "chase-cards-grid chase-cards-grid--full" : "chase-cards-grid";
     return `<div class="chase-group">
   <div class="chase-group-head">
     <span class="chase-group-label">${esc(title)}</span>
     <span class="chase-group-count">${notices.length}</span>
   </div>
-  <div class="chase-cards-grid">
+  <div class="${gridCls}">
     ${notices.map(n => renderOpportunityCard(n, { showWinBrief, scanContext: context })).join("")}
   </div>
 </div>`;
@@ -1046,6 +1047,7 @@ export function reportChaseNowCss(): string {
   --line:rgba(180,146,78,.15);--line-strong:rgba(0,0,0,.10);
   margin:48px 0;
   background:#FFFDFB;
+  color:#1B1714;
   border:1px solid rgba(180,146,78,.22);
   border-top:3px solid #B4924E;
   overflow:hidden;
@@ -1063,6 +1065,7 @@ export function reportChaseNowCss(): string {
 .chase-group-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#1B1714;font-weight:600}
 .chase-group-count{font-family:var(--mono);font-size:10px;color:#9A9490;background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.2);padding:2px 8px;border-radius:3px}
 .chase-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.chase-cards-grid--full{grid-template-columns:1fr}
 .chase-ignore{margin-top:8px;padding:18px 22px;background:rgba(0,0,0,.02);border:1px solid rgba(0,0,0,.07)}
 .chase-ignore-head{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9A9490;margin-bottom:10px}
 .chase-ignore-list{margin:0;padding-left:18px;font-size:12.5px;color:#6B6358;line-height:1.8}
