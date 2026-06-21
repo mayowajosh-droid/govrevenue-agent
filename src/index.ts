@@ -5088,7 +5088,7 @@ ${pageShellHeader(null, authCtx)}
 <section style="background:var(--surface);border-bottom:1px solid var(--border-2)">
   <div style="max-width:1160px;margin:0 auto;padding:48px 32px 40px">
     <div style="font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand)">Articles · field notes from the public record</div>
-    <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(34px,5vw,60px);letter-spacing:-.02em;line-height:1;margin:14px 0 0;max-width:800px">How the public market actually <em style="font-style:italic;color:var(--brand)">works</em> — written for people who bid.</h1>
+    <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(24px,3vw,40px);letter-spacing:-.02em;line-height:1.06;margin:14px 0 0;max-width:800px">How the public market actually <em style="font-style:italic;color:var(--brand)">works</em> — written for people who bid.</h1>
     <p style="max-width:520px;font-size:16px;line-height:1.6;color:var(--text-mid);margin:18px 0 0">Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.</p>
   </div>
 </section>
