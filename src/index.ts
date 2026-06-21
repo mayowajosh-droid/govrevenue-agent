@@ -5449,7 +5449,7 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .hero h1{font-size:36px}
   #globe-canvas{opacity:.3}
   .hero-grad{background:none}
-  .hero-card-wrap{transform:none}
+  .hero-card-wrap{transform:none;display:flex;justify-content:center}
   .desk-grid{grid-template-columns:1fr 1fr}
   footer.hp-foot .wrap{grid-template-columns:1fr 1fr}
   .section{padding:52px 0}
@@ -9843,9 +9843,18 @@ html{scroll-behavior:smooth}
 .dm-src-link{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:underline;text-decoration-color:var(--border-2);padding:0 6px}
 .dm-src-link:hover{color:var(--text)}
 .dm-foot-copy{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);padding:12px 0 16px;border-top:1px solid var(--border)}
+@media(max-width:1380px){
+  .dp-panels-inner{padding:0 32px}
+  .dp-panel{padding:40px 24px}
+  .dp-val{font-size:28px}
+  .dp-stat{padding:20px 14px}
+  .dp-eyebrow{font-size:10px;letter-spacing:.08em}
+  .dm-mast-inner{padding:0 32px}
+  .dm-hero-chart-bars{gap:4px}
+}
 @media(max-width:1100px){
-  .dp-panels-inner{grid-template-columns:1fr}
-  .dm-mast-inner{grid-template-columns:1fr}
+  .dp-panels-inner{grid-template-columns:1fr;padding:0 24px}
+  .dm-mast-inner{grid-template-columns:1fr;padding:0 24px}
   .dm-mast-cta{display:none}
   .dm-mast h1{font-size:36px}
   .analytics-inner{grid-template-columns:1fr;gap:40px}
