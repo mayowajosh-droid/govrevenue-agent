@@ -5221,84 +5221,126 @@ ${pageShellFoot()}
 
 function adminArticleCss(): string {
   return `
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --base:#F4F1E9;--surface:#FFFFFF;--surface-2:#F9F7F2;
-  --brand:#B4924E;--green:#15803D;--red:#B91C1C;
+  --brand:#B4924E;--brand-dim:rgba(180,146,78,.1);--brand-mid:rgba(180,146,78,.28);--brand-border:rgba(180,146,78,.32);
+  --burg:#7B1A3A;--burg-3:#C06080;
+  --base:#F4F1E9;--surface:#FFFFFF;--surface-2:#FAF8F4;--surface-3:#F2EDE5;
+  --border:#E5DED4;--border-2:#CEC5B8;
   --text:#1A1208;--muted:#7D6B50;--muted-2:#A8957C;
-  --border:#E5DFD4;--border-2:#D4CBBA;
-  --sans:"Libre Franklin",system-ui,-apple-system,sans-serif;
-  --mono:"Spline Sans Mono",ui-monospace,monospace;
-  --serif:"Newsreader",Georgia,serif;
+  --green:#166534;--green-bg:rgba(22,101,52,.08);--green-border:rgba(22,101,52,.22);
+  --red:#B91C1C;--red-bg:rgba(185,28,28,.07);--red-border:rgba(185,28,28,.2);
+  --amber:#92400E;--amber-bg:rgba(146,64,14,.08);--amber-border:rgba(146,64,14,.2);
+  --blue:#1D4ED8;--blue-bg:rgba(29,78,216,.08);--blue-border:rgba(29,78,216,.2);
+  --sg:'Space Grotesk',system-ui,sans-serif;
+  --mono:'Spline Sans Mono','SF Mono',ui-monospace,monospace;
+  --inter:'Inter',system-ui,sans-serif;
 }
-html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-/* layout */
-.al-shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
-.al-sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column}
-.al-logo{font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text);padding:0 20px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
+html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--inter);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:rgba(180,146,78,.18);color:var(--text)}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+/* ——— LAYOUT ——— */
+.al-shell{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
+.al-sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:100}
+/* sidebar brand — gold tint gradient */
+.al-brand{padding:20px 20px 16px;background:linear-gradient(145deg,rgba(180,146,78,.06) 0%,rgba(255,255,255,0) 65%);border-bottom:1px solid var(--border)}
+.al-brand-row{display:flex;align-items:center;gap:9px}
+.al-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 8px rgba(180,146,78,.55);flex-shrink:0;animation:lp 2.2s infinite}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.2}}
+.al-logo{font-family:var(--sg);font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.al-logo span{color:var(--brand)}
 .al-logo b{color:var(--brand)}
-.al-nav a{display:block;padding:7px 20px;font-size:12px;color:var(--muted);transition:color .12s,background .12s}
-.al-nav a:hover{color:var(--text);background:var(--surface-2)}
-.al-nav a.active{color:var(--brand);border-left:2px solid var(--brand);padding-left:18px;background:var(--brand-dim,rgba(180,146,78,.08))}
-.al-nav-div{height:1px;background:var(--border);margin:10px 20px}
-.al-main{padding:32px 36px;overflow:auto}
-/* topbar */
-.al-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border)}
-.al-topbar-title{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text)}
-/* buttons */
-.al-btn{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:8px 14px;border:1px solid var(--border-2);background:var(--surface);color:var(--text);cursor:pointer;transition:border-color .12s,color .12s}
-.al-btn:hover{border-color:var(--brand);color:var(--brand)}
+.al-tag{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin-top:7px;padding-left:17px}
+.al-nav-sec{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);padding:14px 18px 5px}
+.al-nav a,.al-nav-link{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-family:var(--inter);font-size:13px;font-weight:500;color:var(--muted);text-decoration:none!important;transition:color .11s,background .11s;border-left:2px solid transparent;margin:1px 0}
+.al-nav a:hover,.al-nav-link:hover{color:var(--text);background:var(--surface-2);text-decoration:none}
+.al-nav a.active{color:var(--brand);border-left-color:var(--brand);background:var(--brand-dim)}
+.al-nav-div{height:1px;background:var(--border);margin:6px 16px}
+.al-main{min-width:0;overflow:auto}
+/* ——— TOPBAR ——— */
+.al-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:sticky;top:0;z-index:80}
+.al-crumb{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9.5px;color:var(--muted-2);letter-spacing:.08em;margin-bottom:3px}
+.al-crumb span{color:var(--border-2)}.al-crumb b{color:var(--brand)}
+.al-topbar-title{font-family:var(--sg);font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+/* ——— BUTTONS ——— */
+.al-btn{display:inline-flex;align-items:center;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:.12s;white-space:nowrap;border-radius:6px;text-decoration:none}
+.al-btn:hover{background:var(--base);border-color:var(--border-2);color:var(--text);text-decoration:none}
 .al-btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
-.al-btn-primary:hover{opacity:.88;color:#fff;border-color:var(--brand)}
-.al-btn-danger{border-color:rgba(185,28,28,.3);color:var(--red)}
-.al-btn-danger:hover{border-color:var(--red)}
-/* table */
-.al-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border)}
-.al-table th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border-2);background:var(--surface-2)}
-.al-table td{padding:12px 14px;font-size:12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.al-btn-primary:hover{background:#9E7D3C;border-color:#9E7D3C;color:#fff;opacity:1}
+/* hero green for Live button */
+.al-btn-live{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
+.al-btn-live:hover{background:rgba(22,101,52,.13);border-color:rgba(22,101,52,.35);color:var(--green)}
+.al-btn-danger{border-color:var(--red-border);color:var(--red);background:var(--red-bg)}
+.al-btn-danger:hover{border-color:rgba(185,28,28,.4);background:var(--red-bg)}
+.al-btn-repost{border-color:var(--amber-border);color:var(--amber);background:var(--amber-bg)}
+.al-btn-repost:hover{border-color:rgba(146,64,14,.35);background:var(--amber-bg)}
+/* ——— TABLE ——— */
+.al-tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,.03);margin:0 28px 28px}
+.al-table{width:100%;border-collapse:collapse;background:var(--surface);font-size:12.5px}
+.al-table th{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface-3);position:sticky;top:0;z-index:10;white-space:nowrap}
+.al-table td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
 .al-table tr:last-child td{border-bottom:none}
-.al-table tr:hover td{background:var(--surface-2)}
+.al-table tr:hover td{background:var(--brand-dim)}
 .al-th-sort{cursor:pointer;user-select:none;white-space:nowrap}
 .al-th-sort:hover{color:var(--brand)}
 .al-si{font-size:11px;opacity:.5;margin-left:3px}
 .al-th-sort.al-sort-active{color:var(--brand)}
 .al-th-sort.al-sort-active .al-si{opacity:1}
-.al-num{width:36px;text-align:center;font-family:var(--mono);color:var(--muted);font-size:11px}
-/* pills */
-.al-pill{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
-.al-pill-published{background:rgba(21,128,61,.1);color:#15803D}
-.al-pill-draft{background:rgba(125,107,80,.1);color:var(--muted)}
-.al-pill-scheduled{background:rgba(180,146,78,.13);color:var(--brand)}
-.al-pill-pending{background:rgba(185,28,28,.08);color:var(--red)}
-.al-pill-approved{background:rgba(21,128,61,.1);color:#15803D}
-.al-pill-spam,.al-pill-hidden{background:rgba(185,28,28,.08);color:var(--red)}
-/* editor split */
-.al-editor{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 140px);border:1px solid var(--border)}
+.al-num{width:38px;text-align:center;font-family:var(--mono);color:var(--muted-2);font-size:11px}
+/* ——— PILLS — hero green for published ——— */
+.al-pill{display:inline-flex;align-items:center;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;font-weight:600;border:1px solid}
+.al-pill-published{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.al-pill-draft{background:rgba(125,107,80,.08);color:var(--muted);border-color:rgba(125,107,80,.2)}
+.al-pill-scheduled{background:var(--brand-dim);color:var(--brand);border-color:var(--brand-border)}
+.al-pill-pending{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.al-pill-approved{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.al-pill-spam,.al-pill-hidden{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+/* ——— EDITOR ——— */
+.al-editor{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 140px);border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .al-editor-pane{overflow:auto;display:flex;flex-direction:column}
 .al-editor-pane-head{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-shrink:0}
 .al-source{flex:1;resize:none;background:var(--base);color:var(--text);border:none;border-right:1px solid var(--border);padding:16px;font-family:var(--mono);font-size:13px;line-height:1.7;outline:none}
 .al-preview-pane{background:var(--base);border-left:1px solid var(--border);overflow:auto}
 .al-preview-iframe{width:100%;height:100%;border:none;background:transparent}
-/* fields */
+/* ——— FIELDS ——— */
 .al-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
 .al-field{display:flex;flex-direction:column;gap:5px}
 .al-field-full{grid-column:1/-1}
 .al-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.al-input{width:100%;padding:10px 13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:13px;outline:none}
-.al-input:focus{border-color:var(--brand)}
-.al-select{width:100%;padding:10px 13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;outline:none}
+.al-input{width:100%;padding:10px 13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--inter);font-size:13px;outline:none;border-radius:5px;transition:border-color .12s}
+.al-input:focus{border-color:var(--brand);outline:none}
+.al-select{width:100%;padding:10px 13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;outline:none;border-radius:5px}
 .al-actions{display:flex;gap:10px;align-items:center;margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
-/* comment rows */
-.al-comment-row{background:var(--surface);border:1px solid var(--border);padding:16px 18px;margin-bottom:10px}
+/* ——— COMMENTS ——— */
+.al-comment-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:10px}
 .al-comment-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.al-comment-body-text{font-family:var(--sans);font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px}
+.al-comment-body-text{font-family:var(--inter);font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px}
 .al-comment-actions{display:flex;gap:8px;flex-wrap:wrap}
+/* ——— MISC ——— */
 .al-empty{font-family:var(--mono);font-size:12px;color:var(--muted);padding:48px 0;text-align:center}
-.al-alert{padding:11px 16px;font-family:var(--mono);font-size:11px;margin-bottom:18px}
-.al-alert-ok{background:rgba(21,128,61,.08);border:1px solid rgba(21,128,61,.25);color:#15803D}
-.al-alert-err{background:rgba(185,28,28,.08);border:1px solid rgba(185,28,28,.25);color:var(--red)}
+.al-alert{padding:11px 16px;font-family:var(--mono);font-size:11px;margin-bottom:16px;border-radius:6px}
+.al-alert-ok{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green)}
+.al-alert-err{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+/* ——— MOBILE ——— */
+.al-sb-overlay{display:none;position:fixed;inset:0;background:rgba(26,18,8,.42);z-index:199;backdrop-filter:blur(2px)}
+.al-sb-overlay.open{display:block}
+.al-hb-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;cursor:pointer;color:var(--text);font-size:17px;line-height:1;flex-shrink:0}
+@media(max-width:900px){
+  .al-shell{grid-template-columns:1fr}
+  .al-sidebar{position:fixed;left:0;top:0;height:100vh;width:260px;z-index:200;transform:translateX(-100%);transition:transform .24s cubic-bezier(.4,0,.2,1);box-shadow:none}
+  .al-sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.14)}
+  .al-hb-btn{display:flex}
+  .al-topbar{padding:12px 16px;gap:10px}
+  .al-topbar-title{font-size:17px}
+  .al-crumb{display:none}
+  .al-tbl-wrap{margin:0 16px 20px}
+}
+@media(max-width:480px){
+  .al-tbl-wrap{margin:0 12px 16px}
+}
 `;
 }
 
@@ -5309,26 +5351,26 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
     const pill = `<span class="al-pill al-pill-${a.status}">${a.status}</span>`;
     const hasImages = !!a.hero_image_url;
     const imgIndicator = (a.hero_prompt || a.body_md.includes(":::image"))
-      ? (hasImages ? `<span title="Images rendered" style="color:#15803D;font-size:11px">✓ img</span>` : `<span title="Images pending" style="color:#B91C1C;font-size:11px">✗ img</span>`)
+      ? (hasImages ? `<span title="Images rendered" style="font-family:var(--mono);font-size:9px;color:var(--green);background:var(--green-bg);border:1px solid var(--green-border);padding:1px 6px;border-radius:10px;vertical-align:middle">✓ img</span>` : `<span title="Images pending" style="font-family:var(--mono);font-size:9px;color:var(--red);background:var(--red-bg);border:1px solid var(--red-border);padding:1px 6px;border-radius:10px;vertical-align:middle">✗ img</span>`)
       : "";
     return `<tr>
   <td class="al-num" data-val="${idx + 1}">${idx + 1}</td>
-  <td data-val="${escapeHtml(a.title.toLowerCase())}"><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a> ${imgIndicator}</td>
+  <td data-val="${escapeHtml(a.title.toLowerCase())}"><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:600;font-family:var(--sg)">${escapeHtml(a.title)}</a> ${imgIndicator}</td>
   <td data-val="${escapeHtml(a.status)}">${pill}</td>
   <td data-val="${escapeHtml(a.desk ?? "")}" style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(a.desk ?? "—")}</td>
   <td data-val="${isoDate}" style="font-family:var(--mono);font-size:11px;color:var(--muted)">${date}</td>
-  <td data-val="${a.views}" style="font-family:var(--mono);font-size:11px">${a.views}</td>
+  <td data-val="${a.views}" style="font-family:var(--mono);font-size:11px;font-weight:600">${a.views}</td>
   <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    <a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" class="al-btn" style="font-size:10px;padding:5px 10px">Edit</a>
-    ${a.status === "published" ? `<a href="/articles/${escapeHtml(a.slug)}" target="_blank" class="al-btn" style="font-size:10px;padding:5px 10px">Live ↗</a>` : ""}
+    <a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" class="al-btn" style="font-size:9px;padding:5px 10px">Edit</a>
+    ${a.status === "published" ? `<a href="/articles/${escapeHtml(a.slug)}" target="_blank" class="al-btn al-btn-live" style="font-size:9px;padding:5px 10px">Live ↗</a>` : ""}
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/render-images?token=${encodeURIComponent(token)}" style="display:inline">
-      <button class="al-btn" type="submit" style="font-size:10px;padding:5px 10px" title="Regenerate all images for this article">🖼 Images</button>
+      <button class="al-btn" type="submit" style="font-size:9px;padding:5px 10px" title="Regenerate all images for this article">Images</button>
     </form>
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/repost?token=${encodeURIComponent(token)}" onsubmit="return confirm('Repost this article from scratch? The current version will be deleted and recreated with fresh images.')" style="display:inline">
-      <button class="al-btn" type="submit" style="font-size:10px;padding:5px 10px;color:#92400e;border-color:rgba(146,64,14,.3);background:rgba(146,64,14,.07)" title="Delete and recreate this article from scratch (resets images, revisions)">↺ Repost</button>
+      <button class="al-btn al-btn-repost" type="submit" style="font-size:9px;padding:5px 10px" title="Delete and recreate this article from scratch (resets images, revisions)">↺ Repost</button>
     </form>
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this article?')" style="display:inline">
-      <button class="al-btn al-btn-danger" type="submit" style="font-size:10px;padding:5px 10px">Delete</button>
+      <button class="al-btn al-btn-danger" type="submit" style="font-size:9px;padding:5px 10px">Delete</button>
     </form>
   </td>
 </tr>`;
@@ -5342,27 +5384,52 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
 <style>${adminArticleCss()}</style>
 </head>
 <body>
+<div id="al-sb-overlay" class="al-sb-overlay" onclick="alCloseSidebar()"></div>
 <div class="al-shell">
-  <aside class="al-sidebar">
-    <div class="al-logo">Gov<b>Revenue</b></div>
+  <aside class="al-sidebar" id="al-sidebar">
+    <div class="al-brand">
+      <div class="al-brand-row">
+        <span class="al-dot"></span>
+        <span class="al-logo">Gov<span>Revenue</span></span>
+        <button onclick="alCloseSidebar()" id="al-sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+      </div>
+      <div class="al-tag">ADMIN PANEL</div>
+    </div>
+    <div class="al-nav-sec">Navigation</div>
     <nav class="al-nav">
-      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <a href="/admin/scans?token=${encodeURIComponent(token)}">
+        <span>⬅ Scans Dashboard</span>
+      </a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="active">Articles</a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}">New article</a>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="active">
+        <span>Articles</span>
+        <span style="font-family:var(--mono);font-size:9px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);padding:2px 7px;border-radius:10px">${articles.length}</span>
+      </a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}">
+        <span>+ New article</span>
+      </a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}">Comment queue</a>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}">
+        <span>Comment queue</span>
+      </a>
     </nav>
   </aside>
   <div class="al-main">
     <div class="al-topbar">
-      <div class="al-topbar-title">Articles</div>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="al-btn al-btn-primary">+ New article</a>
+      <div>
+        <div class="al-crumb">Admin <span>›</span> <b>Articles</b></div>
+        <div class="al-topbar-title">Articles</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="al-hb-btn" onclick="alOpenSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
+        <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="al-btn al-btn-primary">+ New article</a>
+      </div>
     </div>
-    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
+    <div style="padding:20px 28px 28px">
+    ${msg ? `<div class="al-alert al-alert-ok">✓ ${escapeHtml(msg)}</div>` : ""}
     ${articles.length === 0
       ? `<p class="al-empty">No articles yet. <a href="/admin/articles/new?token=${encodeURIComponent(token)}" style="color:var(--brand)">Write the first one.</a></p>`
-      : `<table class="al-table" id="al-articles-table"><thead><tr>
+      : `<div class="al-tbl-wrap"><table class="al-table" id="al-articles-table"><thead><tr>
           <th class="al-num al-th-sort" data-col="0"># <span class="al-si"></span></th>
           <th class="al-th-sort" data-col="1">Title <span class="al-si"></span></th>
           <th class="al-th-sort" data-col="2">Status <span class="al-si"></span></th>
@@ -5370,31 +5437,34 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
           <th class="al-th-sort" data-col="4">Published <span class="al-si"></span></th>
           <th class="al-th-sort" data-col="5">Views <span class="al-si"></span></th>
           <th>Actions</th>
-        </tr></thead><tbody>${rows}</tbody></table>`}
+        </tr></thead><tbody>${rows}</tbody></table></div>`}
+    </div>
   </div>
 </div>
 <script>
 (function(){
+  var sidebar=document.getElementById('al-sidebar');
+  var overlay=document.getElementById('al-sb-overlay');
+  var sbClose=document.getElementById('al-sb-close');
+  var hbBtn=document.querySelector('.al-hb-btn');
+  function alOpenSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
+  function alCloseSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
+  window.alOpenSidebar=alOpenSidebar;window.alCloseSidebar=alCloseSidebar;
+  if(window.innerWidth<=900&&hbBtn)hbBtn.style.display='flex';
+  window.addEventListener('resize',function(){if(hbBtn)hbBtn.style.display=window.innerWidth<=900?'flex':'none';});
   var table=document.getElementById('al-articles-table');
   if(!table)return;
   var sortCol=-1,asc=true;
   var ths=table.querySelectorAll('th.al-th-sort');
-  // seed all sort indicators with neutral icon
   ths.forEach(function(th){var s=th.querySelector('.al-si');if(s)s.textContent='↕';});
   ths.forEach(function(th){
     th.addEventListener('click',function(){
       var col=+this.getAttribute('data-col');
       asc=(sortCol===col)?!asc:true;
       sortCol=col;
-      // reset all headers
-      ths.forEach(function(h){
-        h.classList.remove('al-sort-active');
-        var s=h.querySelector('.al-si');if(s)s.textContent='↕';
-      });
-      // mark active header
+      ths.forEach(function(h){h.classList.remove('al-sort-active');var s=h.querySelector('.al-si');if(s)s.textContent='↕';});
       this.classList.add('al-sort-active');
       var si=this.querySelector('.al-si');if(si)si.textContent=asc?'▲':'▼';
-      // sort rows
       var tbody=table.querySelector('tbody');
       var rows=Array.from(tbody.rows);
       rows.sort(function(a,b){
@@ -5405,10 +5475,7 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
         return asc?cmp:-cmp;
       });
       rows.forEach(function(r){tbody.appendChild(r);});
-      rows.forEach(function(r,i){
-        r.cells[0].textContent=String(i+1);
-        r.cells[0].setAttribute('data-val',String(i+1));
-      });
+      rows.forEach(function(r,i){r.cells[0].textContent=String(i+1);r.cells[0].setAttribute('data-val',String(i+1));});
     });
   });
 })();
@@ -5451,22 +5518,37 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
 <style>${adminArticleCss()}</style>
 </head>
 <body>
+<div id="al-sb-overlay" class="al-sb-overlay" onclick="alCloseSidebar()"></div>
 <div class="al-shell">
-  <aside class="al-sidebar">
-    <div class="al-logo">Gov<b>Revenue</b></div>
+  <aside class="al-sidebar" id="al-sidebar">
+    <div class="al-brand">
+      <div class="al-brand-row">
+        <span class="al-dot"></span>
+        <span class="al-logo">Gov<span>Revenue</span></span>
+        <button onclick="alCloseSidebar()" id="al-sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+      </div>
+      <div class="al-tag">ADMIN PANEL</div>
+    </div>
+    <div class="al-nav-sec">Navigation</div>
     <nav class="al-nav">
-      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <a href="/admin/scans?token=${encodeURIComponent(token)}"><span>⬅ Scans Dashboard</span></a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}">Articles</a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"${isNew ? ' class="active"' : ""}>New article</a>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}"><span>Articles</span></a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"${isNew ? ' class="active"' : ""}><span>+ New article</span></a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}">Comment queue</a>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}"><span>Comment queue</span></a>
     </nav>
   </aside>
   <div class="al-main">
     <div class="al-topbar">
-      <div class="al-topbar-title">${isNew ? "New article" : "Edit article"}</div>
-      ${!isNew ? `<a href="/articles/${slug}" target="_blank" class="al-btn">View live ↗</a>` : ""}
+      <div>
+        <div class="al-crumb">Admin <span>›</span> <a href="/admin/articles?token=${encodeURIComponent(token)}" style="color:var(--muted)">Articles</a> <span>›</span> <b>${isNew ? "New" : "Edit"}</b></div>
+        <div class="al-topbar-title">${isNew ? "New article" : "Edit article"}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="al-hb-btn" onclick="alOpenSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
+        ${!isNew ? `<a href="/articles/${slug}" target="_blank" class="al-btn al-btn-live">View live ↗</a>` : ""}
+      </div>
     </div>
     ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
 
@@ -5530,6 +5612,17 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
   </div>
 </div>
 <script>
+(function(){
+  var sidebar=document.getElementById('al-sidebar');
+  var overlay=document.getElementById('al-sb-overlay');
+  var sbClose=document.getElementById('al-sb-close');
+  var hbBtn=document.querySelector('.al-hb-btn');
+  function alOpenSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
+  function alCloseSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
+  window.alOpenSidebar=alOpenSidebar;window.alCloseSidebar=alCloseSidebar;
+  if(window.innerWidth<=900&&hbBtn)hbBtn.style.display='flex';
+  window.addEventListener('resize',function(){if(hbBtn)hbBtn.style.display=window.innerWidth<=900?'flex':'none';});
+})();
 const src = document.getElementById('source');
 const frame = document.getElementById('preview-frame');
 const form = document.getElementById('article-form');
@@ -5579,7 +5672,7 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
   </div>
   <div class="al-comment-body-text">${escapeHtml(c.body)}</div>
   <div class="al-comment-actions">
-    ${c.status === "pending" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/approve?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px;color:var(--green)">Approve</button></form>` : ""}
+    ${c.status === "pending" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/approve?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:9px;padding:5px 10px;background:var(--green-bg);border-color:var(--green-border);color:var(--green)">Approve</button></form>` : ""}
     <button class="al-btn" style="font-size:10px;padding:5px 10px" onclick="toggleReply('${escapeHtml(c.id)}')">Reply</button>
     <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/like?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">♥ Author like</button></form>
     ${c.status !== "hidden" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/hide?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">Hide</button></form>` : ""}
@@ -5588,7 +5681,7 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
   </div>
   <div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px">
     <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/reply?token=${encodeURIComponent(token)}">
-      <textarea name="body" placeholder="Your reply (posts as GovRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--bg);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;outline:none"></textarea><br>
+      <textarea name="body" placeholder="Your reply (posts as GovRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--inter);font-size:13px;resize:vertical;outline:none;border-radius:5px"></textarea><br>
       <button class="al-btn al-btn-primary" type="submit" style="margin-top:6px;font-size:10px">Post reply</button>
     </form>
   </div>
@@ -5607,30 +5700,58 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
 <style>${adminArticleCss()}</style>
 </head>
 <body>
+<div id="al-sb-overlay" class="al-sb-overlay" onclick="alCloseSidebar()"></div>
 <div class="al-shell">
-  <aside class="al-sidebar">
-    <div class="al-logo">Gov<b>Revenue</b></div>
+  <aside class="al-sidebar" id="al-sidebar">
+    <div class="al-brand">
+      <div class="al-brand-row">
+        <span class="al-dot"></span>
+        <span class="al-logo">Gov<span>Revenue</span></span>
+        <button onclick="alCloseSidebar()" id="al-sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+      </div>
+      <div class="al-tag">ADMIN PANEL</div>
+    </div>
+    <div class="al-nav-sec">Navigation</div>
     <nav class="al-nav">
-      <a href="/admin/scans?token=${encodeURIComponent(token)}">← Dashboard</a>
+      <a href="/admin/scans?token=${encodeURIComponent(token)}"><span>⬅ Scans Dashboard</span></a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}">Articles</a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}">New article</a>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}"><span>Articles</span></a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"><span>+ New article</span></a>
       <div class="al-nav-div"></div>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="active">Comment queue</a>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="active"><span>Comment queue</span></a>
     </nav>
   </aside>
   <div class="al-main">
     <div class="al-topbar">
-      <div class="al-topbar-title">Comments</div>
-      <div style="display:flex;gap:8px">${tabs}</div>
+      <div>
+        <div class="al-crumb">Admin <span>›</span> Articles <span>›</span> <b>Comments</b></div>
+        <div class="al-topbar-title">Comment queue</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="al-hb-btn" onclick="alOpenSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
+        ${tabs}
+      </div>
     </div>
-    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
+    <div style="padding:20px 28px 28px">
+    ${msg ? `<div class="al-alert al-alert-ok">✓ ${escapeHtml(msg)}</div>` : ""}
     ${comments.length === 0
       ? `<p class="al-empty">No comments in this queue.</p>`
       : rows}
+    </div>
   </div>
 </div>
 <script>
+(function(){
+  var sidebar=document.getElementById('al-sidebar');
+  var overlay=document.getElementById('al-sb-overlay');
+  var sbClose=document.getElementById('al-sb-close');
+  var hbBtn=document.querySelector('.al-hb-btn');
+  function alOpenSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
+  function alCloseSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
+  window.alOpenSidebar=alOpenSidebar;window.alCloseSidebar=alCloseSidebar;
+  if(window.innerWidth<=900&&hbBtn)hbBtn.style.display='flex';
+  window.addEventListener('resize',function(){if(hbBtn)hbBtn.style.display=window.innerWidth<=900?'flex':'none';});
+})();
 function toggleReply(id) {
   const el = document.getElementById('reply-'+id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
@@ -10852,105 +10973,149 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const totalBandCount = valueBands.reduce((s, b) => s + b.count, 0);
 
   const spendTrendSvg = (() => {
-    if (trendData.length < 2) return `<p style="color:var(--muted);font-size:13px;padding:24px 0">Trend data builds after a few weeks of signals.</p>`;
-    const W = 600, H = 200, pL = 58, pR = 12, pT = 12, pB = 40;
+    if (trendData.length < 2) return `<p class="an-empty">Trend data builds after a few weeks of signals.</p>`;
+    const W = 600, H = 240, pL = 64, pR = 16, pT = 16, pB = 48;
     const cW = W - pL - pR, cH = H - pT - pB;
     const numMonths = trendData.length;
     const slotW = cW / numMonths;
-    const bW = Math.max(slotW - 6, 4);
+    const bW = Math.max(slotW - 8, 5);
     const baseY = pT + cH;
     const slug = profile.slug;
-    const yLevels = [0, 0.33, 0.67, 1];
+    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    const yLevels = [0, 0.25, 0.5, 0.75, 1];
     const yLines = yLevels.map(t => ({ y: +(pT + cH * (1 - t)).toFixed(1), label: t === 0 ? "£0" : fmtShort(maxMonthVal * t) }));
     const bars = trendData.map(([key, val], i) => {
       const h = Math.max(+((val / maxMonthVal) * cH).toFixed(1), 2);
       const x = +(pL + slotW * i + (slotW - bW) / 2).toFixed(1);
       const y = +(baseY - h).toFixed(1);
       const cx = +(x + bW / 2).toFixed(1);
-      const mo = new Date(key + "-01").toLocaleDateString("en-GB", { month: "short" });
-      return { x, y, w: bW, h, cx, mo };
+      const moLabel = new Date(key + "-01").toLocaleDateString("en-GB", { month: "short" });
+      const yrLabel = "'" + key.slice(2, 4);
+      const isCurrent = key === currentMonthKey;
+      return { x, y, w: bW, h, cx, moLabel, yrLabel, isCurrent, val };
     });
     return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;overflow:visible" aria-label="Monthly awarded spend">
-      <defs><linearGradient id="sg-${slug}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#B4924E" stop-opacity=".82"/><stop offset="100%" stop-color="#B4924E" stop-opacity=".28"/></linearGradient></defs>
-      ${yLines.map(({ y, label }) => `<line x1="${pL}" y1="${y}" x2="${W - pR}" y2="${y}" stroke="rgba(27,30,25,.08)" stroke-width="1"/><text x="${pL - 5}" y="${+y + 4}" font-size="9" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#9AA093" text-anchor="end">${escapeHtml(label)}</text>`).join("")}
-      <line x1="${pL}" y1="${baseY}" x2="${W - pR}" y2="${baseY}" stroke="rgba(27,30,25,.16)" stroke-width="1"/>
-      ${bars.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="url(#sg-${slug})" rx="2"/><text x="${b.cx}" y="${baseY + 14}" font-size="8.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E" text-anchor="middle">${escapeHtml(b.mo)}</text>`).join("")}
+      <defs>
+        <linearGradient id="sg-${slug}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#B4924E" stop-opacity=".75"/><stop offset="100%" stop-color="#B4924E" stop-opacity=".18"/></linearGradient>
+        <linearGradient id="sg-hi-${slug}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#B4924E" stop-opacity="1"/><stop offset="100%" stop-color="#C8A85A" stop-opacity=".45"/></linearGradient>
+      </defs>
+      ${yLines.slice(1).map(({ y, label }) => `<line x1="${pL}" y1="${y}" x2="${W - pR}" y2="${y}" stroke="rgba(26,18,8,.05)" stroke-width="1" stroke-dasharray="3,4"/>`).join("")}
+      ${yLines.map(({ y, label }) => `<text x="${pL - 7}" y="${+y + 3.5}" font-size="9" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#A8957C" text-anchor="end">${escapeHtml(label)}</text>`).join("")}
+      <line x1="${pL}" y1="${baseY}" x2="${W - pR}" y2="${baseY}" stroke="rgba(26,18,8,.12)" stroke-width="1"/>
+      ${bars.map(b => `<g>
+        <rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${b.isCurrent ? `url(#sg-hi-${slug})` : `url(#sg-${slug})`}" rx="2"${b.isCurrent ? ` style="filter:drop-shadow(0 2px 6px rgba(180,146,78,.28))"` : ""}>
+          <title>${escapeHtml(b.moLabel + " " + b.yrLabel + ": " + fmtShort(b.val))}</title>
+        </rect>
+        <text x="${b.cx}" y="${baseY + 14}" font-size="8.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="${b.isCurrent ? "#B4924E" : "#A8957C"}" text-anchor="middle" font-weight="${b.isCurrent ? "600" : "400"}">${escapeHtml(b.moLabel)}</text>
+        <text x="${b.cx}" y="${baseY + 26}" font-size="7.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="${b.isCurrent ? "#B4924E" : "#C0B29E"}" text-anchor="middle">${escapeHtml(b.yrLabel)}</text>
+      </g>`).join("")}
     </svg>`;
   })();
 
-  const buyersSvg = (() => {
-    const buyers = topBuyers.filter(([, info]) => info.awardedValue > 0).slice(0, 5);
-    if (buyers.length === 0) return `<p style="color:var(--muted);font-size:13px;padding:16px 0">Buyer data builds with demand signal.</p>`;
+  const buyersHtml = (() => {
+    const buyers = topBuyers.filter(([, info]) => info.awardedValue > 0).slice(0, 6);
+    if (buyers.length === 0) return `<p class="an-empty">Buyer data builds with demand signals.</p>`;
     const maxVal = buyers[0][1].awardedValue;
-    const W = 500, rowH = 40, pT = 6, pL = 176, pR = 68;
-    const H = pT + rowH * buyers.length + 8;
-    const cW = W - pL - pR;
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block" aria-label="Top buyers by spend">
-      ${buyers.map(([buyer, info], i) => {
-        const y = pT + rowH * i;
-        const barH = 14, barY = y + (rowH - barH) / 2 - 2;
-        const bW = Math.max(+(cW * (info.awardedValue / maxVal)).toFixed(1), 4);
-        const name = buyer.length > 26 ? buyer.slice(0, 25) + "…" : buyer;
-        const op = +(0.85 - i * 0.12).toFixed(2);
-        return `<text x="${pL - 8}" y="${barY + barH - 2}" font-size="10.5" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#1B1E19" text-anchor="end">${escapeHtml(name)}</text><rect x="${pL}" y="${barY}" width="${bW}" height="${barH}" fill="#B4924E" opacity="${op}" rx="2"/><text x="${pL + bW + 6}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E">${escapeHtml(fmtShort(info.awardedValue))}</text>`;
-      }).join("")}
-    </svg>`;
+    return buyers.map(([buyer, info], i) => {
+      const pct = Math.round((info.awardedValue / maxVal) * 100);
+      const name = buyer.length > 38 ? buyer.slice(0, 37) + "…" : buyer;
+      return `<div class="an-buyer-row">
+        <span class="an-buyer-rank">${i + 1}</span>
+        <div class="an-buyer-mid">
+          <div class="an-buyer-name">${escapeHtml(name)}</div>
+          <div class="an-buyer-track"><div class="an-buyer-fill" style="width:${pct}%"></div></div>
+        </div>
+        <span class="an-buyer-val">${escapeHtml(fmtShort(info.awardedValue))}</span>
+      </div>`;
+    }).join("");
   })();
 
-  const bandSvg = (() => {
-    if (totalBandCount === 0) return `<p style="color:var(--muted);font-size:13px;padding:16px 0">Distribution builds with awarded notices.</p>`;
-    const W = 500, rowH = 36, pT = 6, pL = 130, pR = 80;
-    const H = pT + rowH * valueBands.length + 8;
-    const cW = W - pL - pR;
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block" aria-label="Contract value band distribution">
-      ${valueBands.map((b) => {
-        const idx = valueBands.indexOf(b);
-        const y = pT + rowH * idx;
-        const barH = 13, barY = y + (rowH - barH) / 2 - 2;
-        const bW = Math.max(+(cW * (b.count / maxBandCount)).toFixed(1), b.count > 0 ? 4 : 0);
-        const pctLbl = totalBandCount > 0 ? `${b.count} (${Math.round((b.count / totalBandCount) * 100)}%)` : "0";
-        const op = +(0.28 + (b.count / maxBandCount) * 0.57).toFixed(2);
-        return `<text x="${pL - 8}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E" text-anchor="end">${escapeHtml(b.label)}</text>${bW > 0 ? `<rect x="${pL}" y="${barY}" width="${bW}" height="${barH}" fill="#B4924E" opacity="${op}" rx="2"/>` : ""}<text x="${pL + Math.max(bW, 0) + 6}" y="${barY + barH - 2}" font-size="10" font-family="Spline Sans Mono,ui-monospace,monospace" fill="#86897E">${escapeHtml(pctLbl)}</text>`;
-      }).join("")}
-    </svg>`;
+  const bandsHtml = (() => {
+    if (totalBandCount === 0) return `<p class="an-empty">Distribution builds with awarded notices.</p>`;
+    return valueBands.map(b => {
+      const pct = Math.round((b.count / maxBandCount) * 100);
+      const pctOfTotal = totalBandCount > 0 ? Math.round((b.count / totalBandCount) * 100) : 0;
+      const statHtml = b.count > 0
+        ? `${b.count} <span class="an-band-pct">${pctOfTotal}%</span>`
+        : `<span class="an-band-pct">—</span>`;
+      return `<div class="an-band-row${b.count === 0 ? " an-band-row--zero" : ""}">
+        <span class="an-band-lbl">${escapeHtml(b.label)}</span>
+        <div class="an-band-track"><div class="an-band-fill" style="width:${pct}%"></div></div>
+        <span class="an-band-stat">${statHtml}</span>
+      </div>`;
+    }).join("");
   })();
 
   const analyticsHtml = profile.live && !isCompiling ? `
-  <section class="analytics-section" id="desk-analytics">
-    <div style="padding:0 56px;margin-bottom:36px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <div class="analytics-head" style="letter-spacing:.2em;margin-bottom:6px">DESK ANALYTICS</div>
-        <p style="font-size:13px;color:var(--muted);margin:0">12-month intelligence summary &mdash; public record only</p>
+  <section class="an-section" id="desk-analytics">
+    <div class="an-wrap">
+      <div class="an-hd">
+        <div>
+          <div class="an-eyebrow">Desk Analytics</div>
+          <h2 class="an-title">Market Intelligence</h2>
+          <p class="an-subtitle">${trendData.length}-month public procurement record &mdash; awarded contracts only</p>
+        </div>
+        <a href="/desk/${profile.slug}/notices" class="an-view-all">View all opportunities &rarr;</a>
       </div>
-      <a href="/desk/${profile.slug}/notices" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;letter-spacing:.06em">VIEW ALL OPPORTUNITIES &rarr;</a>
-    </div>
-    <div style="padding:0 56px;margin-bottom:48px">
-      <div class="analytics-head" style="margin-bottom:8px">12-MONTH SPEND TREND</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;letter-spacing:.01em">Monthly awarded contract value &mdash; ${trendData.length} months of public procurement data</p>
-      <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:22px 20px 14px">
+      <div class="an-kpi-strip">
+        <div class="an-kpi">
+          <div class="an-kpi-val">${escapeHtml(fmtBig(totalAwarded))}</div>
+          <div class="an-kpi-lbl">Total awarded</div>
+        </div>
+        <div class="an-kpi an-kpi--div">
+          <div class="an-kpi-val">${escapeHtml(String(awardedCount))}</div>
+          <div class="an-kpi-lbl">Contracts indexed</div>
+        </div>
+        <div class="an-kpi an-kpi--div">
+          <div class="an-kpi-val">${topBuyers.length}</div>
+          <div class="an-kpi-lbl">Active buyers</div>
+        </div>
+        <div class="an-kpi an-kpi--div">
+          <div class="an-kpi-val">${avgContractVal > 0 ? escapeHtml(fmtShort(avgContractVal)) : "&mdash;"}</div>
+          <div class="an-kpi-lbl">Avg contract</div>
+        </div>
+      </div>
+      <div class="an-card">
+        <div class="an-card-hd">
+          <div>
+            <div class="an-card-title">Monthly Spend Trend</div>
+            <div class="an-card-sub">${trendData.length} months of awarded contract data &mdash; public record</div>
+          </div>
+          <div class="an-chip">${escapeHtml(fmtBig(totalAwarded))}+ &middot; ${escapeHtml(String(awardedCount))} contracts</div>
+        </div>
         ${spendTrendSvg}
       </div>
-      <p style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:8px">${escapeHtml(fmtBig(totalAwarded))}+ total awarded &middot; ${escapeHtml(String(awardedCount))} contracts &middot; Public record only</p>
-    </div>
-    <div class="analytics-inner">
-      <div>
-        <div class="analytics-head" style="margin-bottom:8px">TOP BUYERS BY AWARDED SPEND</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Ranked by 12-month awarded value on this desk</p>
-        <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:18px 16px">
-          ${buyersSvg}
+      <div class="an-grid">
+        <div class="an-card">
+          <div class="an-card-hd">
+            <div>
+              <div class="an-card-title">Top Buyers</div>
+              <div class="an-card-sub">Ranked by 12-month awarded spend on this desk</div>
+            </div>
+          </div>
+          ${buyersHtml}
+          <p class="an-footnote">${topBuyers.length} active buyer${topBuyers.length === 1 ? "" : "s"} tracked on this desk</p>
         </div>
-        <p style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:8px">${topBuyers.length} active buyers tracked on this desk</p>
-      </div>
-      <div>
-        <div class="analytics-head" style="margin-bottom:8px">CONTRACT SIZE DISTRIBUTION</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">${totalBandCount} awarded contracts by value band</p>
-        <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:18px 16px">
-          ${bandSvg}
+        <div>
+          <div class="an-card">
+            <div class="an-card-hd">
+              <div>
+                <div class="an-card-title">Contract Size</div>
+                <div class="an-card-sub">${totalBandCount} awarded contracts by value band</div>
+              </div>
+            </div>
+            ${bandsHtml}
+          </div>
+          ${topCats.length > 0 ? `<div class="an-card" style="margin-top:16px">
+            <div class="an-card-hd">
+              <div>
+                <div class="an-card-title">Category Breakdown</div>
+                <div class="an-card-sub">Top demand areas by awarded value</div>
+              </div>
+            </div>
+            ${catBreakdownHtml}
+          </div>` : ""}
         </div>
-        ${topCats.length > 0 ? `<div style="margin-top:32px">
-          <div class="analytics-head" style="margin-bottom:14px">CATEGORY BREAKDOWN</div>
-          ${catBreakdownHtml}
-        </div>` : ""}
       </div>
     </div>
   </section>` : "";
@@ -11095,27 +11260,57 @@ html{scroll-behavior:smooth}
 .urgency-item:hover .urgency-title{color:var(--text)}
 .urgency-title{font-size:12.5px;color:var(--muted);line-height:1.35;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px;transition:color .12s}
 .urgency-badge{font-family:var(--mono);font-size:10px;background:rgba(180,146,78,.2);color:var(--brand);padding:3px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0}
-/* Analytics section — dark zone continuation */
-.analytics-section{background:var(--base);padding:56px 0;border-bottom:1px solid var(--border)}
-.analytics-inner{padding:0 56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
-.analytics-inner--single{grid-template-columns:1fr;max-width:680px}
-.analytics-head{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-/* Spend trend chart */
-.trend-chart{background:var(--surface-2);border:1px solid var(--border-2);padding:28px 24px 0}
-.trend-bars{display:flex;align-items:flex-end;justify-content:space-between;gap:5px;height:140px;border-bottom:1px solid var(--border);padding-bottom:0;overflow:hidden}
-.trend-bar-col{flex:1;max-width:46px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
-.trend-bar{width:100%;background:linear-gradient(to top,rgba(180,146,78,.4),var(--brand));border-radius:2px 2px 0 0;transition:opacity .15s;cursor:default}
-.trend-bar:hover{opacity:.75}
-.trend-bar-label{font-family:var(--mono);font-size:8.5px;color:var(--faint);text-align:center;padding:10px 0 12px;line-height:1.4}
-.trend-foot{padding:20px 0 28px;display:flex;align-items:baseline;gap:12px}
-.trend-total{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--text)}
-.trend-total-label{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
-/* Category breakdown — dark */
-.cat-breakdown-item{display:grid;grid-template-columns:1fr 72px;gap:16px;align-items:center;margin-bottom:22px}
-.cat-breakdown-label{font-size:13.5px;color:var(--muted);margin-bottom:6px}
-.cat-breakdown-track{height:3px;background:rgba(27,30,25,.10);border-radius:2px}
+/* ── Analytics section ── */
+.an-section{background:var(--surface-2);padding:64px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.an-wrap{max-width:1120px;margin:0 auto;padding:0 56px}
+.an-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:32px}
+.an-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.an-title{font-family:var(--serif);font-size:26px;font-weight:500;color:var(--text);letter-spacing:-.01em;line-height:1.15;margin-bottom:5px}
+.an-subtitle{font-size:13px;color:var(--muted);margin:0}
+.an-view-all{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border-2);padding-bottom:2px;white-space:nowrap;transition:color .12s,border-color .12s;flex-shrink:0}
+.an-view-all:hover{color:var(--brand);border-color:var(--brand);text-decoration:none}
+/* KPI strip */
+.an-kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 4px rgba(26,18,8,.04)}
+.an-kpi{padding:20px 22px}
+.an-kpi--div{border-left:1px solid var(--border)}
+.an-kpi-val{font-family:var(--serif);font-size:26px;font-weight:500;color:var(--text);letter-spacing:-.02em;line-height:1;margin-bottom:5px}
+.an-kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
+/* Cards */
+.an-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;box-shadow:0 1px 4px rgba(26,18,8,.04);margin-bottom:20px}
+.an-card-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.an-card-title{font-family:var(--sans);font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.an-card-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted-2);letter-spacing:.03em}
+.an-chip{font-family:var(--mono);font-size:9.5px;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.2);padding:4px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+/* 2-col grid */
+.an-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+/* Buyers */
+.an-buyer-row{display:grid;grid-template-columns:26px 1fr 56px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.an-buyer-row:last-child{border-bottom:none}
+.an-buyer-rank{font-family:var(--mono);font-size:9.5px;color:var(--muted-2);text-align:center}
+.an-buyer-mid{min-width:0}
+.an-buyer-name{font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
+.an-buyer-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.an-buyer-fill{height:100%;background:linear-gradient(90deg,rgba(180,146,78,.35),var(--brand));border-radius:2px}
+.an-buyer-val{font-family:var(--mono);font-size:11px;color:var(--brand);text-align:right;white-space:nowrap}
+/* Bands */
+.an-band-row{display:grid;grid-template-columns:96px 1fr 68px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.an-band-row:last-child{border-bottom:none}
+.an-band-row--zero .an-band-fill{opacity:0}
+.an-band-lbl{font-family:var(--mono);font-size:9.5px;color:var(--muted);white-space:nowrap}
+.an-band-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.an-band-fill{height:100%;background:var(--brand);opacity:.7;border-radius:3px}
+.an-band-stat{font-family:var(--mono);font-size:10.5px;color:var(--text);text-align:right;white-space:nowrap}
+.an-band-pct{color:var(--muted-2)}
+/* Category breakdown */
+.cat-breakdown-item{display:grid;grid-template-columns:1fr 72px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.cat-breakdown-item:last-child{border-bottom:none}
+.cat-breakdown-label{font-size:13px;color:var(--text);margin-bottom:5px}
+.cat-breakdown-track{height:3px;background:var(--border);border-radius:2px}
 .cat-breakdown-fill{height:3px;background:var(--brand);border-radius:2px}
-.cat-breakdown-val{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:right;padding-top:20px}
+.cat-breakdown-val{font-family:var(--mono);font-size:11px;color:var(--brand);text-align:right}
+/* Misc */
+.an-empty{color:var(--muted);font-size:13px;padding:16px 0;font-family:var(--mono)}
+.an-footnote{font-family:var(--mono);font-size:9.5px;color:var(--muted-2);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 /* Recent awards — dark */
 .awards-section{background:var(--surface-2);border-bottom:1px solid var(--border)}
 .awards-inner{padding:56px 56px}
@@ -11213,12 +11408,17 @@ html{scroll-behavior:smooth}
   .dm-mast-inner{grid-template-columns:1fr;padding:0 24px}
   .dm-mast-cta{display:none}
   .dm-mast h1{font-size:36px}
-  .analytics-inner{grid-template-columns:1fr;gap:40px}
+  .an-grid{grid-template-columns:1fr;gap:16px}
+  .an-kpi-strip{grid-template-columns:repeat(2,1fr)}
+  .an-kpi--div:nth-child(2){border-left:1px solid var(--border)}
+  .an-kpi--div:nth-child(3){border-left:none;border-top:1px solid var(--border)}
+  .an-kpi--div:nth-child(4){border-left:1px solid var(--border);border-top:1px solid var(--border)}
   .awards-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:760px){
   .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner{padding-left:16px;padding-right:16px}
-  .dp-pulse-inner,.analytics-inner,.awards-inner{padding-left:16px;padding-right:16px}
+  .dp-pulse-inner,.awards-inner{padding-left:16px;padding-right:16px}
+  .an-wrap{padding:0 16px}
   .dm-mast{padding:32px 0 28px}
   .dm-mast-inner{grid-template-columns:1fr;gap:0}
   .dm-hero-chart{display:none}
@@ -11239,12 +11439,14 @@ html{scroll-behavior:smooth}
   .dp-pulse-inner{flex-wrap:wrap}
   .dp-pulse-stat{flex:0 0 50%;border-right:none;border-bottom:1px solid var(--border)}
   .awards-grid{grid-template-columns:1fr}
-  .analytics-inner{grid-template-columns:1fr;gap:24px}
+  .an-kpi-strip{grid-template-columns:1fr 1fr}
   .awards-inner{padding:36px 16px}
   .sub-cta-row{flex-direction:column;gap:14px;align-items:flex-start}
 }
 @media(max-width:480px){
-  .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner,.dp-pulse-inner,.analytics-inner,.awards-inner{padding-left:12px;padding-right:12px}
+  .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner,.dp-pulse-inner,.awards-inner{padding-left:12px;padding-right:12px}
+  .an-wrap{padding:0 12px}
+  .an-kpi-strip{grid-template-columns:1fr 1fr}
   .dm-mast{padding:20px 0 16px}
   .dm-mast h1{font-size:18px}
   .dm-mast-lede{font-size:13px}
