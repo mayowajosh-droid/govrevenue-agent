@@ -9670,7 +9670,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
 <title>${escapeHtml(profile.label)} &mdash; GovRevenue Desk</title>
 <style>
 ${pageShellCss()}
-:root{--paper:var(--surface);--paper-2:var(--surface-2);--ink:var(--text);--slate:var(--muted);--accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);}
+:root{--paper:#fff;--paper-2:var(--surface);--ink:var(--text);--slate:var(--muted);--accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);}
 html{scroll-behavior:smooth}
 /* Masthead */
 .dm-mast{padding:60px 0 56px;background:radial-gradient(120% 160% at 80% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6}
@@ -10708,7 +10708,7 @@ function noticesPage(
 ${pageShellCss()}
 /* ── Bridge tokens for opportunity engine ── */
 :root{
-  --paper:var(--surface);--paper-2:var(--surface-2);
+  --paper:#fff;--paper-2:var(--surface);
   --ink:var(--text);--slate:var(--muted);
   --accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);
 }
