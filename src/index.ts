@@ -5369,14 +5369,17 @@ ${pageShellHeader(null, homepageAuth)}
 ${chaseNowHtml}
 <section class="section" id="desks">
   <div class="wrap">
-    <div class="section-head"><h2>The desks</h2><a href="/desks">All desks &rarr;</a></div>
+    <div class="section-head"><h2>The desks</h2></div>
     <div class="desk-grid">
-      ${DESK_PROFILES.filter(d => d.live).map(d => {
+      ${DESK_PROFILES.filter(d => d.live).slice(0, 9).map(d => {
         const sig = deskSignals.get(d.slug);
         return sig
           ? renderDeskCard(sig, d.label, d.slug)
           : `<a class="desk-card reveal" href="/desk/${escapeHtml(d.slug)}"><div class="dc-top"><span class="dc-label">${escapeHtml(d.label)}</span><div class="dc-chips"><span class="dc-chip dc-chip-src">CF</span></div></div><div class="dc-title">Scanning for live notices…</div><div class="dc-buyer">Signals load on first hourly refresh.</div><div class="dc-foot"><span class="dc-date">—</span><span class="dc-cta">View desk &rarr;</span></div></a>`;
       }).join("")}
+    </div>
+    <div style="text-align:center;margin-top:32px">
+      <a href="/desks" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mid);border:1px solid var(--border-2);padding:12px 28px;transition:border-color .15s,color .15s">See all ${DESK_PROFILES.filter(d => d.live).length} desks &rarr;</a>
     </div>
   </div>
 </section>

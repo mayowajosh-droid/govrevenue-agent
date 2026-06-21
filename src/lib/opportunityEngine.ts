@@ -1008,12 +1008,12 @@ export function chaseNowCss(): string {
 .cnc-fit-cta:hover{color:var(--ink)}
 .cnc-src-link{font-family:var(--mono);font-size:10px;color:var(--slate);text-decoration:underline;text-underline-offset:3px}
 .cnc-src-link:hover{color:var(--ink)}
-.cnc-card-see-all{background:var(--ink);border:2px solid var(--ink);padding:28px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;text-decoration:none;transition:background .2s,border-color .2s}
-.cnc-card-see-all:hover{background:var(--accent);border-color:var(--accent)}
-.cnc-see-count{font-family:var(--serif);font-size:48px;font-weight:600;color:#fff;line-height:1;letter-spacing:-.03em}
-.cnc-see-label{font-family:var(--sans);font-size:14px;color:rgba(255,255,255,.6);margin-top:8px;line-height:1.45;font-weight:400}
-.cnc-see-cta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);padding-top:16px;transition:color .15s}
-.cnc-card-see-all:hover .cnc-see-cta{color:#fff}
+.cnc-card-see-all{background:#102A1E;border:2px solid #102A1E;padding:28px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;text-decoration:none;transition:background .2s,border-color .2s}
+.cnc-card-see-all:hover{background:#1d4939;border-color:#1d4939}
+.cnc-see-count{font-family:var(--serif);font-size:56px;font-weight:600;color:#ECE6D6;line-height:1;letter-spacing:-.03em}
+.cnc-see-label{font-family:var(--sans);font-size:14px;color:rgba(236,230,214,.65);margin-top:8px;line-height:1.45;font-weight:400}
+.cnc-see-cta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,230,214,.45);padding-top:16px;transition:color .15s}
+.cnc-card-see-all:hover .cnc-see-cta{color:#ECE6D6}
 @media(max-width:960px){.cnc-grid{grid-template-columns:repeat(2,1fr)}.cnc-stat-bar{flex-wrap:wrap}}
 @media(max-width:600px){.cnc-grid{grid-template-columns:1fr}.cnc-stat-bar{flex-wrap:wrap}.cnc-stat{flex:1 1 calc(50% - 5px)}.cnc-mini-chart{flex:1 1 100%}.cnc-inner{padding:0 20px}.cnc-title{font-size:28px}}
 `;
