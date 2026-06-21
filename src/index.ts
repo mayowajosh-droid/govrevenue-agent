@@ -1238,11 +1238,12 @@ async function queryOpenDeskSignals(limit: number): Promise<HomepageSignal[]> {
 async function queryChaseableSignals(limit: number): Promise<HomepageSignal[]> {
   if (pool) {
     const r = await pool.query<HomepageSignal>(
-      `SELECT id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
+      `SELECT DISTINCT ON (LOWER(TRIM(title)), LOWER(TRIM(COALESCE(buyer,''))))
+         id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
        FROM homepage_signals
        WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
          AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')
-       ORDER BY deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
+       ORDER BY LOWER(TRIM(title)), LOWER(TRIM(COALESCE(buyer,''))), deadline_date ASC NULLS LAST, notice_date DESC NULLS LAST
        LIMIT $1`,
       [limit]
     );
@@ -1268,7 +1269,7 @@ type ChaseStats = {
 
 async function queryChaseableStats(): Promise<ChaseStats> {
   if (!pool) return { totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] };
-  const [totals, byDesk, closing] = await Promise.all([
+  const [totals, byDesk, closing, avgVal] = await Promise.all([
     pool.query<{ total: string }>(
       `SELECT COUNT(*) AS total
        FROM homepage_signals
@@ -1287,10 +1288,18 @@ async function queryChaseableStats(): Promise<ChaseStats> {
        WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
          AND deadline_date BETWEEN NOW() AND NOW() + INTERVAL '30 days'`
     ),
+    pool.query<{ avg_k: string }>(
+      `SELECT ROUND(AVG(value_amount) / 1000) AS avg_k
+       FROM homepage_signals
+       WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
+         AND (deadline_date IS NULL OR deadline_date > NOW() + INTERVAL '5 days')
+         AND value_amount > 0`
+    ),
   ]);
+  const rawAvg = parseFloat(avgVal.rows[0]?.avg_k || "0");
   return {
     totalOpen: parseInt(totals.rows[0]?.total || "0"),
-    avgValueK: null,
+    avgValueK: rawAvg > 0 ? rawAvg : null,
     closingThisMonth: parseInt(closing.rows[0]?.cnt || "0"),
     byDesk: byDesk.rows.map(r => ({ category: r.category, count: parseInt(r.cnt) })),
   };
