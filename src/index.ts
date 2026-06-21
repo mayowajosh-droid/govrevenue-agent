@@ -8540,11 +8540,11 @@ ${pageShellHeader(null, getAuthUser(req))}
         <span class="kcard-sub">Per month over the tracked period</span>
         <div class="kcard-glow grn" aria-hidden="true"></div>
       </div>
-      <div class="kcard purple rv">
+      <div class="kcard ${trendPct >= 0 ? 'grn' : 'warn'} rv">
         <span class="kcard-label">Momentum</span>
-        <span class="kcard-val c-purple">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
+        <span class="kcard-val ${trendPct >= 0 ? 'c-grn' : 'c-red'}">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
         <span class="kcard-sub">3-month trailing vs opening &middot; peak ${escapeHtml(peakPoint.label)}</span>
-        <div class="kcard-glow grn" aria-hidden="true"></div>
+        <div class="kcard-glow ${trendPct >= 0 ? 'grn' : 'red'}" aria-hidden="true"></div>
       </div>
     </div>
   </div>
