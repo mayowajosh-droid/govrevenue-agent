@@ -12846,12 +12846,12 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 
   const vColor = (v: string) => {
     const l = v.toLowerCase();
-    if (l.includes("strong") || l.startsWith("yes")) return "#15803D";
+    if (l.includes("strong") || l.startsWith("yes")) return "#166534";
     if (l.includes("possible") || l.includes("conditional")) return "#92400E";
     return "#B91C1C";
   };
   const gColor = (g: string) =>
-    g === "A" ? "#15803D" : g === "B" ? "#1D4ED8" : g === "C" ? "#92400E" : "#B91C1C";
+    g === "A" ? "#166534" : g === "B" ? "#1D4ED8" : g === "C" ? "#92400E" : "#B91C1C";
 
   // Pre-compute scan-per-day chart (14 days)
   const days14: string[] = [];
@@ -12871,7 +12871,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       const h = n === 0 ? 2 : Math.max(4, Math.round((n / maxSPerDay) * 64));
       const isToday = d === new Date().toISOString().slice(0, 10);
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${n} scans">
-        <div style="width:100%;height:${h}px;background:${isToday ? "#B4924E" : "rgba(180,146,78,.35)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+        <div style="width:100%;height:${h}px;background:${isToday ? "#7B1A3A" : "rgba(123,26,58,.28)"};border-radius:2px 2px 0 0;min-height:2px;${isToday ? "box-shadow:0 0 8px rgba(123,26,58,.35)" : ""}"></div>
         <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
       </div>`;
     }).join("")}
@@ -12891,7 +12891,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
         const h = visits === 0 ? 2 : Math.max(4, Math.round((visits / maxVPerDay) * 64));
         const isToday = d === new Date().toISOString().slice(0, 10);
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${visits} views, ${uips} IPs">
-          <div style="width:100%;height:${h}px;background:${isToday ? "#1D4ED8" : "rgba(29,78,216,.3)"};border-radius:1px 1px 0 0;min-height:2px"></div>
+          <div style="width:100%;height:${h}px;background:${isToday ? "#1D4ED8" : "rgba(29,78,216,.25)"};border-radius:2px 2px 0 0;min-height:2px"></div>
           <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
         </div>`;
       }).join("")}
@@ -12907,7 +12907,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
           <span style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px;flex-shrink:0">${Number(p.visits).toLocaleString()}</span>
         </div>
         <div style="height:3px;background:rgba(0,0,0,.08);border-radius:2px">
-          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#B4924E;opacity:.8;border-radius:2px"></div>
+          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#7B1A3A;opacity:.7;border-radius:2px"></div>
         </div>
       </div>`).join("");
 
@@ -13048,118 +13048,152 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GovRevenue — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Spline+Sans+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --base:#F4F1E9;--surface:#FFFFFF;--surface-2:#F9F7F2;
-  --brand:#B4924E;--brand-dim:rgba(180,146,78,.1);--brand-mid:rgba(180,146,78,.3);
-  --border:#E5DFD4;--border-2:#D4CBBA;
-  --text:#1A1208;--muted:#7D6B50;--muted-2:#A8957C;
-  --green:#15803D;--green-bg:#F0FDF4;
-  --red:#B91C1C;--red-bg:#FEF2F2;
-  --amber:#92400E;--amber-bg:#FFFBEB;
-  --blue:#1D4ED8;--blue-bg:#EFF6FF;
-  --serif:"Newsreader",Georgia,serif;
-  --sans:"Libre Franklin",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --mono:"Spline Sans Mono","SF Mono",ui-monospace,Menlo,monospace;
+  --burg:#7B1A3A;--burg-2:#9B2E50;--burg-3:#B85070;
+  --burg-dim:rgba(123,26,58,.06);--burg-mid:rgba(123,26,58,.14);--burg-border:rgba(123,26,58,.22);
+  --base:#F5F1EE;--surface:#FFFFFF;--surface-2:#FAF8F6;--surface-3:#F2EEE9;
+  --border:#E4DDD6;--border-2:#CEC5BB;
+  --text:#1A100C;--muted:#7A6660;--muted-2:#A8948C;
+  --green:#166534;--green-bg:rgba(22,101,52,.08);--green-border:rgba(22,101,52,.22);
+  --red:#B91C1C;--red-bg:rgba(185,28,28,.07);--red-border:rgba(185,28,28,.2);
+  --amber:#92400E;--amber-bg:rgba(146,64,14,.08);--amber-border:rgba(146,64,14,.2);
+  --blue:#1D4ED8;--blue-bg:rgba(29,78,216,.08);--blue-border:rgba(29,78,216,.2);
+  --sg:'Space Grotesk',system-ui,sans-serif;
+  --mono:'Spline Sans Mono','SF Mono',ui-monospace,monospace;
+  --inter:'Inter',system-ui,sans-serif;
 }
-html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
-a{color:var(--brand);text-decoration:none}
+html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--inter);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--burg);text-decoration:none}
 a:hover{text-decoration:underline}
-.shell{display:flex;min-height:100vh}
-.sidebar{width:224px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
-.sb-brand{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
-.sb-logo{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
-.sb-logo b{color:var(--brand)}
-.sb-tag{font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin-top:4px}
-.sb-nav{padding:6px 0;flex:1}
-.sb-group{font-family:var(--mono);font-size:7.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);padding:12px 18px 3px}
-.sb-link{display:flex;align-items:center;gap:8px;padding:7px 18px;font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--muted);text-decoration:none!important;transition:color .12s,background .12s;border-left:2px solid transparent}
+::selection{background:rgba(123,26,58,.15);color:var(--burg)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+.shell{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
+/* ——— SIDEBAR ——— */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
+.sb-brand{padding:20px 20px 16px;background:linear-gradient(145deg,rgba(123,26,58,.05) 0%,rgba(255,255,255,0) 60%);border-bottom:1px solid var(--border)}
+.sb-logo-row{display:flex;align-items:center;gap:9px}
+.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--burg);box-shadow:0 0 8px rgba(123,26,58,.5);flex-shrink:0}
+.sb-logo{font-family:var(--sg);font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.sb-logo span{color:var(--burg)}
+.sb-tag{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin-top:8px;padding-left:17px}
+.sb-nav{padding:8px 0;flex:1}
+.sb-group{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);padding:14px 18px 5px}
+.sb-link{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-family:var(--inter);font-size:13px;font-weight:500;color:var(--muted);text-decoration:none!important;transition:color .11s,background .11s;border-left:2px solid transparent;margin:1px 0}
 .sb-link:hover{color:var(--text);background:var(--surface-2);text-decoration:none}
-.sb-link.active{color:var(--brand);border-left-color:var(--brand);background:var(--brand-dim)}
-.sb-count{margin-left:auto;background:var(--base);border:1px solid var(--border);font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:8px;color:var(--muted)}
-.sb-div{height:1px;background:var(--border);margin:4px 18px}
-.sb-foot{padding:12px;border-top:1px solid var(--border);margin-top:auto}
-.sb-token{font-family:var(--mono);font-size:8px;color:var(--muted-2);margin-bottom:8px;letter-spacing:.04em}
-.sb-action{display:block;width:100%;padding:7px 10px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:5px;transition:.12s;text-decoration:none;border-radius:5px}
-.sb-action:hover{background:var(--brand-dim);border-color:var(--brand-mid);color:var(--brand);text-decoration:none}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:150}
-.topbar-left{display:flex;align-items:center;gap:14px}
-.topbar-title{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--text)}
-.topbar-date{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
-.topbar-meta{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
-.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;animation:lp 2s infinite}
-@keyframes lp{0%,100%{opacity:1}50%{opacity:.25}}
+.sb-link.active{color:var(--burg);border-left-color:var(--burg);background:var(--burg-dim)}
+.sb-link.active .sb-count{background:var(--burg-dim);color:var(--burg);border-color:var(--burg-border)}
+.sb-count{font-family:var(--mono);font-size:10px;background:var(--base);border:1px solid var(--border);padding:1px 7px;border-radius:20px;color:var(--muted);flex-shrink:0}
+.sb-foot{padding:14px;border-top:1px solid var(--border);margin-top:auto}
+.sb-token{display:flex;align-items:center;gap:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:10px}
+.sb-token span:first-child{color:var(--muted-2);font-size:9px;letter-spacing:.06em}
+.sb-action{display:block;width:100%;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:6px;transition:.12s;text-decoration:none;border-radius:6px}
+.sb-action:hover{background:var(--burg-dim);border-color:var(--burg-border);color:var(--burg);text-decoration:none}
+/* ——— TOPBAR ——— */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 28px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:sticky;top:0;z-index:150}
+.topbar-left{display:flex;flex-direction:column;gap:2px}
+.topbar-crumb{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em}
+.topbar-crumb span{color:var(--border-2)}
+.topbar-crumb b{color:var(--burg)}
+.topbar-title{font-family:var(--sg);font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.clock-chip{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:7px 12px;background:var(--surface-2)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:lp 2.2s infinite}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.2}}
+.tb-btn{display:flex;align-items:center;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:7px 13px;border-radius:6px;cursor:pointer;transition:.12s;background:var(--surface);text-decoration:none}
+.tb-btn:hover{border-color:var(--burg-border);color:var(--burg);background:var(--burg-dim);text-decoration:none}
+/* ——— SECTIONS ——— */
 .section{padding:28px 28px 0}
-.s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid var(--border)}
-.s-eyebrow{font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:4px}
-.s-title{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.05;color:var(--text)}
-.s-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted-2)}
-.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.kpi{background:var(--surface);padding:18px 16px 14px}
-.kpi-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);margin-bottom:8px}
-.kpi-val{font-family:var(--serif);font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--text)}
-.kpi-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px}
-.kpi-green{color:var(--green)}.kpi-red{color:var(--red)}.kpi-gold{color:var(--brand)}.kpi-blue{color:var(--blue)}
-.stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
-.stat-cell{background:var(--surface-2);padding:14px 16px}
-.stat-val{font-family:var(--serif);font-size:22px;font-weight:600;color:var(--text);margin-bottom:2px}
-.stat-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+.s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.s-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--burg);margin-bottom:5px}
+.s-title{font-family:var(--sg);font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.05;color:var(--text)}
+.s-sub{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
+/* ——— KPI GRID ——— */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.kpi{background:var(--surface);padding:18px 16px 15px;position:relative}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--burg) 0%,var(--burg-3) 100%);opacity:.35}
+.kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:9px}
+.kpi-val{font-family:var(--sg);font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1;color:var(--text)}
+.kpi-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:7px}
+.kpi-burg{color:var(--burg)}.kpi-green{color:var(--green)}.kpi-red{color:var(--red)}.kpi-amber{color:var(--amber)}.kpi-blue{color:var(--blue)}
+/* ——— STAT STRIP ——— */
+.stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.stat-cell{background:var(--surface-2);padding:14px 18px}
+.stat-val{font-family:var(--sg);font-size:22px;font-weight:700;color:var(--text);margin-bottom:3px;line-height:1}
+.stat-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+/* ——— CARDS ——— */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px}
-.card{background:var(--surface);border:1px solid var(--border);padding:18px;border-radius:10px;transition:box-shadow .2s;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.07)}
-.card-head{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.card-head-val{color:var(--text);font-size:11px;text-transform:none;letter-spacing:0;font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);padding:18px 20px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:box-shadow .18s}
+.card:hover{box-shadow:0 4px 18px rgba(0,0,0,.07)}
+.card-head{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-head-val{color:var(--text);font-size:11.5px;text-transform:none;letter-spacing:0;font-weight:600}
+/* ——— TIER BARS ——— */
 .tier-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
-.tier-lbl{font-family:var(--mono);font-size:9.5px;width:52px;flex-shrink:0;color:var(--muted)}
-.tier-track{flex:1;height:5px;background:var(--border);border-radius:3px}
+.tier-lbl{font-family:var(--mono);font-size:10px;width:54px;flex-shrink:0;color:var(--muted)}
+.tier-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
 .tier-fill{height:100%;border-radius:3px}
-.tier-n{font-family:var(--mono);font-size:9.5px;color:var(--text);width:22px;text-align:right;flex-shrink:0;font-weight:600}
-.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.tier-n{font-family:var(--mono);font-size:10px;color:var(--text);width:22px;text-align:right;flex-shrink:0;font-weight:700}
+/* ——— TABLES ——— */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
 .scroll-tbl{max-height:480px;overflow-y:auto}
 table.a-tbl{border-collapse:collapse;width:100%;font-size:12px}
-table.a-tbl th{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface-2);position:sticky;top:0;z-index:10}
-table.a-tbl td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+table.a-tbl th{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface-3);position:sticky;top:0;z-index:10}
+table.a-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
 table.a-tbl tr:last-child td{border-bottom:none}
-table.a-tbl tr:hover td{background:var(--brand-dim)}
-.pill{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px;font-weight:600;border:1px solid}
-.pill-completed{background:var(--green-bg);color:var(--green);border-color:rgba(21,128,61,.2)}
-.pill-failed{background:var(--red-bg);color:var(--red);border-color:rgba(185,28,28,.2)}
-.pill-running,.pill-pending{background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)}
+table.a-tbl tr:hover td{background:var(--burg-dim)}
+/* ——— PILLS ——— */
+.pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:20px;font-weight:600;border:1px solid}
+.pill-completed{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.pill-failed{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.pill-running,.pill-pending{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
 .pill-free{background:var(--base);color:var(--muted);border-color:var(--border-2)}
-.pill-pro{background:var(--brand-dim);color:var(--brand);border-color:var(--brand-mid)}
-.pill-agency{background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)}
-.pill-active{background:var(--green-bg);color:var(--green);border-color:rgba(21,128,61,.2)}
+.pill-pro{background:var(--burg-dim);color:var(--burg);border-color:var(--burg-border)}
+.pill-agency{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+.pill-active{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .pill-inactive{background:var(--base);color:var(--muted);border-color:var(--border)}
-.a-btn{display:inline-block;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.12s;background:var(--surface);white-space:nowrap;border-radius:5px}
+/* ——— BUTTONS ——— */
+.a-btn{display:inline-flex;align-items:center;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.12s;background:var(--surface);white-space:nowrap;border-radius:6px}
 .a-btn:hover{background:var(--base);border-color:var(--border-2);color:var(--text);text-decoration:none}
-.a-btn-danger{border-color:rgba(185,28,28,.25);color:var(--red);background:var(--red-bg)}
+.a-btn-danger{border-color:var(--red-border);color:var(--red);background:var(--red-bg)}
 .a-btn-danger:hover{background:var(--red-bg);border-color:rgba(185,28,28,.4)}
-.a-btn-ok{border-color:rgba(21,128,61,.25);color:var(--green);background:var(--green-bg)}
-.a-btn-ok:hover{background:var(--green-bg);border-color:rgba(21,128,61,.4)}
-#sel-bar{display:none;align-items:center;gap:10px;padding:9px 28px;background:rgba(185,28,28,.05);border-bottom:1px solid rgba(185,28,28,.12);position:sticky;top:46px;z-index:140}
+.a-btn-ok{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
+.a-btn-ok:hover{background:var(--green-bg);border-color:rgba(22,101,52,.4)}
+.a-btn-burg{border-color:var(--burg-border);color:var(--burg);background:var(--burg-dim)}
+.a-btn-burg:hover{background:rgba(123,26,58,.1);border-color:rgba(123,26,58,.35)}
+/* ——— SEL BAR ——— */
+#sel-bar{display:none;align-items:center;gap:10px;padding:9px 28px;background:rgba(185,28,28,.05);border-bottom:1px solid rgba(185,28,28,.12);position:sticky;top:52px;z-index:140}
 #sel-bar.visible{display:flex}
-.a-alert-ok{padding:10px 18px;background:var(--green-bg);border:1px solid rgba(21,128,61,.2);color:var(--green);font-family:var(--mono);font-size:10.5px;margin-bottom:14px;border-radius:6px}
+/* ——— MISC ——— */
+.a-alert-ok{padding:11px 18px;background:var(--green-bg);border:1px solid var(--green-border);color:var(--green);font-family:var(--mono);font-size:10.5px;margin-bottom:14px;border-radius:7px}
 .env-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
 .env-row:last-child{border-bottom:none}
-.env-key{font-family:var(--mono);font-size:10px;color:var(--muted);width:210px;flex-shrink:0}
-.env-set{color:var(--green);font-family:var(--mono);font-size:10px;font-weight:600}
-.env-unset{color:var(--muted-2);opacity:.6;font-family:var(--mono);font-size:10px}
+.env-key{font-family:var(--mono);font-size:10px;color:var(--muted);width:215px;flex-shrink:0}
+.env-set{color:var(--green);font-family:var(--mono);font-size:10px;font-weight:700}
+.env-unset{color:var(--muted-2);font-family:var(--mono);font-size:10px;opacity:.6}
 .env-val{font-family:var(--mono);font-size:10px;color:var(--text)}
-.gap{height:28px}
-input[type=checkbox]{accent-color:var(--brand);width:12px;height:12px;cursor:pointer}
-.insight-num{font-family:var(--serif);font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--text)}
-.insight-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:5px}
+.gap{height:32px}
+input[type=checkbox]{accent-color:var(--burg);width:13px;height:13px;cursor:pointer}
+.insight-num{font-family:var(--sg);font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1;color:var(--text)}
+.insight-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:5px}
+.insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px}
+.insight-cell{background:var(--surface-2);padding:16px 18px}
 </style>
 </head>
 <body>
 <div class="shell">
+
+<!-- ===== SIDEBAR ===== -->
 <aside class="sidebar">
   <div class="sb-brand">
-    <div class="sb-logo">Gov<b>Revenue</b></div>
+    <div class="sb-logo-row">
+      <div class="sb-dot"></div>
+      <div class="sb-logo">Gov<span>Revenue</span></div>
+    </div>
     <div class="sb-tag">Command Centre</div>
   </div>
   <nav class="sb-nav">
@@ -13175,37 +13209,40 @@ input[type=checkbox]{accent-color:var(--brand);width:12px;height:12px;cursor:poi
     <a href="#briefing" class="sb-link">Briefing <span class="sb-count">${briefing.length}</span></a>
     <div class="sb-group">Content</div>
     <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles <span class="sb-count">${articleStats.total||0}</span></a>
-    <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comments${Number(commentStats.pending||0)>0?` <span class="sb-count" style="background:var(--amber-bg);color:var(--amber);border-color:rgba(146,64,14,.2)">${commentStats.pending}</span>`:""}</a>
+    <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comments${Number(commentStats.pending||0)>0?` <span class="sb-count" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)">${commentStats.pending}</span>`:""}</a>
     <div class="sb-group">System</div>
-    <a href="#system" class="sb-link">System Status</a>
+    <a href="#system" class="sb-link">System Status <span style="display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9.5px;color:var(--green)"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);animation:lp 2s infinite"></span>OK</span></a>
   </nav>
   <div class="sb-foot">
-    <div class="sb-token">Token: ****${escapeHtml(token.slice(-6))}</div>
+    <div class="sb-token"><span>TOKEN</span><span>••••${escapeHtml(token.slice(-6))}</span></div>
     <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')">
-      <button class="sb-action" type="submit">↻ Rebuild signals</button>
+      <button class="sb-action" type="submit">↻ Rebuild Signals</button>
     </form>
     <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all desk caches?')">
-      <button class="sb-action" type="submit">↻ Rebuild desks</button>
+      <button class="sb-action" type="submit">↻ Rebuild Desks</button>
     </form>
     <a href="/admin/subscriptions?token=${encodeURIComponent(token)}" class="sb-action">→ Subscriptions</a>
   </div>
 </aside>
-<div class="main">
 
-<div class="topbar">
+<!-- ===== MAIN ===== -->
+<main style="min-width:0;display:flex;flex-direction:column">
+
+<header class="topbar">
   <div class="topbar-left">
-    <div class="topbar-title">Admin Dashboard</div>
-    <div class="topbar-date"><span class="live-dot"></span><span id="aclock">${new Date().toISOString().slice(0,19).replace("T"," ")} UTC</span></div>
+    <div class="topbar-crumb"><span>ADMIN</span><span>/</span><b>SCANS</b></div>
+    <div class="topbar-title">Scan Intelligence</div>
   </div>
-  <div class="topbar-meta">
-    <a href="/admin/scans?token=${encodeURIComponent(token)}" style="color:var(--brand);font-weight:600">↻ Refresh</a>
-    <a href="/" target="_blank" style="color:var(--muted)">↗ Live site</a>
+  <div class="topbar-right">
+    <div class="clock-chip"><div class="live-dot"></div><span id="aclock" style="font-size:11px">${new Date().toISOString().slice(0,19).replace("T"," ")} UTC</span></div>
+    <a href="/admin/scans?token=${encodeURIComponent(token)}" class="tb-btn">↻ Refresh</a>
+    <a href="/" target="_blank" class="tb-btn">↗ Live site</a>
   </div>
-</div>
+</header>
 
 ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} scan(s) re-queued.</div>` : ""}
 <div id="sel-bar">
-  <span id="sel-count" style="font-family:var(--mono);font-size:11px">0 selected</span>
+  <span id="sel-count" style="font-family:var(--mono);font-size:11px;color:var(--muted)">0 selected</span>
   <button class="a-btn a-btn-ok" onclick="bulkAction('rerun')">↻ Re-run</button>
   <button class="a-btn a-btn-danger" onclick="bulkAction('delete')">✕ Delete</button>
 </div>
@@ -13217,7 +13254,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §1 OVERVIEW -->
 <section class="section" id="overview">
   <div class="s-head">
-    <div><div class="s-eyebrow">Dashboard</div><div class="s-title">Overview</div></div>
+    <div>
+      <div class="s-eyebrow">Dashboard</div>
+      <div class="s-title">Overview</div>
+    </div>
     <div class="s-sub">${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
   </div>
 
@@ -13239,12 +13279,12 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Open Signals</div>
-      <div class="kpi-val kpi-gold">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div>
+      <div class="kpi-val kpi-burg">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div>
       <div class="kpi-sub">${sigs.new_24h || 0} new &middot; ${sigs.closing_7d || 0} closing soon</div>
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Open Value</div>
-      <div class="kpi-val" style="font-size:22px">${fmtMoney(Number(sigs.open_value || 0))}</div>
+      <div class="kpi-val kpi-burg" style="font-size:22px">${fmtMoney(Number(sigs.open_value || 0))}</div>
       <div class="kpi-sub">${sigs.categories || 0} active desks</div>
     </div>
     <div class="kpi">
@@ -13258,7 +13298,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div class="card">
       <div class="card-head">User Breakdown <span class="card-head-val">${us.total || 0} total</span></div>
       <div class="tier-row"><span class="tier-lbl">Free</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalFreeCount/totalUserCount)}%;background:var(--muted-2)"></div></div><span class="tier-n">${us.free_count || 0}</span></div>
-      <div class="tier-row"><span class="tier-lbl" style="color:var(--brand)">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--brand)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:var(--burg)">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--burg)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
       <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:var(--amber)">Agency</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalAgencyCount/totalUserCount)}%;background:var(--amber)"></div></div><span class="tier-n">${us.agency_count || 0}</span></div>
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
         <div class="tier-row"><span class="tier-lbl" style="color:var(--green);font-size:9px">Alerts</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*activeSubCount/totalUserCount))}%;background:var(--green)"></div></div><span class="tier-n">${activeSubCount}</span></div>
@@ -13275,15 +13315,13 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
         const n = gradeCount[g] || 0;
         const gradedTotal = Math.max(1, scans.filter((s:any) => s.edp?.evidenceGrade).length);
         const pct = Math.round((n / gradedTotal) * 100);
-        const gc = g==="A"?"var(--green)":g==="B"?"var(--blue)":g==="C"?"var(--amber)":g==="D"?"var(--red)":"var(--muted)";
-        return `<div style="margin-bottom:11px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span style="font-family:var(--serif);font-size:15px;font-weight:700;color:${gc}">Grade ${g}</span>
-            <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${n} <span style="opacity:.55">(${pct}%)</span></span>
-          </div>
-          <div style="height:5px;background:var(--border);border-radius:3px">
-            <div style="width:${pct}%;height:100%;background:${gc};opacity:.75;border-radius:3px"></div>
-          </div>
+        const col = g==="A"?"var(--green)":g==="B"?"var(--blue)":g==="C"?"var(--amber)":g==="D"?"var(--red)":"var(--muted)";
+        const bg = g==="A"?"var(--green-bg)":g==="B"?"var(--blue-bg)":g==="C"?"var(--amber-bg)":g==="D"?"var(--red-bg)":"var(--base)";
+        const bd = g==="A"?"var(--green-border)":g==="B"?"var(--blue-border)":g==="C"?"var(--amber-border)":g==="D"?"var(--red-border)":"var(--border)";
+        return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
+          <span style="font-family:var(--mono);font-size:11.5px;font-weight:700;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:${col};background:${bg};border:1px solid ${bd};flex-shrink:0">${g}</span>
+          <div style="flex:1;height:6px;background:var(--border);border-radius:20px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:20px"></div></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);width:64px;text-align:right">${n} · ${pct}%</span>
         </div>`;
       }).join("")}
     </div>
@@ -13294,7 +13332,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §2 SCANS -->
 <section class="section" id="scans">
   <div class="s-head">
-    <div><div class="s-eyebrow">Database</div><div class="s-title">Scan Intelligence</div></div>
+    <div>
+      <div class="s-eyebrow">Database</div>
+      <div class="s-title">Scan Intelligence</div>
+    </div>
     <div class="s-sub">${scans.length} records &middot; most recent first &middot; all form fields</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
@@ -13323,7 +13364,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §3 USERS -->
 <section class="section" id="users">
   <div class="s-head">
-    <div><div class="s-eyebrow">Database</div><div class="s-title">Registered Users</div></div>
+    <div>
+      <div class="s-eyebrow">Database</div>
+      <div class="s-title">Registered Users</div>
+    </div>
     <div class="s-sub">${users.length} accounts</div>
   </div>
   <div class="tbl-wrap scroll-tbl">
@@ -13338,7 +13382,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §4 VISITORS -->
 <section class="section" id="visitors">
   <div class="s-head">
-    <div><div class="s-eyebrow">Analytics</div><div class="s-title">Visitor Intelligence</div></div>
+    <div>
+      <div class="s-eyebrow">Analytics</div>
+      <div class="s-title">Visitor Intelligence</div>
+    </div>
     <div class="s-sub">HTML page views only &middot; x-forwarded-for IPs &middot; API/admin excluded</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
@@ -13362,13 +13409,16 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §5 SIGNALS -->
 <section class="section" id="signals">
   <div class="s-head">
-    <div><div class="s-eyebrow">Intelligence</div><div class="s-title">Live Signal Database</div></div>
+    <div>
+      <div class="s-eyebrow">Intelligence</div>
+      <div class="s-title">Live Signal Database</div>
+    </div>
     <div class="s-sub">${Number(sigs.total || 0).toLocaleString()} notices indexed</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(6,1fr)">
     <div class="stat-cell"><div class="stat-val" style="color:var(--green)">${Number(sigs.open_count || 0).toLocaleString()}</div><div class="stat-lbl">Open now</div></div>
     <div class="stat-cell"><div class="stat-val" style="font-size:18px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="stat-lbl">Open value</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:var(--brand)">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--burg)">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
     <div class="stat-cell"><div class="stat-val" style="color:var(--amber)">${sigs.closing_7d || 0}</div><div class="stat-lbl">Closing &lt;7d</div></div>
     <div class="stat-cell"><div class="stat-val">${sigs.categories || 0}</div><div class="stat-lbl">Active desks</div></div>
     <div class="stat-cell"><div class="stat-val">${Number(sigs.total || 0).toLocaleString()}</div><div class="stat-lbl">Total indexed</div></div>
@@ -13379,7 +13429,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §6 ALERTS -->
 <section class="section" id="alerts">
   <div class="s-head">
-    <div><div class="s-eyebrow">Notifications</div><div class="s-title">Weekly Alerts</div></div>
+    <div>
+      <div class="s-eyebrow">Notifications</div>
+      <div class="s-title">Weekly Alerts</div>
+    </div>
     <div class="s-sub">${subscriptions.length} total &middot; ${activeSubCount} active</div>
   </div>
   <div class="tbl-wrap scroll-tbl" style="margin-bottom:0">
@@ -13394,7 +13447,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §7 BRIEFING -->
 <section class="section" id="briefing">
   <div class="s-head">
-    <div><div class="s-eyebrow">Notifications</div><div class="s-title">Briefing Subscribers</div></div>
+    <div>
+      <div class="s-eyebrow">Notifications</div>
+      <div class="s-title">Briefing Subscribers</div>
+    </div>
     <div class="s-sub">${briefing.length} subscribers</div>
   </div>
   <div class="tbl-wrap">
@@ -13409,28 +13465,31 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §8 CONTENT -->
 <section class="section" id="content">
   <div class="s-head">
-    <div><div class="s-eyebrow">CMS</div><div class="s-title">Content</div></div>
+    <div>
+      <div class="s-eyebrow">CMS</div>
+      <div class="s-title">Content</div>
+    </div>
     <div class="s-sub">Articles &amp; comment moderation</div>
   </div>
   <div class="two-col">
     <div class="card">
       <div class="card-head">Articles</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num">${articleStats.total||0}</div><div class="insight-lbl">Total</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--green)">${articleStats.published||0}</div><div class="insight-lbl">Published</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--muted)">${articleStats.draft||0}</div><div class="insight-lbl">Drafts</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--blue)">${Number(articleStats.total_views||0).toLocaleString()}</div><div class="insight-lbl">Total Views</div></div>
+      <div class="insight-grid">
+        <div class="insight-cell"><div class="insight-num">${articleStats.total||0}</div><div class="insight-lbl">Total</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:var(--green)">${articleStats.published||0}</div><div class="insight-lbl">Published</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:var(--muted)">${articleStats.draft||0}</div><div class="insight-lbl">Drafts</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:var(--blue)">${Number(articleStats.total_views||0).toLocaleString()}</div><div class="insight-lbl">Total Views</div></div>
       </div>
       <a href="/admin/articles?token=${encodeURIComponent(token)}" class="a-btn a-btn-ok" style="margin-right:6px">→ Manage articles</a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="a-btn">+ New article</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="a-btn a-btn-burg">+ New article</a>
     </div>
     <div class="card">
-      <div class="card-head">Comment Queue ${Number(commentStats.pending||0)>0?`<span style="background:var(--amber-bg);color:var(--amber);border:1px solid rgba(146,64,14,.2);padding:2px 7px;border-radius:8px;font-size:9px;font-family:var(--mono)">${commentStats.pending} pending</span>`:""}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num">${commentStats.total||0}</div><div class="insight-lbl">Total</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--green)">${commentStats.approved||0}</div><div class="insight-lbl">Approved</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:${Number(commentStats.pending||0)>0?"var(--amber)":"var(--muted)"}">${commentStats.pending||0}</div><div class="insight-lbl">Pending</div></div>
-        <div style="background:var(--surface-2);padding:16px"><div class="insight-num" style="color:var(--muted)">${Math.max(0,Number(commentStats.total||0)-Number(commentStats.approved||0)-Number(commentStats.pending||0))}</div><div class="insight-lbl">Hidden / Spam</div></div>
+      <div class="card-head">Comment Queue ${Number(commentStats.pending||0)>0?`<span style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);padding:2px 8px;border-radius:20px;font-size:9px;font-family:var(--mono)">${commentStats.pending} pending</span>`:""}</div>
+      <div class="insight-grid">
+        <div class="insight-cell"><div class="insight-num">${commentStats.total||0}</div><div class="insight-lbl">Total</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:var(--green)">${commentStats.approved||0}</div><div class="insight-lbl">Approved</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:${Number(commentStats.pending||0)>0?"var(--amber)":"var(--muted)"}">${commentStats.pending||0}</div><div class="insight-lbl">Pending</div></div>
+        <div class="insight-cell"><div class="insight-num" style="color:var(--muted)">${Math.max(0,Number(commentStats.total||0)-Number(commentStats.approved||0)-Number(commentStats.pending||0))}</div><div class="insight-lbl">Hidden/Spam</div></div>
       </div>
       <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="a-btn ${Number(commentStats.pending||0)>0?"a-btn-ok":""}">→ Review queue</a>
     </div>
@@ -13441,19 +13500,22 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 <!-- §9 SYSTEM -->
 <section class="section" id="system">
   <div class="s-head">
-    <div><div class="s-eyebrow">Infrastructure</div><div class="s-title">System Status</div></div>
+    <div>
+      <div class="s-eyebrow">Infrastructure</div>
+      <div class="s-title">System Status</div>
+    </div>
     <div class="s-sub">Uptime ${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s &middot; Node ${process.version}</div>
   </div>
   <div class="two-col" style="margin-bottom:14px">
     <div class="card">
       <div class="card-head">Environment Variables</div>
-      ${envRows.map(([k, set]) => `<div class="env-row"><span class="env-key">${k}</span><span class="${set ? "env-set" : "env-unset"}">${set ? "✓  Set" : "✗  Not set"}</span></div>`).join("")}
+      ${envRows.map(([k, set]) => `<div class="env-row"><span class="env-key">${k}</span><span class="${set ? "env-set" : "env-unset"}">${set ? "✓ Set" : "✗ Not set"}</span></div>`).join("")}
     </div>
     <div class="card">
       <div class="card-head">Runtime Config</div>
       ${configRows.map(([k, v]) => `<div class="env-row"><span class="env-key">${escapeHtml(k)}</span><span class="env-val">${escapeHtml(v)}</span></div>`).join("")}
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <div style="font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px">Quick Actions</div>
+        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px">Quick Actions</div>
         <div style="display:flex;gap:7px;flex-wrap:wrap">
           <form method="POST" action="/admin/signals/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all signals?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild signals</button></form>
           <form method="POST" action="/admin/desks/rebuild?token=${encodeURIComponent(token)}" onsubmit="return confirm('Rebuild all 24 desk caches?')"><button class="a-btn a-btn-ok" type="submit">↻ Rebuild desks</button></form>
@@ -13463,16 +13525,16 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     </div>
   </div>
 </section>
-<div style="height:48px"></div>
-</div><!-- .main -->
-</div><!-- .shell -->
+<div style="text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--muted-2);padding:16px 0 32px;letter-spacing:.08em">GOVREVENUE ADMIN &middot; POSTGRESQL CONNECTED &middot; BULLMQ + REDIS &middot; NODE ${process.version} &middot; CLAUDE OPUS PRIMARY</div>
+</main>
+</div>
 
 <script>
 setInterval(function(){var el=document.getElementById('aclock');if(el)el.textContent=new Date().toISOString().slice(0,19).replace('T',' ')+' UTC';},1000);
 var sections=document.querySelectorAll('section[id]');
 var navLinks=document.querySelectorAll('.sb-link[href^="#"]');
-function updateNav(){var cur='';sections.forEach(function(s){if(window.scrollY>=s.offsetTop-70)cur=s.id;});navLinks.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+cur);});}
-window.addEventListener('scroll',updateNav);updateNav();
+function updateNav(){var cur='';sections.forEach(function(s){if(window.scrollY>=s.offsetTop-80)cur=s.id;});navLinks.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+cur);});}
+window.addEventListener('scroll',updateNav,{passive:true});updateNav();
 var chkAll=document.getElementById('chk-all');
 var selBar=document.getElementById('sel-bar');
 var selCount=document.getElementById('sel-count');
