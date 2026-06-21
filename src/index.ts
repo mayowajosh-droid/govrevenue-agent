@@ -2078,7 +2078,6 @@ async function renderArticleImages(articleId: string): Promise<void> {
         n: 1,
         size: dalleSize as "1024x1024" | "1792x1024" | "1024x1792",
         quality: "standard",
-        response_format: "url",
       });
 
       const tempUrl = response.data?.[0]?.url;
@@ -13342,7 +13341,7 @@ app.get("/admin/articles/test-dalle", requireAdmin, asyncRoute(async (_req, res)
   try {
     const r = await openai.images.generate({
       model: "dall-e-3", prompt: "A simple red circle on a white background.", n: 1,
-      size: "1024x1024", quality: "standard", response_format: "url",
+      size: "1024x1024", quality: "standard",
     });
     res.json({ ok: true, url: r.data?.[0]?.url ?? null });
   } catch (err: any) {
