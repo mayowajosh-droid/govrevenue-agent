@@ -8423,7 +8423,7 @@ canvas#detailChart{display:block;width:100%}
 .bname{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:70px;text-align:right}
 .bcnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:60px;text-align:right;white-space:nowrap}
-.brief-sec{padding:72px 0;border-bottom:1px solid var(--border);background:var(--base)}
+.brief-sec{padding:72px 0;border-bottom:1px solid var(--border);background:#F7F4EE}
 .brief-wrap{max-width:1160px;margin:0 auto;padding:0 40px}
 .brief-intro{max-width:680px;margin-bottom:56px}
 .brief-art{display:grid;grid-template-columns:100px 1fr;gap:0 52px;padding:52px 0;border-top:1px solid var(--border)}
@@ -8545,35 +8545,6 @@ ${pageShellHeader(null, getAuthUser(req))}
         <span class="kcard-sub">3-month trailing vs opening &middot; peak ${escapeHtml(peakPoint.label)}</span>
       </div>
     </div>
-  </div>
-</section>
-
-<section class="pipe-band" aria-label="Pipeline urgency">
-  <div class="pipe-inner">
-    <span class="pipe-label">Active window</span>
-    <div class="pipe-cells">
-      <div class="pipe-cell">
-        <div class="pipe-val c-grn">${totalOpenCount.toLocaleString()}</div>
-        <div class="pipe-sub">Open now</div>
-        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:100%"></div></div>
-      </div>
-      <div class="pipe-cell">
-        <div class="pipe-val">${closing30.toLocaleString()}</div>
-        <div class="pipe-sub">Closing ≤ 30 days</div>
-        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:${totalOpenCount > 0 ? Math.round((closing30 / totalOpenCount) * 100) : 50}%;background:#B4924E"></div></div>
-      </div>
-      <div class="pipe-cell">
-        <div class="pipe-val urgent">${closing60.toLocaleString()}</div>
-        <div class="pipe-sub">Closing ≤ 60 days</div>
-        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:${totalOpenCount > 0 ? Math.round((closing60 / totalOpenCount) * 100) : 70}%;background:#f87171"></div></div>
-      </div>
-      <div class="pipe-cell">
-        <div class="pipe-val" style="color:#C8A96B">${fmtBnShort(openPipelineM)}</div>
-        <div class="pipe-sub">Pipeline value</div>
-        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:85%;background:#C8A96B"></div></div>
-      </div>
-    </div>
-    <div class="pipe-cta"><a href="/signals?status=open">Browse open &rarr;</a></div>
   </div>
 </section>
 
