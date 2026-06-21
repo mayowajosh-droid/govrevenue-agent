@@ -9678,17 +9678,17 @@ html{scroll-behavior:smooth}
 .dm-mast-cta p{font-size:14px;line-height:1.55;margin-bottom:16px;color:#C5C9BC}
 .btn-cta{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--brand);color:#10110D;font-family:var(--sans);font-size:14px;font-weight:600;padding:14px;transition:.18s}
 .btn-cta:hover{background:var(--brand-hot)}
-/* Hero category chart */
+/* Hero monthly spend chart */
 .dm-hero-chart{display:flex;flex-direction:column;padding-top:6px}
-.dm-hero-chart-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(180,146,78,.65);margin-bottom:18px}
-.dm-hero-chart-bars{display:flex;align-items:flex-end;gap:10px;height:160px;border-bottom:1px solid rgba(236,230,214,.1);padding-bottom:0}
+.dm-hero-chart-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(180,146,78,.65);margin-bottom:14px}
+.dm-hero-chart-bars{display:flex;align-items:flex-end;gap:5px;height:150px;border-bottom:1px solid rgba(236,230,214,.1);padding-bottom:0}
 .dm-hero-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;cursor:default}
-.dm-hero-bar-val{font-family:var(--mono);font-size:8px;color:rgba(180,146,78,.65);margin-bottom:4px;text-align:center;white-space:nowrap}
-.dm-hero-bar{width:100%;background:linear-gradient(to top,rgba(180,146,78,.35),rgba(180,146,78,.72));border-radius:2px 2px 0 0;transition:opacity .15s}
+.dm-hero-bar-val{font-family:var(--mono);font-size:7px;color:rgba(180,146,78,.6);margin-bottom:3px;text-align:center;white-space:nowrap;line-height:1}
+.dm-hero-bar{width:100%;background:linear-gradient(to top,rgba(180,146,78,.32),rgba(180,146,78,.75));border-radius:2px 2px 0 0;transition:opacity .15s}
 .dm-hero-col:hover .dm-hero-bar{opacity:.8}
 .dm-hero-col:hover .dm-hero-bar-val{color:rgba(180,146,78,.9)}
-.dm-hero-bar-label{font-family:var(--mono);font-size:7.5px;color:rgba(236,230,214,.38);text-align:center;padding:8px 2px 0;line-height:1.45;overflow:hidden;max-width:100%}
-.dm-hero-chart-foot{font-family:var(--mono);font-size:8.5px;color:rgba(236,230,214,.25);margin-top:10px;letter-spacing:.04em}
+.dm-hero-bar-label{font-family:var(--mono);font-size:6.5px;color:rgba(236,230,214,.35);text-align:center;padding:6px 0 0;line-height:1.4;overflow:hidden;max-width:100%}
+.dm-hero-chart-foot{font-family:var(--mono);font-size:8px;color:rgba(236,230,214,.22);margin-top:9px;letter-spacing:.04em}
 /* Three panels — dark intelligence surface */
 .dp-panels{background:var(--base);border-bottom:1px solid rgba(255,255,255,.04)}
 .dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--border)}
@@ -9915,20 +9915,22 @@ ${pageShellHeader(profile, authCtx)}
         <span>Public record only. Sourced from Contracts Finder and Find a Tender.</span>
       </div>
     </div>
-    ${profile.live && !isCompiling && topCats.length >= 2 ? `<div class="dm-hero-chart">
-      <div class="dm-hero-chart-eyebrow">CATEGORY SPEND &mdash; 12M</div>
+    ${profile.live && !isCompiling && trendData.length >= 2 ? `<div class="dm-hero-chart">
+      <div class="dm-hero-chart-eyebrow">MONTHLY AWARDED SPEND &mdash; 12M</div>
       <div class="dm-hero-chart-bars">
-        ${topCats.map(c => {
-          const pct = Math.max(Math.round((c.value / maxCatVal) * 100), 5);
-          const label = c.label.replace(/&.*$/, "").replace(/\s*\(.*\)/, "").trim().slice(0, 16);
-          return `<div class="dm-hero-col" title="${escapeHtml(c.label + ": " + fmtShort(c.value))}">
-            <div class="dm-hero-bar-val">${escapeHtml(fmtShort(c.value))}</div>
+        ${trendData.map(([key, val]) => {
+          const pct = Math.max(Math.round((val / maxMonthVal) * 100), 3);
+          const dt = new Date(key + "-01");
+          const mo = dt.toLocaleDateString("en-GB", { month: "short" });
+          const yr = String(dt.getFullYear()).slice(2);
+          return `<div class="dm-hero-col" title="${escapeHtml(mo + " '" + yr + ": " + fmtShort(val))}">
+            <div class="dm-hero-bar-val">${escapeHtml(fmtShort(val))}</div>
             <div class="dm-hero-bar" style="height:${pct}%"></div>
-            <div class="dm-hero-bar-label">${escapeHtml(label)}</div>
+            <div class="dm-hero-bar-label">${escapeHtml(mo)}<br><span style="opacity:.7">${escapeHtml("'" + yr)}</span></div>
           </div>`;
         }).join("")}
       </div>
-      <div class="dm-hero-chart-foot">Awarded spend by category &mdash; public record</div>
+      <div class="dm-hero-chart-foot">Monthly awarded contract value &mdash; public record &middot; ${trendData.length} months</div>
     </div>` : `<div></div>`}
     <div class="dm-mast-cta">
       <p>Find out if your firm fits this desk. A scan compares your services against live ${escapeHtml(profile.label)} procurement and returns a sourced verdict in minutes.</p>
@@ -9946,8 +9948,6 @@ ${pulseHtml}
     <div class="dp-panel">${watchlistHtml}</div>
   </div>
 </div>
-
-${analyticsHtml}
 
 ${recentAwardsHtml}
 
