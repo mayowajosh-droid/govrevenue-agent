@@ -1942,10 +1942,13 @@ function renderPullQuote(content: string): string {
 }
 
 function parseShortcodes(bodyMd: string, assets: ArticleAssetRow[] = []): string {
+  // Normalise line endings so the regex works regardless of how body was saved
+  const normMd = bodyMd.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const assetMap = new Map(assets.map(a => [a.position_key, a]));
   let result = "";
-  let remaining = bodyMd;
+  let remaining = normMd;
   const re = /^:::(image|gif|record|quote)(\{[^}]*\})?[ \t]*\n([\s\S]*?)^:::[ \t]*$/m;
+  let imgIdx = 0;
 
   while (remaining.length > 0) {
     const m = re.exec(remaining);
@@ -1966,7 +1969,9 @@ function parseShortcodes(bodyMd: string, assets: ArticleAssetRow[] = []): string
     const captionLine = inner.trim();
 
     if (type === "image") {
-      const posKey = attrs.key || `img-${m.index}`;
+      // Use sequential index matching renderArticleImages, so assets look up correctly
+      const posKey = attrs.key || `img-${imgIdx}`;
+      imgIdx++;
       const asset = assetMap.get(posKey);
       result += renderImageCard(
         asset?.image_url ?? attrs.src ?? null,
@@ -13371,13 +13376,14 @@ app.get("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
 
 app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
   const token = String(req.query.token ?? "");
-  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md, action } = req.body;
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMdNew, action } = req.body;
+  const body_md = rawBodyMdNew != null ? String(rawBodyMdNew).replace(/\r\n/g, "\n").replace(/\r/g, "\n") : "";
 
   const rawSlug = slugInput || slugify(title ?? "untitled");
   const finalSlug = rawSlug.replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
   const id = `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
-  const rt = computeReadingTime(body_md ?? "");
+  const rt = computeReadingTime(body_md);
   const publishedAt = action === "publish" ? now : (status === "scheduled" && scheduled_at ? new Date(scheduled_at).toISOString() : null);
   const finalStatus: ArticleStatus = action === "publish" ? "published" : (status as ArticleStatus) ?? "draft";
 
@@ -13412,7 +13418,8 @@ app.post("/admin/articles/:id", requireAdmin, asyncRoute(async (req, res) => {
   const article = await getArticleById(req.params.id);
   if (!article) { res.status(404).send(notFoundHtml("Article not found")); return; }
 
-  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md } = req.body;
+  const { title, dek, eyebrow, desk, hero_prompt, status, scheduled_at, slug: slugInput, body_md: rawBodyMd } = req.body;
+  const body_md = rawBodyMd != null ? String(rawBodyMd).replace(/\r\n/g, "\n").replace(/\r/g, "\n") : undefined;
   const now = new Date().toISOString();
   const rt = computeReadingTime(body_md ?? article.body_md);
   const newSlug = (slugInput ?? article.slug).replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
