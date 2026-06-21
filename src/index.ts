@@ -5016,11 +5016,19 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
     const date = featured.published_at
       ? new Date(featured.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }).toUpperCase()
       : "";
+    const quoteOverlay = `
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(6,18,10,.72) 0%,rgba(10,28,18,.58) 100%)"></div>
+      <div style="position:relative;padding:32px;display:flex;flex-direction:column;justify-content:center;gap:12px;height:100%;min-height:240px">
+        ${featured.dek ? `<p style="font-family:var(--serif);font-size:16px;font-style:italic;color:rgba(236,230,214,.92);line-height:1.6;margin:0;text-shadow:0 1px 6px rgba(0,0,0,.5)">"${escapeHtml(featured.dek)}"</p>` : ""}
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(180,146,78,.85);margin-top:4px">${escapeHtml(featured.eyebrow || featured.desk || "Article")}</span>
+      </div>`;
     const rightPanel = featured.hero_image_url
-      ? `<div style="background-image:url('${escapeHtml(featured.hero_image_url)}');background-size:cover;background-position:center;border-left:1px solid rgba(236,230,214,.14)"></div>`
-      : `<div style="background:#0C1F15;border-left:1px solid rgba(236,230,214,.14);padding:32px 32px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-           ${featured.dek ? `<p style="font-family:var(--serif);font-size:17px;font-style:italic;color:#C5C9BC;line-height:1.55;margin:0">"${escapeHtml(featured.dek)}"</p>` : ""}
-           <span style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9AA093;margin-top:10px">${escapeHtml(featured.eyebrow || featured.desk || "Article")}</span>
+      ? `<div style="position:relative;overflow:hidden;border-left:1px solid rgba(236,230,214,.14)">
+           <div style="position:absolute;inset:-24px;background-image:url('${escapeHtml(featured.hero_image_url)}');background-size:cover;background-position:center;filter:blur(10px);transform:scale(1.08)"></div>
+           ${quoteOverlay}
+         </div>`
+      : `<div style="position:relative;overflow:hidden;background:#0C1F15;border-left:1px solid rgba(236,230,214,.14)">
+           ${quoteOverlay}
          </div>`;
     return `
 <section style="max-width:1160px;margin:0 auto;padding:40px 32px 0">
