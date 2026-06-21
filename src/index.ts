@@ -5177,6 +5177,9 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/render-images?token=${encodeURIComponent(token)}" style="display:inline">
       <button class="al-btn" type="submit" style="font-size:10px;padding:5px 10px" title="Regenerate all images for this article">🖼 Images</button>
     </form>
+    <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/repost?token=${encodeURIComponent(token)}" onsubmit="return confirm('Repost this article from scratch? The current version will be deleted and recreated with fresh images.')" style="display:inline">
+      <button class="al-btn" type="submit" style="font-size:10px;padding:5px 10px;color:#92400e;border-color:rgba(146,64,14,.3);background:rgba(146,64,14,.07)" title="Delete and recreate this article from scratch (resets images, revisions)">↺ Repost</button>
+    </form>
     <form method="POST" action="/admin/articles/${escapeHtml(a.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete this article?')" style="display:inline">
       <button class="al-btn al-btn-danger" type="submit" style="font-size:10px;padding:5px 10px">Delete</button>
     </form>
@@ -5311,13 +5314,13 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
           <input class="al-input" name="slug" value="${slug}">
         </div>` : ""}
       </div>
-      <div class="al-actions" style="margin-bottom:14px">
-        <button class="al-btn al-btn-primary" type="submit" name="action" value="save">Save draft</button>
-        ${extraActions}
-        ${isNew ? `<button class="al-btn al-btn-primary" type="submit" name="action" value="publish">Publish now</button>` : ""}
-        <a href="/admin/articles?token=${encodeURIComponent(token)}" class="al-btn">Cancel</a>
-      </div>
     </form>
+    <div class="al-actions" style="margin-bottom:14px">
+      <button class="al-btn al-btn-primary" type="submit" form="article-form" name="action" value="save">Save draft</button>
+      ${extraActions}
+      ${isNew ? `<button class="al-btn al-btn-primary" type="submit" form="article-form" name="action" value="publish">Publish now</button>` : ""}
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="al-btn">Cancel</a>
+    </div>
 
     <div class="al-editor">
       <div class="al-editor-pane">
@@ -13487,6 +13490,37 @@ app.post("/admin/articles/:id/delete", requireAdmin, asyncRoute(async (req, res)
     await logAdminAudit("admin", "article:delete", req.params.id, {});
   }
   res.redirect(`/admin/articles?token=${encodeURIComponent(token)}&msg=Article+deleted`);
+}));
+
+app.post("/admin/articles/:id/repost", requireAdmin, asyncRoute(async (req, res) => {
+  const token = String(req.query.token ?? "");
+  const old = await getArticleById(req.params.id);
+  if (!old || !pool) { res.redirect(`/admin/articles?token=${encodeURIComponent(token)}`); return; }
+
+  const newId = `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+  const rt = computeReadingTime(old.body_md);
+
+  // Delete old article first (cascades assets, revisions, comments, slug_redirects)
+  await pool.query(`DELETE FROM articles WHERE id=$1`, [old.id]);
+
+  // Recreate with same content, same slug, fresh timestamps
+  await pool.query(
+    `INSERT INTO articles (id, slug, title, dek, eyebrow, hero_prompt, body_md, desk, status, author_id, published_at, updated_at, reading_time)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [newId, old.slug, old.title, old.dek, old.eyebrow, old.hero_prompt, old.body_md, old.desk,
+     old.status, old.author_id, old.status === "published" ? now : old.published_at, now, rt]
+  );
+  await logAdminAudit("admin", "article:repost", newId, { oldId: old.id, slug: old.slug });
+
+  // Trigger fresh image render in background
+  if (process.env.OPENAI_API_KEY && (old.hero_prompt || old.body_md.includes(":::image"))) {
+    renderArticleImages(newId).catch(err => {
+      console.error("[article-images] repost render failed", err);
+      captureError(err, { articleImages: { articleId: newId } });
+    });
+  }
+  res.redirect(`/admin/articles/${newId}/edit?token=${encodeURIComponent(token)}&msg=Reposted.+Fresh+images+rendering+in+background.`);
 }));
 
 app.post("/admin/articles/:id/render-images", requireAdmin, asyncRoute(async (req, res) => {
