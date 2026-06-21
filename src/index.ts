@@ -10699,22 +10699,12 @@ function noticesPage(
 <title>Opportunity Board &mdash; ${escapeHtml(profile.label)} &mdash; GovRevenue</title>
 <style>
 ${pageShellCss()}
-/* ── Dark theme override for opportunity board ── */
+/* ── Bridge tokens for opportunity engine ── */
 :root{
-  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;--surface-3:#1E2A3A;
-  --brand:#B4924E;--brand-hot:#C4933F;--brand-dim:rgba(180,146,78,.14);
-  --green:#22C55E;--gold:#B4924E;--red:#EF4444;--info:#60A5FA;
-  --text:#E9EEF5;--text-mid:#C8C0AE;--muted:#9AA093;--faint:#6B7280;
-  --border:rgba(255,255,255,.06);--border-2:rgba(255,255,255,.10);--border-3:rgba(255,255,255,.16);
-  /* bridge tokens for opportunity engine */
   --paper:var(--surface);--paper-2:var(--surface-2);
   --ink:var(--text);--slate:var(--muted);
   --accent:var(--brand);--line:var(--border);--line-strong:var(--border-2);
 }
-body{background:var(--base);color:var(--text)}
-.gh{background:rgba(11,16,24,.92)}
-.gh-nav a{color:var(--text-mid)}
-.gh-nav a.dnav-active{color:var(--text);border-bottom-color:var(--brand)}
 ${oppCardCss()}
 ${winBriefCss()}
 ${noticesBoardCss()}
