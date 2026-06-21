@@ -5260,6 +5260,10 @@ a{color:inherit;text-decoration:none}
 .al-table td{padding:12px 14px;font-size:12px;border-bottom:1px solid var(--border);vertical-align:middle}
 .al-table tr:last-child td{border-bottom:none}
 .al-table tr:hover td{background:var(--surface-2)}
+.al-th-sort{cursor:pointer;user-select:none;white-space:nowrap}
+.al-th-sort:hover{color:var(--brand)}
+.al-si{font-size:9px;opacity:.7}
+.al-num{width:36px;text-align:center;font-family:var(--mono);color:var(--muted);font-size:11px}
 /* pills */
 .al-pill{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
 .al-pill-published{background:rgba(21,128,61,.1);color:#15803D}
@@ -5297,19 +5301,21 @@ a{color:inherit;text-decoration:none}
 }
 
 function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: string): string {
-  const rows = articles.map(a => {
+  const rows = articles.map((a, idx) => {
     const date = a.published_at ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
+    const isoDate = a.published_at ? new Date(a.published_at).toISOString() : "";
     const pill = `<span class="al-pill al-pill-${a.status}">${a.status}</span>`;
     const hasImages = !!a.hero_image_url;
     const imgIndicator = (a.hero_prompt || a.body_md.includes(":::image"))
       ? (hasImages ? `<span title="Images rendered" style="color:#15803D;font-size:11px">✓ img</span>` : `<span title="Images pending" style="color:#B91C1C;font-size:11px">✗ img</span>`)
       : "";
     return `<tr>
-  <td><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a> ${imgIndicator}</td>
-  <td>${pill}</td>
-  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(a.desk ?? "—")}</td>
-  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${date}</td>
-  <td style="font-family:var(--mono);font-size:11px">${a.views}</td>
+  <td class="al-num" data-val="${idx + 1}">${idx + 1}</td>
+  <td data-val="${escapeHtml(a.title.toLowerCase())}"><a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" style="color:var(--text);font-weight:500">${escapeHtml(a.title)}</a> ${imgIndicator}</td>
+  <td data-val="${escapeHtml(a.status)}">${pill}</td>
+  <td data-val="${escapeHtml(a.desk ?? "")}" style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(a.desk ?? "—")}</td>
+  <td data-val="${isoDate}" style="font-family:var(--mono);font-size:11px;color:var(--muted)">${date}</td>
+  <td data-val="${a.views}" style="font-family:var(--mono);font-size:11px">${a.views}</td>
   <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     <a href="/admin/articles/${escapeHtml(a.id)}/edit?token=${encodeURIComponent(token)}" class="al-btn" style="font-size:10px;padding:5px 10px">Edit</a>
     ${a.status === "published" ? `<a href="/articles/${escapeHtml(a.slug)}" target="_blank" class="al-btn" style="font-size:10px;padding:5px 10px">Live ↗</a>` : ""}
@@ -5354,9 +5360,46 @@ function adminArticlesListPage(articles: ArticleRow[], token: string, msg?: stri
     ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
     ${articles.length === 0
       ? `<p class="al-empty">No articles yet. <a href="/admin/articles/new?token=${encodeURIComponent(token)}" style="color:var(--brand)">Write the first one.</a></p>`
-      : `<table class="al-table"><thead><tr><th>Title</th><th>Status</th><th>Desk</th><th>Published</th><th>Views</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`}
+      : `<table class="al-table" id="al-articles-table"><thead><tr>
+          <th class="al-num al-th-sort" data-col="0"># <span class="al-si"></span></th>
+          <th class="al-th-sort" data-col="1">Title <span class="al-si"></span></th>
+          <th class="al-th-sort" data-col="2">Status <span class="al-si"></span></th>
+          <th class="al-th-sort" data-col="3">Desk <span class="al-si"></span></th>
+          <th class="al-th-sort" data-col="4">Published <span class="al-si"></span></th>
+          <th class="al-th-sort" data-col="5">Views <span class="al-si"></span></th>
+          <th>Actions</th>
+        </tr></thead><tbody>${rows}</tbody></table>`}
   </div>
 </div>
+<script>
+(function(){
+  var table=document.getElementById('al-articles-table');
+  if(!table)return;
+  var sortCol=-1,asc=true;
+  table.querySelectorAll('th.al-th-sort').forEach(function(th){
+    th.addEventListener('click',function(){
+      var col=+this.dataset.col;
+      asc=(sortCol===col)?!asc:true;
+      sortCol=col;
+      table.querySelectorAll('.al-si').forEach(function(s){s.textContent='';});
+      this.querySelector('.al-si').textContent=asc?' ▲':' ▼';
+      var tbody=table.querySelector('tbody');
+      var rows=Array.from(tbody.rows);
+      rows.sort(function(a,b){
+        var av=(a.cells[col].dataset.val||'').toLowerCase();
+        var bv=(b.cells[col].dataset.val||'').toLowerCase();
+        var an=parseFloat(av),bn=parseFloat(bv);
+        // ISO date strings sort correctly as strings; numbers sort numerically
+        var cmp=(!isNaN(an)&&!isNaN(bn))?(an-bn):av.localeCompare(bv,'en',{numeric:true,sensitivity:'base'});
+        return asc?cmp:-cmp;
+      });
+      rows.forEach(function(r){tbody.appendChild(r);});
+      // keep # column showing sorted position (not original order)
+      rows.forEach(function(r,i){r.cells[0].textContent=i+1;r.cells[0].dataset.val=String(i+1);});
+    });
+  });
+})();
+</script>
 </body></html>`;
 }
 
