@@ -5326,7 +5326,7 @@ a{color:inherit;text-decoration:none}
 #globe-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.55}
 .hero-grad{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,#0A1C12 20%,transparent 70%)}
 .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.5fr .5fr;gap:32px;align-items:center;min-height:560px;padding:64px 40px}
-.hero-card-wrap{display:flex;align-items:center;justify-content:center}
+.hero-card-wrap{display:flex;align-items:center;justify-content:center;transform:translateX(-120px)}
 .hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(38px,4.6vw,60px);line-height:1.04;letter-spacing:-.02em;margin:14px 0 20px;color:#ECE6D6}
 .hero h1 em{font-style:italic;color:var(--brand)}
 .hero .lede{font-size:16px;line-height:1.65;color:#C5C9BC;max-width:32em;margin-bottom:28px}
@@ -5339,7 +5339,7 @@ a{color:inherit;text-decoration:none}
 .chip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#B8BEB3;border:1px solid rgba(236,230,214,.18);padding:7px 12px;background:rgba(12,31,21,.6);display:flex;gap:8px;align-items:center}
 .chip b{color:#ECE6D6;font-weight:600}
 .chip .up{color:#6ECF97}
-.record{position:relative;border:1px solid rgba(236,230,214,.16);background:rgba(10,28,18,.55);backdrop-filter:blur(14px);box-shadow:0 20px 40px -14px rgba(0,0,0,.55);width:min(270px,100%)}
+.record{position:relative;border:1px solid rgba(236,230,214,.14);background:rgba(10,28,18,.38);backdrop-filter:blur(14px);box-shadow:0 20px 40px -14px rgba(0,0,0,.55);width:min(270px,100%)}
 .record .rhead{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid rgba(236,230,214,.10)}
 .record .rhead .t{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#ECE6D6}
 .record .rhead .src{font-family:var(--mono);font-size:8.5px;color:#B8BEB3}
@@ -5449,6 +5449,7 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .hero h1{font-size:36px}
   #globe-canvas{opacity:.3}
   .hero-grad{background:none}
+  .hero-card-wrap{transform:none}
   .desk-grid{grid-template-columns:1fr 1fr}
   footer.hp-foot .wrap{grid-template-columns:1fr 1fr}
   .section{padding:52px 0}
