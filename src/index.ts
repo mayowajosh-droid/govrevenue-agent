@@ -10724,8 +10724,8 @@ ${noticesBoardCss()}
 .ob-mast h1{font-family:var(--serif);font-size:clamp(26px,3vw,40px);font-weight:400;line-height:1.05;letter-spacing:-.02em;color:#ECE6D6;margin-bottom:10px}
 .ob-lede{font-size:14px;color:rgba(197,201,188,.75);margin-bottom:36px;max-width:48em}
 .ob-stats{display:flex;border-top:1px solid rgba(236,230,214,.1)}
-.ob-stat{flex:1;padding:22px 28px;border-right:1px solid rgba(236,230,214,.08)}.ob-stat:last-child{border-right:none}
-.ob-stat-num{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.ob-stat{flex:1;padding:22px 28px;border-right:1px solid rgba(236,230,214,.08);text-align:center}.ob-stat:last-child{border-right:none}
+.ob-stat-num{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
 .ob-stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(197,201,188,.5)}
 .ob-live-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0;animation:obPulse 2s infinite}
 @keyframes obPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.45)}60%{box-shadow:0 0 0 5px rgba(74,222,128,0)}}
