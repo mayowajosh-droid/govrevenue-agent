@@ -1043,7 +1043,7 @@ export function reportChaseNowCss(): string {
 export function noticesBoardCss(): string {
   return `
 /* ── Board wrapper ──────────────────────────────────────── */
-.nb-board-wrap{padding:0 48px 64px}
+.nb-board-wrap{padding:0 48px 64px;max-width:1320px;margin:0 auto}
 
 /* ── Filter / toolbar bar ───────────────────────────────── */
 .nb-filter-bar{
