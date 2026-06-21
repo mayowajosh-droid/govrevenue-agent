@@ -50,7 +50,7 @@ import {
   type HomepageTeaserSignal,
   type ChaseStats as OppChaseStats,
 } from "./lib/opportunityEngine.js";
-type ScanStatus = "pending" | "running" | "completed" | "failed";
+type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
 type UserRecord = {
   id: string;
@@ -5947,9 +5947,18 @@ app.post("/form-submit", asyncRoute(async (req, res) => {
     return;
   }
 
-  const scan = await createScan(parsed.data);
   const authUser = getAuthUser(req);
-  if (authUser && pool) {
+
+  // Guest checkout: create the scan in pending_payment status, carry id through Stripe
+  if (!authUser) {
+    const scan = await createScan(parsed.data);
+    if (pool) await pool.query(`UPDATE scans SET status='pending_payment' WHERE id=$1`, [scan.id]);
+    res.redirect(302, `/checkout?plan=payg&scan=${encodeURIComponent(scan.id)}`);
+    return;
+  }
+
+  const scan = await createScan(parsed.data);
+  if (pool) {
     await pool.query(`UPDATE scans SET user_id=$2 WHERE id=$1`, [scan.id, authUser.userId]);
   }
   await enqueueScan(scan.id, parsed.data);
@@ -6697,10 +6706,12 @@ app.get("/billing/checkout", asyncRoute(async (req, res) => {
   let mode: "payment" | "subscription";
   let successUrl: string;
 
+  const scanId = typeof req.query.scan === "string" ? req.query.scan.slice(0, 40) : "";
+
   if (plan === "payg") {
     priceId = STRIPE_PAYG_PRICE_ID;
     mode = "payment";
-    successUrl = `${BASE_URL}/scan?paid=1`;
+    successUrl = `${BASE_URL}/scan/resume?session_id={CHECKOUT_SESSION_ID}`;
   } else if (plan === "agency") {
     priceId = STRIPE_AGENCY_PRICE_ID;
     mode = "subscription";
@@ -6719,7 +6730,7 @@ app.get("/billing/checkout", asyncRoute(async (req, res) => {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: `${BASE_URL}/checkout?plan=${plan}`,
-    metadata: { plan, ...(auth ? { userId: auth.userId } : {}) },
+    metadata: { plan, ...(auth ? { userId: auth.userId } : {}), ...(scanId ? { scanId } : {}) },
     allow_promotion_codes: true,
   };
   if (auth?.email) sessionParams.customer_email = auth.email;
@@ -6784,6 +6795,18 @@ app.post("/billing/webhook", express.raw({ type: "application/json" }), asyncRou
 
     if (userId) {
       await createOrder(userId, session.id, paymentIntent, plan, amountTotal, "paid");
+    }
+
+    // If a pending_payment scan was attached to this checkout, link + start it
+    const pendingScanId = session.metadata?.scanId;
+    if (pendingScanId && userId && pool) {
+      const sr = await pool.query<ScanRecord>(`SELECT * FROM scans WHERE id=$1 AND status='pending_payment'`, [pendingScanId]);
+      if (sr.rows[0]) {
+        await pool.query(`UPDATE scans SET user_id=$2, status='pending' WHERE id=$1`, [pendingScanId, userId]);
+        enqueueScan(pendingScanId, sr.rows[0].input_json).catch(err =>
+          console.error("[webhook] failed to enqueue pending scan", pendingScanId, err)
+        );
+      }
     }
 
   } else if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
@@ -7286,6 +7309,7 @@ app.get("/checkout", (req, res) => {
   const plan = PLAN_CONFIG[planKey];
   if (!plan) { res.redirect("/pricing"); return; }
   const err = req.query.err === "not_configured" ? "Payment is not yet configured. Please contact us." : "";
+  const scanId = typeof req.query.scan === "string" ? req.query.scan.slice(0, 40) : "";
 
   const itemsHtml = plan.items.map(i => `
     <div class="oi"><span class="oi-tick">&#10003;</span><span>${escapeHtml(i)}</span></div>`).join("");
@@ -7355,7 +7379,7 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
     ${err ? `<div class="err">${escapeHtml(err)}</div>` : ""}
     <div class="pay-head">Secure checkout via Stripe</div>
     <div class="pay-sub">Your account is created automatically from your payment email — no separate registration step.</div>
-    <a href="/billing/checkout?plan=${encodeURIComponent(planKey)}" class="btn-pay">Proceed to payment &rarr;</a>
+    <a href="/billing/checkout?plan=${encodeURIComponent(planKey)}${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}" class="btn-pay">Proceed to payment &rarr;</a>
     <div class="pay-note">
       Secured by Stripe &middot; Card or Apple Pay<br>
       By proceeding you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>
@@ -7515,10 +7539,7 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 });
 
 app.get("/scan", (req, res) => {
-  if (!getAuthUser(req)) {
-    res.redirect(`/register?next=${encodeURIComponent(req.url)}`);
-    return;
-  }
+  const auth = getAuthUser(req);
   const deskParam = typeof req.query.desk === "string" ? req.query.desk.slice(0, 60) : "";
   const noticeIdParam = typeof req.query.noticeId === "string" ? req.query.noticeId.slice(0, 80) : "";
   const servicesParam = typeof req.query.services === "string" ? req.query.services.slice(0, 300) : "";
@@ -7710,8 +7731,8 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
     </div>
 
     <div class="submit-row">
-      <button type="submit" class="btn-submit">Run GovRevenue Scan &rarr;</button>
-      <span class="submit-note">Takes 2&ndash;4 minutes &middot; HTML &amp; PDF report</span>
+      <button type="submit" class="btn-submit">${auth ? "Run GovRevenue Scan" : "Continue to payment (£29)"} &rarr;</button>
+      <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
     </div>
   </form>
 </main>
@@ -7725,6 +7746,44 @@ window.addEventListener("pageshow", () => {
 </body>
 </html>`);
 });
+
+// Post-PAYG-checkout landing — logs the buyer in and drops them straight at their scan
+app.get("/scan/resume", asyncRoute(async (req, res) => {
+  const sessionId = String(req.query.session_id || "");
+  if (!stripe || !sessionId) { res.redirect("/scan"); return; }
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    res.redirect("/scan");
+    return;
+  }
+
+  const email = session.customer_details?.email ?? session.customer_email ?? "";
+  const pendingScanId = session.metadata?.scanId ?? "";
+
+  // Log the user in — retry briefly in case the webhook hasn't fired yet
+  let user = email ? await getUserByEmail(email) : null;
+  if (!user && email) {
+    for (let i = 0; i < 4; i++) {
+      await new Promise(r => setTimeout(r, 600));
+      user = await getUserByEmail(email);
+      if (user) break;
+    }
+  }
+
+  if (user) {
+    const token = signToken(user);
+    res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
+  }
+
+  if (pendingScanId) {
+    res.redirect(`/scan/${encodeURIComponent(pendingScanId)}`);
+  } else {
+    res.redirect("/scan?paid=1");
+  }
+}));
 
 app.get("/scan/:id", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
