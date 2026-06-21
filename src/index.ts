@@ -2085,7 +2085,7 @@ async function renderArticleImages(articleId: string): Promise<void> {
         prompt: photoPrompt,
         n: 1,
         size: imgSize,
-        quality: "high",
+        quality: "medium",
       }) as { data?: { b64_json?: string }[] };
 
       const b64 = response.data?.[0]?.b64_json;
@@ -2134,7 +2134,7 @@ async function renderArticleImages(articleId: string): Promise<void> {
       console.log(`[article-images] ✓ rendered ${item.posKey}: ${finalUrl}`);
 
       // Pace between calls to stay within gpt-image-1 rate limits
-      await new Promise(r => setTimeout(r, 13_000));
+      await new Promise(r => setTimeout(r, 6_000));
     } catch (err) {
       console.error(`[article-images] failed for ${item.posKey}`, err);
       captureError(err, { articleImages: { articleId, posKey: item.posKey } });
