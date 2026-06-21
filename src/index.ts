@@ -6300,6 +6300,13 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 .sector-btn:hover{background:var(--surface-3);border-color:var(--border-3);color:var(--text)}
 @media(max-width:900px){.dash-grid{grid-template-columns:1fr}.mkt-strip{padding-left:16px;padding-right:16px}}
 @media(max-width:760px){.scan-table th:nth-child(n+4),.scan-table td:nth-child(n+4){display:none}.dl-grid{grid-template-columns:1fr}}
+@media(max-width:480px){
+  .mkt-strip{padding-left:12px;padding-right:12px;gap:12px;flex-direction:column;align-items:flex-start}
+  .scan-table th:nth-child(n+3),.scan-table td:nth-child(n+3){display:none}
+  .scan-table{font-size:12px}
+  .tools-grid{grid-template-columns:1fr}
+  .tool-card{padding:11px}
+}
 `;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -6907,6 +6914,18 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .faq-a{font-size:14px;color:var(--muted);line-height:1.7}
 .caveat{padding:32px 0;border-top:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--faint)}
 @media(max-width:760px){.plans{grid-template-columns:1fr}.hero{padding:48px 0 40px}h1{font-size:28px}}
+@media(max-width:480px){
+  .wrap{padding:0 14px}
+  h1{font-size:22px}
+  .hero{padding:28px 0 24px}
+  .hero-sub{font-size:14px}
+  .plan{padding:20px}
+  .plan-name{font-size:16px}
+  .plan-price{font-size:32px}
+  .plan li{font-size:13px}
+  .faq h2{font-size:20px}
+  .faq-q{font-size:14px}
+}
 </style>
 </head>
 <body>
@@ -10033,6 +10052,21 @@ ${pageShellCss()}
 .dl-meta-link{color:var(--brand)}
 @media(max-width:1100px){.dl-agg{grid-template-columns:repeat(3,1fr)}.dl-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.dl-hero-inner,.dl-body-inner{padding-left:16px;padding-right:16px}.dl-hero{padding:48px 0 40px}.dl-hero h1{font-size:34px}.dl-agg{grid-template-columns:1fr 1fr}.dl-agg-val{font-size:26px}.dl-sort-bar{flex-direction:column;gap:6px}.dl-grid{grid-template-columns:1fr;gap:16px}.dl-body{padding:36px 0 56px}}
+@media(max-width:480px){
+  .dl-hero-inner,.dl-body-inner{padding-left:12px;padding-right:12px}
+  .dl-hero{padding:28px 0 24px}
+  .dl-hero h1{font-size:22px}
+  .dl-hero-sub{font-size:13px}
+  .dl-agg{grid-template-columns:1fr 1fr;gap:6px}
+  .dl-agg-card{padding:14px 16px}
+  .dl-agg-val{font-size:22px}
+  .dl-card{padding:0}
+  .dl-card-top{padding:16px 14px 12px}
+  .dl-card-title{font-size:16px}
+  .dl-meta{padding:12px 14px;flex-direction:column;align-items:flex-start;gap:4px}
+  .dl-pager{padding:32px 0 0;gap:4px}
+  .dl-pager-btn{padding:7px 10px;font-size:11px}
+}
 .dl-pager{display:flex;align-items:center;justify-content:center;gap:6px;padding:48px 0 0;flex-wrap:wrap}
 .dl-pager-btn{font-family:var(--mono);font-size:12px;letter-spacing:.07em;padding:8px 14px;border:1px solid var(--border-2);border-radius:2px;color:var(--text);transition:border-color .15s,background .15s}
 .dl-pager-btn:hover{border-color:var(--brand);background:var(--brand-dim)}
@@ -10459,6 +10493,13 @@ ${pageShellCss()}
 .bi-cta{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);text-decoration:underline;text-decoration-color:var(--brand-dim);white-space:nowrap}
 .bi-cta:hover{text-decoration-color:var(--brand)}
 @media(max-width:760px){.bi-card-right{display:none}}
+@media(max-width:480px){
+  .bi-card{padding:14px 12px}
+  .bi-avatar{width:34px;height:34px;font-size:9px}
+  .bi-name{font-size:12px}
+  .bi-spend{font-size:13px}
+  .bi-meta{font-size:10px}
+}
 </style>
 </head>
 <body>
@@ -10602,6 +10643,14 @@ th{padding:10px 14px;text-align:left;font-family:var(--mono);font-size:11px;lett
 .buyer.gone{background:rgba(155,45,32,.06);color:var(--red);border:1px solid rgba(155,45,32,.20)}
 .none{font-size:13px;color:var(--muted);font-family:var(--mono)}
 ${prior ? "" : ".no-prior{background:var(--surface);border:1px solid var(--border-2);padding:26px 30px;font-size:14px;color:var(--muted);line-height:1.6}"}
+@media(max-width:480px){
+  body{padding:20px 14px}
+  h1{font-size:22px}
+  th{font-size:9.5px;padding:8px 10px}
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .buyer{font-size:11px;padding:4px 8px}
+  .section-head{font-size:17px;margin:24px 0 10px}
+}
 </style>
 </head>
 <body>
