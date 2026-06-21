@@ -1311,12 +1311,14 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
     const [r, topR] = await Promise.all([
       pool.query<ChartDataPoint>(
         `SELECT to_char(date_trunc('month', notice_date), 'Mon') AS month,
-                ROUND(SUM(COALESCE(value_amount, 0)) / 1e6::numeric, 2)::float AS total_m
+                ROUND(SUM(value_amount) / 1e6::numeric, 2)::float AS total_m
          FROM homepage_signals
          WHERE notice_date > NOW() - INTERVAL '12 months'
            AND notice_date <= NOW()
            AND value_amount IS NOT NULL
            AND value_amount > 0
+           AND value_amount <= 2000000000
+           AND (LOWER(status) LIKE '%award%')
          GROUP BY date_trunc('month', notice_date)
          ORDER BY date_trunc('month', notice_date)`
       ),
@@ -1327,6 +1329,8 @@ async function queryChartData(): Promise<{ points: ChartDataPoint[]; illustrativ
            AND notice_date <= NOW()
            AND value_amount IS NOT NULL
            AND value_amount > 0
+           AND value_amount <= 2000000000
+           AND (LOWER(status) LIKE '%award%')
          GROUP BY category
          ORDER BY SUM(value_amount) DESC
          LIMIT 1`
@@ -5103,7 +5107,9 @@ app.get("/", asyncRoute(async (req, res) => {
   const chartPoints = chartResult.illustrative
     ? [1.9, 2.1, 2.0, 2.4, 2.7, 2.6, 3.0, 3.3, 3.5, 3.8, 4.0, 4.2]
     : chartResult.points.map(p => p.total_m);
-  const chartFinalVal = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1] : 4.2;
+  const chartFinalVal = chartPoints.length > 0
+    ? parseFloat(chartPoints.reduce((a, b) => a + b, 0).toFixed(2))
+    : 4.2;
   const chartMinVal = chartResult.illustrative
     ? 1.6
     : parseFloat((Math.max(0, Math.min(...chartPoints) * 0.85)).toFixed(2));
@@ -5242,6 +5248,7 @@ a{color:inherit;text-decoration:none}
 .chartwrap .ch-head .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .chartwrap .ch-head .big{font-family:var(--serif);font-size:24px;font-weight:500;color:var(--text)}
 .chartwrap .ch-head .big .up{color:var(--green);font-size:13px;margin-left:6px}
+.chartwrap .ch-head .big .dn{color:var(--red);font-size:13px;margin-left:6px}
 #growthChart{width:100%;height:220px;display:block}
 .section{padding:68px 0;border-bottom:1px solid var(--border)}
 .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:32px}
@@ -5408,7 +5415,7 @@ ${pageShellHeader(null, homepageAuth)}
           <span class="lab">UK public-sector awarded${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
           <span class="lab" style="display:block;font-size:10px;opacity:.6;margin-top:2px">Monthly totals &middot; rolling 12 months</span>
         </div>
-        <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="up">&#9650; ${Math.abs(chartTrendPct)}%</span></span>
+        <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart" style="cursor:pointer" onclick="location.href='/charts'"></canvas>
       <a href="/charts" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">View intelligence &rarr;</a>
@@ -7665,7 +7672,7 @@ app.get("/charts", asyncRoute(async (req, res) => {
         SELECT
           COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '30 days')::text AS closing_30,
           COUNT(*) FILTER (WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '60 days')::text AS closing_60,
-          COUNT(*) FILTER (WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')::text AS open_count
+          COUNT(*) FILTER (WHERE (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%') AND deadline_date >= NOW())::text AS open_count
         FROM homepage_signals WHERE deadline_date IS NOT NULL`),
       pool.query<DeskPointRow>(`
         SELECT to_char(date_trunc('month', notice_date), 'Mon ''YY') AS mlabel,
@@ -8726,7 +8733,10 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   });
   const openNoticeCount = allMatchingOpen.length;
   const openNotices = allMatchingOpen.slice(0, 6);
-  const awardedNotices = data?.contractsFinder.awarded || [];
+  const awardedNotices = (data?.contractsFinder.awarded || []).filter(n => {
+    const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
+    return !d || d.getTime() >= cutoff365;
+  });
 
   const awardedCount = awardedNotices.length;
   const uniqueBuyerCount = new Set(awardedNotices.map(n => n.buyer).filter(b => b && b !== "Not stated")).size;
@@ -8976,10 +8986,10 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         <span class="dp-pulse-val">${openNoticeCount}</span>
         <span class="dp-pulse-label">Active tenders</span>
       </div>
-      <div class="dp-pulse-stat">
-        <span class="dp-pulse-val">${avgContractVal > 0 ? escapeHtml(fmtBig(avgContractVal)) : "&mdash;"}</span>
+      ${avgContractVal > 0 ? `<div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${escapeHtml(fmtBig(avgContractVal))}</span>
         <span class="dp-pulse-label">Avg contract value</span>
-      </div>
+      </div>` : ''}
       <div class="dp-pulse-stat">
         <span class="dp-pulse-val">${buyersThisMonth > 0 ? buyersThisMonth : "&mdash;"}</span>
         <span class="dp-pulse-label">Buyers publishing now</span>
@@ -9306,10 +9316,16 @@ html{scroll-behavior:smooth}
   .sub-cta-row{flex-direction:column;gap:14px;align-items:flex-start}
 }
 @media(max-width:480px){
+  .gh-inner,.dm-mast-inner,.dp-panels-inner,.dm-section-inner,.dm-sources-inner,.dp-pulse-inner,.analytics-inner,.awards-inner{padding-left:12px;padding-right:12px}
+  .dm-mast{padding:20px 0 16px}
+  .dm-mast h1{font-size:18px}
+  .dm-mast-lede{font-size:13px}
   .dm-grid{grid-template-columns:1fr}
   .dp-stats{grid-template-columns:1fr}
   .dp-pulse-stat{flex:0 0 100%}
-  .dm-mast h1{font-size:20px}
+  .dp-val{font-size:22px}
+  .dp-panel{padding:16px 0}
+  .awards-inner{padding:24px 12px}
 }
 ${oppCardCss()}
 /* Scoped overrides: opp-cards on dark panel surface */
@@ -9564,7 +9580,11 @@ ${pageShellCss()}
   .ls-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 @media(max-width:480px){
+  .gh-inner,.sub-mast-inner,.sub-body-inner,.dm-sources-inner{padding-left:12px;padding-right:12px}
+  .sub-mast{padding:20px 0 16px}
+  .sub-mast h1{font-size:20px}
   .sub-stats{grid-template-columns:1fr}
+  .bw-card-right{display:none}
 }
 </style>
 </head>
@@ -9855,12 +9875,29 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
     topCats: InferredCategory[];
     cachedAt: string | null;
   };
+  const desksPageToday = new Date();
+  desksPageToday.setHours(0, 0, 0, 0);
+  const desksPage12mAgo = new Date(desksPageToday);
+  desksPage12mAgo.setFullYear(desksPage12mAgo.getFullYear() - 1);
+  const DESK_OUTLIER_CAP = 2_000_000_000;
+
   const stats: DS[] = entries.map(({ profile, cached }) => {
     if (!cached) return { profile, openCount: 0, awardedCount: 0, totalValue: 0, uniqueBuyers: 0, topCats: [], cachedAt: null };
-    const open = cached.data.contractsFinder.open ?? [];
-    const awarded = cached.data.contractsFinder.awarded ?? [];
-    const all = [...open, ...awarded];
-    const totalValue = awarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+    const openRaw = cached.data.contractsFinder.open ?? [];
+    const awardedRaw = cached.data.contractsFinder.awarded ?? [];
+    // open_now: must have deadline >= today
+    const open = openRaw.filter(n => !n.deadlineDate || new Date(n.deadlineDate) >= desksPageToday);
+    // value_awarded_12m: last 12 months only, excl >£2bn outliers
+    const awarded = awardedRaw.filter(n => {
+      const d = n.awardedDate || n.publishedDate;
+      return d && new Date(d) >= desksPage12mAgo;
+    });
+    // buyer tracking uses all notices (all time)
+    const all = [...openRaw, ...awardedRaw];
+    const totalValue = awarded.reduce((s, n) => {
+      const v = n.awardedValue ?? 0;
+      return s + (v > 0 && v <= DESK_OUTLIER_CAP ? v : 0);
+    }, 0);
     const uniqueBuyers = new Set(all.map(n => n.buyer).filter((b): b is string => !!b)).size;
     const topCats = inferDeskCategories(awarded, profile.categories).filter(c => c.count > 0).sort((a, b) => b.value - a.value).slice(0, 3);
     return { profile, openCount: open.length, awardedCount: awarded.length, totalValue, uniqueBuyers, topCats, cachedAt: cached.cached_at };

@@ -945,7 +945,7 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
   </div>
   <div class="cnc-stat-bar">
     <div class="cnc-stat"><span class="cnc-stat-label">Open now</span><span class="cnc-stat-val cnc-stat-val--green">${stats.totalOpen || "—"}</span></div>
-    <div class="cnc-stat"><span class="cnc-stat-label">Avg. contract size</span><span class="cnc-stat-val">${stats.avgValueK ? (stats.avgValueK >= 1000 ? `£${(stats.avgValueK / 1000).toFixed(1)}m` : `£${stats.avgValueK}k`) : "—"}</span></div>
+    ${stats.avgValueK ? `<div class="cnc-stat"><span class="cnc-stat-label">Avg. contract size</span><span class="cnc-stat-val">${stats.avgValueK >= 1000 ? `£${(stats.avgValueK / 1000).toFixed(1)}m` : `£${stats.avgValueK}k`}</span></div>` : ''}
     <div class="cnc-stat"><span class="cnc-stat-label">Closing this month</span><span class="cnc-stat-val">${stats.closingThisMonth || "—"}</span></div>
     ${miniChart}
   </div>
@@ -1205,6 +1205,28 @@ export function noticesBoardCss(): string {
   .nb-stat-pill{min-width:unset}
   .nb-flat-grid{grid-template-columns:1fr}
   .nb-action-btn{display:none}
+  .nb-filter-sep{display:none}
+  .nb-filter-bar{gap:6px}
+}
+@media(max-width:480px){
+  .nb-board-wrap{padding:0 12px 40px}
+  .nb-flat-grid{grid-template-columns:1fr}
+  .nb-filter-bar{flex-wrap:wrap;padding:10px 12px;gap:6px}
+  .nb-filter-label{font-size:9px}
+  .nb-filter-btn{font-size:9.5px;padding:4px 10px}
+  .nb-sort-select{font-size:9.5px;flex:1}
+  #nb-count-label{display:none}
+  .nb-card{padding:14px}
+  .nb-value{font-size:16px}
+  .nb-card-title{font-size:14px}
+  .nb-chip{font-size:8.5px;padding:2px 6px}
+  .nb-buyer{font-size:11px}
+  .nb-tag{font-size:9px}
+  .nb-cta-row{flex-direction:column;gap:6px}
+  .nb-cta-primary,.nb-cta-secondary{width:100%;text-align:center;padding:10px}
+  .nb-pagination{flex-direction:column;gap:12px;align-items:center}
+  .nb-pg-nums{flex-wrap:wrap;justify-content:center}
+  .nb-pg-btn{padding:7px 18px}
 }
 `;
 }
