@@ -7464,9 +7464,9 @@ ${pageShellHeader(null, null)}
     </div>
     <div class="sig-stats">
       <div class="sc">
-        <span class="sc-lbl">Signals tracked</span>
+        <span class="sc-lbl">Signals in view</span>
         <span class="sc-val">${parseInt(stats.total).toLocaleString()}</span>
-        <span class="sc-sub">Across all 24 desks</span>
+        <span class="sc-sub">Deduped across all 24 desks</span>
       </div>
       <div class="sc sc-green">
         <span class="sc-lbl">Open / live</span>
@@ -7474,9 +7474,9 @@ ${pageShellHeader(null, null)}
         <span class="sc-sub">Active tenders &amp; opportunities</span>
       </div>
       <div class="sc sc-brand">
-        <span class="sc-lbl">Total value tracked</span>
+        <span class="sc-lbl">Value in signals view</span>
         <span class="sc-val">${fmtBigVal(totalVal)}</span>
-        <span class="sc-sub">Public spend indexed</span>
+        <span class="sc-sub">Deduped notices, all dates &middot; not 12m awarded</span>
       </div>
       <div class="sc sc-warn">
         <span class="sc-lbl">Closing within 7 days</span>
@@ -8175,7 +8175,7 @@ ${deskBreak.length > 0 ? `
       </form>
       <p class="nl-note">No spam. Unsubscribe any time. Weekly only.</p>
       <div class="nl-proof">
-        <div><span class="nl-pv">${totalNotices.toLocaleString()}+</span><span class="nl-pl">Notices tracked</span></div>
+        <div><span class="nl-pv">${totalNotices.toLocaleString()}+</span><span class="nl-pl">Notices scored, 12 months</span></div>
         <div><span class="nl-pv">24</span><span class="nl-pl">Sector desks</span></div>
         <div><span class="nl-pv">Hourly</span><span class="nl-pl">Data refresh</span></div>
         <div><span class="nl-pv">${fmtBnShort(openPipelineM)}</span><span class="nl-pl">Open pipeline</span></div>
