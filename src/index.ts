@@ -5232,17 +5232,17 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
         <span style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(180,146,78,.85);margin-top:4px">${escapeHtml(featured.eyebrow || featured.desk || "Article")}</span>
       </div>`;
     const rightPanel = featured.hero_image_url
-      ? `<div style="position:relative;overflow:hidden;border-left:1px solid rgba(236,230,214,.14)">
+      ? `<div class="ai-fr" style="position:relative;overflow:hidden;border-left:1px solid rgba(236,230,214,.14)">
            <div style="position:absolute;inset:-24px;background-image:url('${escapeHtml(featured.hero_image_url)}');background-size:cover;background-position:center;filter:blur(10px);transform:scale(1.08)"></div>
            ${quoteOverlay}
          </div>`
-      : `<div style="position:relative;overflow:hidden;background:#0C1F15;border-left:1px solid rgba(236,230,214,.14)">
+      : `<div class="ai-fr" style="position:relative;overflow:hidden;background:#0C1F15;border-left:1px solid rgba(236,230,214,.14)">
            ${quoteOverlay}
          </div>`;
     return `
-<section style="max-width:1160px;margin:0 auto;padding:40px 32px 0">
-  <a href="/articles/${escapeHtml(featured.slug)}" style="display:grid;grid-template-columns:1.15fr 0.85fr;border:1px solid var(--border-2);background:#102A1E;color:#ECE6D6;overflow:hidden;text-decoration:none">
-    <div style="padding:32px 38px;display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
+<section class="ai-fw">
+  <a href="/articles/${escapeHtml(featured.slug)}" class="ai-featured" style="border:1px solid var(--border-2);background:#102A1E;color:#ECE6D6;overflow:hidden;text-decoration:none">
+    <div class="ai-fl" style="display:flex;flex-direction:column;justify-content:space-between;min-height:240px">
       <div style="display:flex;gap:12px;align-items:center">
         <span style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;background:var(--brand);color:#10110D;padding:4px 9px;font-weight:600">Latest article</span>
         ${date ? `<span style="font-family:var(--mono);font-size:10.5px;color:#9AA093">${date} · ${featured.reading_time} MIN</span>` : ""}
@@ -5285,6 +5285,9 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
 <meta name="description" content="Plain-English intelligence on procurement: where the money moves, how buyers behave, and how to read a notice before your competitors do.">
 <style>
 ${pageShellCss()}
+.ai-fw{max-width:1160px;margin:0 auto;padding:40px 32px 0}
+.ai-featured{display:grid;grid-template-columns:1.15fr 0.85fr}
+.ai-fl{padding:32px 38px}
 .ai-row{display:grid;grid-template-columns:120px 1fr 110px;gap:28px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
 .ai-row:hover{background:var(--surface)}
 .ai-row:last-child{border-bottom:none}
@@ -5294,6 +5297,10 @@ ${pageShellCss()}
 .ai-meta{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
 .ai-read{margin-top:4px;color:var(--faint)}
 @media(max-width:700px){
+  .ai-fw{padding:16px 16px 0}
+  .ai-featured{display:block}
+  .ai-fl{padding:22px 20px}
+  .ai-fr{display:none}
   .ai-row{grid-template-columns:1fr;gap:6px}
   .ai-meta{text-align:left}
 }
