@@ -8270,7 +8270,6 @@ ${pageShellFoot()}
 
   cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();mx=e.clientX-r.left;draw();});
   cv.addEventListener('mouseleave',()=>{mx=null;draw();});
-  cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const rawX=e.clientX-r.left;const data=cur;const pad={l:84};const cw=cv.clientWidth-pad.l-24;const nearI=Math.round((rawX-pad.l)/(cw||1)*(data.length-1));const d=data[Math.max(0,Math.min(nearI,data.length-1))];if(d&&d.notice_count>0)window.open('/signals','_blank');});
 
   document.getElementById('tog-month').addEventListener('click',function(){cur=MD;this.classList.add('tog-active');document.getElementById('tog-week').classList.remove('tog-active');draw();});
   document.getElementById('tog-week').addEventListener('click',function(){cur=WD;this.classList.add('tog-active');document.getElementById('tog-month').classList.remove('tog-active');draw();});
