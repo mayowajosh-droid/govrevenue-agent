@@ -7720,16 +7720,31 @@ strong{font-weight:700}
 .hero-ctas{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .btn-p{background:var(--brand);color:#fff;font-size:13px;font-weight:700;padding:12px 24px;transition:opacity .15s;border-radius:2px}.btn-p:hover{opacity:.88}
 .btn-s{border:1px solid var(--border-2);color:var(--text);font-size:13px;padding:11px 20px;background:transparent;transition:border-color .15s;border-radius:2px}.btn-s:hover{border-color:rgba(255,255,255,.35)}
-.kpi-band{padding:44px 0;background:var(--surface);border-bottom:1px solid var(--border)}
+.kpi-band{padding:48px 0;background:var(--surface);border-bottom:1px solid var(--border)}
 .kpi-row{max-width:1320px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-.kcard{background:var(--surface-2);border:1px solid var(--border-2);padding:20px 22px;transition:border-color .2s;cursor:default;position:relative;overflow:hidden}
-.kcard:hover{border-color:rgba(255,255,255,.22)}
-.kcard-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;display:block}
-.kcard-val{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1;display:block;color:var(--text)}
-.kcard-val.red{color:#f87171}.kcard-val.grn{color:#4ade80}
-.kcard-sub{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:8px;display:block;line-height:1.5}
-.kcard-glow{position:absolute;bottom:-20px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.15;filter:blur(20px);pointer-events:none}
-.kcard-glow.red{background:var(--brand)}.kcard-glow.grn{background:#22C55E}
+.kcard{background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--border-2);padding:22px 24px 20px;transition:border-color .2s,transform .2s;cursor:default;position:relative;overflow:hidden}
+.kcard:hover{border-color:rgba(255,255,255,.22);transform:translateY(-2px)}
+.kcard.gold{border-top-color:#B4924E}.kcard.grn{border-top-color:#22C55E}.kcard.warn{border-top-color:#EF4444}.kcard.blue{border-top-color:#3B82F6}.kcard.purple{border-top-color:#A78BFA}
+.kcard-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;display:block}
+.kcard-val{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.04em;line-height:1;display:block;color:var(--text)}
+.kcard-val.c-gold{color:#C8A96B}.kcard-val.c-grn{color:#4ade80}.kcard-val.c-red{color:#f87171}.kcard-val.c-blue{color:#60A5FA}.kcard-val.c-purple{color:#C4B5FD}
+.kcard-sub{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:10px;display:block;line-height:1.5}
+.kcard-glow{position:absolute;bottom:-24px;right:-24px;width:90px;height:90px;border-radius:50%;opacity:.12;filter:blur(24px);pointer-events:none}
+.kcard-glow.gold{background:#B4924E}.kcard-glow.grn{background:#22C55E}.kcard-glow.red{background:#EF4444}
+/* pipeline urgency */
+.pipe-band{padding:40px 0;background:#0A1C12;border-bottom:1px solid rgba(236,230,214,.08)}
+.pipe-inner{max-width:1320px;margin:0 auto;padding:0 40px;display:flex;align-items:center;gap:48px;flex-wrap:wrap}
+.pipe-label{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#5a8a6a;flex-shrink:0}
+.pipe-cells{display:flex;gap:4px;flex:1}
+.pipe-cell{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(236,230,214,.08);padding:20px 24px}
+.pipe-val{font-family:var(--mono);font-size:42px;font-weight:700;letter-spacing:-.05em;color:#ECE6D6;line-height:1}
+.pipe-val.urgent{color:#f87171}
+.pipe-sub{font-family:var(--mono);font-size:10px;color:#5a8a6a;letter-spacing:.06em;text-transform:uppercase;margin-top:8px}
+.pipe-bar{height:2px;background:rgba(236,230,214,.08);margin-top:14px}
+.pipe-bar-fill{height:100%;background:#22C55E}
+.pipe-cta{flex-shrink:0}
+.pipe-cta a{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#ECE6D6;border:1px solid rgba(236,230,214,.25);padding:12px 20px;transition:border-color .15s}
+.pipe-cta a:hover{border-color:#ECE6D6}
 .sec-eye{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
 .sec-h{font-family:var(--sans);font-size:clamp(22px,2.8vw,36px);font-weight:800;letter-spacing:-.03em;line-height:1.1;color:var(--text)}
 .sec-sub{font-size:14.5px;color:var(--muted);max-width:50em;margin-top:10px;line-height:1.65}
@@ -7750,17 +7765,28 @@ canvas#detailChart{display:block;width:100%}
 .tip-row{display:flex;align-items:center;gap:7px;margin-top:4px}
 .tip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .sectors-sec{padding:64px 0;border-bottom:1px solid var(--border);background:var(--surface)}
-.sectors-wrap{max-width:1320px;margin:0 auto;padding:0 40px}
-.sectors-grid{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid var(--border-2);margin-top:32px;background:var(--surface-2)}
-.sector-head-row{grid-column:span 2;background:var(--surface-3);padding:10px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-.srow{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border);transition:background .15s}
+.sectors-wrap{max-width:1320px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}
+.sectors-list{margin-top:0;border:1px solid var(--border-2)}
+.sector-head-row{background:var(--surface-3);padding:10px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+.srow{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);transition:background .15s}
+.srow:last-child{border-bottom:none}
 .srow:hover{background:var(--surface-3)}
-.srow:nth-child(odd){border-right:1px solid var(--border)}
-.srow:last-child,.srow:nth-last-child(2):nth-child(odd){border-bottom:none}
-.sname{font-size:12.5px;font-weight:500;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sbar-wrap{flex:1.5;height:3px;background:var(--border-2);border-radius:2px;overflow:hidden}
-.sbar-fill{height:100%;background:var(--brand);border-radius:2px;width:0;transition:width .7s ease}
-.sval{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap;width:62px;text-align:right}
+.srank{font-family:var(--mono);font-size:10px;color:var(--faint);width:18px;flex-shrink:0;text-align:right}
+.sname{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbar-wrap{flex:1.5;height:4px;background:var(--border-2);border-radius:2px;overflow:hidden}
+.sbar-fill{height:100%;background:var(--brand);border-radius:2px;width:0;transition:width .9s ease}
+.sval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:68px;text-align:right}
+.scnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:52px;text-align:right}
+/* buyers table */
+.buyers-panel{margin-top:0}
+.buyers-head-row{background:var(--surface-3);padding:10px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;border:1px solid var(--border-2)}
+.brow{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);border-left:1px solid var(--border-2);border-right:1px solid var(--border-2);transition:background .15s}
+.brow:last-child{border-bottom:1px solid var(--border-2)}
+.brow:hover{background:var(--surface-3)}
+.brank{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brand);width:22px;flex-shrink:0}
+.bname{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:70px;text-align:right}
+.bcnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:60px;text-align:right;white-space:nowrap}
 .brief-sec{padding:72px 0;border-bottom:1px solid var(--border);background:var(--base)}
 .brief-wrap{max-width:1160px;margin:0 auto;padding:0 40px}
 .brief-intro{max-width:680px;margin-bottom:56px}
@@ -7797,9 +7823,12 @@ canvas#detailChart{display:block;width:100%}
   .kpi-row{grid-template-columns:repeat(3,1fr)}
   .hero-inner,.chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap{padding-left:24px;padding-right:24px}
 }
+@media(max-width:1024px){
+  .sectors-wrap{grid-template-columns:1fr;gap:32px}
+}
 @media(max-width:768px){
   .kpi-row{grid-template-columns:repeat(2,1fr)}.hero-h1{font-size:32px}
-  .sectors-grid{grid-template-columns:1fr}.sector-head-row{grid-column:1}.srow:nth-child(odd){border-right:none}
+  .pipe-cells{flex-wrap:wrap}.pipe-cell{flex:1 1 calc(50% - 2px)}
   .brief-art{grid-template-columns:1fr;gap:0}.brief-num{display:none}
   .nl-card{padding:24px 20px}
 }
@@ -7810,7 +7839,7 @@ canvas#detailChart{display:block;width:100%}
 </style>
 </head>
 <body>
-${pageShellHeader(null, null)}
+${pageShellHeader(null, getAuthUser(req))}
 
 <main>
 
@@ -7835,33 +7864,63 @@ ${pageShellHeader(null, null)}
 
 <section class="kpi-band" aria-label="Key procurement metrics">
   <div class="kpi-row">
-    <div class="kcard rv">
+    <div class="kcard gold rv">
       <span class="kcard-label">12-month awarded</span>
-      <span class="kcard-val red">${fmtBnShort(totalAnnualM)}</span>
-      <span class="kcard-sub">Total across all desks &middot; ${escapeHtml(reportMonthRange)}</span>
-      <div class="kcard-glow red" aria-hidden="true"></div>
+      <span class="kcard-val c-gold">${fmtBnShort(totalAnnualM)}</span>
+      <span class="kcard-sub">${escapeHtml(reportMonthRange)} &middot; all 24 desks</span>
+      <div class="kcard-glow gold" aria-hidden="true"></div>
     </div>
-    <div class="kcard rv">
-      <span class="kcard-label">Monthly average</span>
-      <span class="kcard-val">${fmtBnShort(avgMonthlyM)}</span>
-      <span class="kcard-sub">Per month over the period</span>
-    </div>
-    <div class="kcard rv">
-      <span class="kcard-label">Peak month</span>
-      <span class="kcard-val">${fmtBnShort(peakPoint.total_m)}</span>
-      <span class="kcard-sub">${escapeHtml(peakPoint.label)} &middot; ${peakVsAvgPct > 0 ? "+" : ""}${peakVsAvgPct}% vs average</span>
-    </div>
-    <div class="kcard rv">
+    <div class="kcard grn rv">
       <span class="kcard-label">Open pipeline now</span>
-      <span class="kcard-val grn">${fmtBnShort(openPipelineM)}</span>
+      <span class="kcard-val c-grn">${fmtBnShort(openPipelineM)}</span>
       <span class="kcard-sub">${totalOpenCount.toLocaleString()} live tenders accepting bids</span>
       <div class="kcard-glow grn" aria-hidden="true"></div>
     </div>
-    <div class="kcard rv">
-      <span class="kcard-label">Momentum signal</span>
-      <span class="kcard-val ${trendPct >= 0 ? "grn" : "red"}">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
-      <span class="kcard-sub">3-month trailing vs opening period</span>
+    <div class="kcard warn rv">
+      <span class="kcard-label">Closing in 30 days</span>
+      <span class="kcard-val c-red">${closing30.toLocaleString()}</span>
+      <span class="kcard-sub">${closing60.toLocaleString()} within 60 days</span>
+      <div class="kcard-glow red" aria-hidden="true"></div>
     </div>
+    <div class="kcard blue rv">
+      <span class="kcard-label">Monthly average</span>
+      <span class="kcard-val c-blue">${fmtBnShort(avgMonthlyM)}</span>
+      <span class="kcard-sub">Per month over the tracked period</span>
+    </div>
+    <div class="kcard purple rv">
+      <span class="kcard-label">Momentum</span>
+      <span class="kcard-val c-purple">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
+      <span class="kcard-sub">3-month trailing vs opening &middot; peak ${escapeHtml(peakPoint.label)}</span>
+    </div>
+  </div>
+</section>
+
+<section class="pipe-band" aria-label="Pipeline urgency">
+  <div class="pipe-inner">
+    <span class="pipe-label">Active window</span>
+    <div class="pipe-cells">
+      <div class="pipe-cell">
+        <div class="pipe-val c-grn">${totalOpenCount.toLocaleString()}</div>
+        <div class="pipe-sub">Open now</div>
+        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="pipe-cell">
+        <div class="pipe-val">${closing30.toLocaleString()}</div>
+        <div class="pipe-sub">Closing ≤ 30 days</div>
+        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:${totalOpenCount > 0 ? Math.round((closing30 / totalOpenCount) * 100) : 50}%;background:#B4924E"></div></div>
+      </div>
+      <div class="pipe-cell">
+        <div class="pipe-val urgent">${closing60.toLocaleString()}</div>
+        <div class="pipe-sub">Closing ≤ 60 days</div>
+        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:${totalOpenCount > 0 ? Math.round((closing60 / totalOpenCount) * 100) : 70}%;background:#f87171"></div></div>
+      </div>
+      <div class="pipe-cell">
+        <div class="pipe-val" style="color:#C8A96B">${fmtBnShort(openPipelineM)}</div>
+        <div class="pipe-sub">Pipeline value</div>
+        <div class="pipe-bar"><div class="pipe-bar-fill" style="width:85%;background:#C8A96B"></div></div>
+      </div>
+    </div>
+    <div class="pipe-cta"><a href="/signals?status=open">Browse open &rarr;</a></div>
   </div>
 </section>
 
@@ -7892,22 +7951,43 @@ ${pageShellHeader(null, null)}
 ${deskBreak.length > 0 ? `
 <section class="sectors-sec rv" aria-label="Sector spend breakdown">
   <div class="sectors-wrap">
-    <div class="sec-eye">Where the money is concentrated</div>
-    <h2 class="sec-h">Top sectors by awarded spend</h2>
-    <p class="sec-sub">Public procurement is not evenly distributed. These are the categories driving the largest share of UK government contract value right now.</p>
-    <div class="sectors-grid">
-      <div class="sector-head-row">Top desks by awarded value &middot; ${escapeHtml(reportMonthRange)}</div>
-      ${(() => {
-        const maxV = deskBreak[0]?.total_m || 1;
-        return deskBreak.map((d) => {
-          const pct = Math.round((d.total_m / maxV) * 100);
-          return `<div class="srow">
-            <span class="sname" title="${escapeHtml(d.label)}">${escapeHtml(d.label)}</span>
-            <div class="sbar-wrap" aria-hidden="true"><div class="sbar-fill" data-pct="${pct}"></div></div>
-            <span class="sval">${fmtBnShort(d.total_m)}</span>
-          </div>`;
-        }).join("");
-      })()}
+    <div>
+      <div class="sec-eye">Where the money is concentrated</div>
+      <h2 class="sec-h">Top sectors by awarded spend</h2>
+      <p class="sec-sub" style="margin-bottom:28px">Public procurement is not evenly distributed. ${topDesk ? `<strong style="color:var(--text)">${escapeHtml(topDesk.label)}</strong> alone accounts for ${topDeskSharePct}% of indexed value.` : ""} These are the categories driving the most government contract value right now.</p>
+      <div class="sectors-list">
+        <div class="sector-head-row"><span>Sector desk</span><span>Notices &middot; Awarded</span></div>
+        ${(() => {
+          const maxV = deskBreak[0]?.total_m || 1;
+          return deskBreak.map((d, i) => {
+            const pct = Math.round((d.total_m / maxV) * 100);
+            return `<div class="srow">
+              <span class="srank">${i + 1}</span>
+              <span class="sname" title="${escapeHtml(d.label)}">${escapeHtml(d.label)}</span>
+              <div class="sbar-wrap" aria-hidden="true"><div class="sbar-fill" data-pct="${pct}"></div></div>
+              <span class="scnt">${d.count}</span>
+              <span class="sval">${fmtBnShort(d.total_m)}</span>
+            </div>`;
+          }).join("");
+        })()}
+      </div>
+    </div>
+    <div>
+      <div class="sec-eye">High-frequency contracting authorities</div>
+      <h2 class="sec-h">Top buyers by spend</h2>
+      <p class="sec-sub" style="margin-bottom:28px">A small cohort of contracting authorities drives a disproportionate share of UK public contract value. These are the most active buyers in the indexed period.</p>
+      ${topBuyers.length > 0 ? `
+      <div class="buyers-panel">
+        <div class="buyers-head-row"><span>Contracting authority</span><span>Notices &middot; Value</span></div>
+        ${topBuyers.map((b, i) => `<div class="brow">
+          <span class="brank">${i + 1}</span>
+          <span class="bname" title="${escapeHtml(b.buyer)}">${escapeHtml(b.buyer)}</span>
+          <span class="bcnt">${b.cnt} notices</span>
+          <span class="bval">£${b.total_val}m</span>
+        </div>`).join("")}
+      </div>
+      <p style="font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-top:12px;line-height:1.6">Top 5 authorities by awarded value &middot; ${escapeHtml(reportMonthRange)} &middot; Aggregators and frameworks excluded</p>
+      ` : `<p style="font-family:var(--mono);font-size:12px;color:var(--faint);padding:40px 0">Buyer data builds once sufficient signals are indexed across desks.</p>`}
     </div>
   </div>
 </section>
@@ -8068,26 +8148,26 @@ ${pageShellFoot()}
     for(let i=0;i<=yTicks;i++){
       const v=yMin+(yRange/yTicks)*i;
       const y=Y(v);
-      ctx.strokeStyle=i===0?'rgba(27,30,25,.15)':'rgba(27,30,25,.06)';
+      ctx.strokeStyle=i===0?'rgba(255,255,255,.12)':'rgba(255,255,255,.05)';
       ctx.lineWidth=i===0?1.5:1;
       ctx.setLineDash(i===0?[]:[3,3]);
       ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
       ctx.setLineDash([]);
       ctx.font='10.5px "Spline Sans Mono",monospace';
-      ctx.fillStyle='#86897E';ctx.textAlign='right';
+      ctx.fillStyle='#566273';ctx.textAlign='right';
       ctx.fillText(fmts(v),pad.l-10,y+4);
     }
 
     data.forEach((_,i)=>{
       const x=X(i);
-      ctx.strokeStyle='rgba(27,30,25,.04)';ctx.lineWidth=1;ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;ctx.setLineDash([]);
       ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();
     });
 
-    ctx.strokeStyle='rgba(27,30,25,.15)';ctx.lineWidth=1.5;
+    ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
 
-    ctx.font='10px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';
+    ctx.font='10px "Spline Sans Mono",monospace';ctx.fillStyle='#566273';
     data.forEach((d,i)=>{
       const x=X(i);
       ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/4);
@@ -8096,7 +8176,7 @@ ${pageShellFoot()}
     });
 
     ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);
-    ctx.font='9.5px "Spline Sans Mono",monospace';ctx.fillStyle='#86897E';ctx.textAlign='center';
+    ctx.font='9.5px "Spline Sans Mono",monospace';ctx.fillStyle='#566273';ctx.textAlign='center';
     ctx.fillText('AWARDED VALUE (£)',0,0);ctx.restore();
 
     const opData=data.filter(d=>d.open_m>0);
@@ -8111,7 +8191,7 @@ ${pageShellFoot()}
     ctx.beginPath();
     data.forEach((d,i)=>{i===0?ctx.moveTo(X(i),Y(d.total_m)):ctx.lineTo(X(i),Y(d.total_m));});
     ctx.lineTo(X(data.length-1),H-pad.b);ctx.lineTo(X(0),H-pad.b);ctx.closePath();
-    ctx.fillStyle='rgba(180,146,78,0.08)';ctx.fill();
+    ctx.fillStyle='rgba(180,146,78,0.12)';ctx.fill();
 
     ctx.strokeStyle='#B4924E';ctx.lineWidth=2.5;
     ctx.beginPath();
@@ -8170,8 +8250,8 @@ ${pageShellFoot()}
           const short=dk.label.length>22?dk.label.slice(0,21)+'…':dk.label;
           return '<div style="margin-top:6px">'
             +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
-            +'<span style="font-size:9.5px;color:#86897E;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
-            +'<span style="font-size:9.5px;color:#3A3E36;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'+'+'</span>'
+            +'<span style="font-size:9.5px;color:#8893A4;white-space:nowrap;overflow:hidden;max-width:130px;display:inline-block;text-overflow:ellipsis">'+short+'</span>'
+            +'<span style="font-size:9.5px;color:#B0BAC8;margin-left:8px;white-space:nowrap">'+fmts(dk.total_m)+'+'+'</span>'
             +'</div>'
             +'<div style="height:3px;background:rgba(27,30,25,.10);border-radius:2px">'
             +'<div style="width:'+pct+'%;height:100%;background:#B4924E;border-radius:2px;opacity:.85"></div>'
@@ -8180,7 +8260,7 @@ ${pageShellFoot()}
         tip.innerHTML='<div class="tip-label">'+d.label+'</div>'
           +'<div class="tip-row"><span class="tip-dot" style="background:#B4924E"></span>Awarded &nbsp;<b>'+fmt(d.total_m)+'+'+'</b>'+(dpct!==null?' <span style="opacity:.7;font-size:10px">'+(dpct>=0?'+':'')+dpct+'%</span>':'')+'</div>'
           +(d.open_m>0?'<div class="tip-row"><span class="tip-dot" style="background:#1d6b4f"></span>Open &nbsp;&nbsp;&nbsp;&nbsp;<b>'+fmt(d.open_m)+'+'+'</b></div>':'')
-          +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(236,230,214,.18);font-size:10px;color:#9AA093">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
+          +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#566273">'+d.notice_count+' notices &middot; '+d.open_count+' open</div>'
           +(desks.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(236,230,214,.2)">'
             +'<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#86897E;margin-bottom:4px">Top 5 desks'+(totalDesks>5?' of '+totalDesks:'')+'</div>'
             +deskRows+'</div>':'');
@@ -9937,56 +10017,56 @@ ${pageShellCss()}
 ${oppCardCss()}
 ${winBriefCss()}
 ${noticesBoardCss()}
+/* ── Opportunity board hero (notices page only) ── */
+.ob-mast{background:radial-gradient(120% 160% at 80% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6}
+.ob-mast-inner{padding:48px 48px 0;max-width:1400px;margin:0 auto}
+.ob-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.05em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.ob-crumb a{color:rgba(236,230,214,.5);text-decoration:none;transition:color .15s}.ob-crumb a:hover{color:#ECE6D6}
+.ob-crumb-sep{color:rgba(236,230,214,.25)}.ob-crumb-active{color:rgba(236,230,214,.7)}
+.ob-mast h1{font-family:var(--serif);font-size:clamp(26px,3vw,40px);font-weight:400;line-height:1.05;letter-spacing:-.02em;color:#ECE6D6;margin-bottom:10px}
+.ob-lede{font-size:14px;color:rgba(197,201,188,.75);margin-bottom:36px;max-width:48em}
+.ob-stats{display:flex;border-top:1px solid rgba(236,230,214,.1)}
+.ob-stat{flex:1;padding:22px 28px;border-right:1px solid rgba(236,230,214,.08)}.ob-stat:last-child{border-right:none}
+.ob-stat-num{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.ob-stat-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(197,201,188,.5)}
+.ob-live-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0;animation:obPulse 2s infinite}
+@keyframes obPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.45)}60%{box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+@media(max-width:768px){.ob-mast-inner{padding:32px 20px 0}.ob-stats{flex-wrap:wrap}.ob-stat{flex:1 1 50%;padding:16px 20px}.ob-stat-num{font-size:22px}}
 </style>
 </head>
 <body>
 ${pageShellHeader(profile, authCtx)}
 
-<section class="pg-mast">
-  <div class="pg-mast-inner">
-    <div class="pg-crumb">
+<section class="ob-mast">
+  <div class="ob-mast-inner">
+    <div class="ob-crumb">
       <a href="/desk/${escapeHtml(profile.slug)}">${escapeHtml(profile.label)}</a>
-      <span class="pg-crumb-sep">&rsaquo;</span>
-      <span class="pg-crumb-active">Opportunity Board</span>
+      <span class="ob-crumb-sep">&rsaquo;</span>
+      <span class="ob-crumb-active">Opportunity Board</span>
     </div>
     <h1>OPPORTUNITY BOARD &mdash; ${escapeHtml(profile.label.toUpperCase())}</h1>
-    <p style="font-size:14px;color:var(--muted);margin-top:8px">Contracts you can chase now. Public notices scored against this desk profile.</p>
-    <div class="nb-stats">
-      <div class="nb-stat-pill">
-        <div class="nb-stat-icon" style="background:rgba(34,197,94,.1)">&#128203;</div>
-        <div>
-          <div class="nb-stat-num" style="color:var(--green)">${isCompiling ? "—" : String(allOpen.length)}<span class="nb-pulse"></span></div>
-          <div class="nb-stat-label">Open notices</div>
-        </div>
-      </div>
-      <div class="nb-stat-pill">
-        <div class="nb-stat-icon" style="background:rgba(185,28,28,.1)">&#9889;</div>
-        <div>
-          <div class="nb-stat-num" style="color:var(--brand)">${isCompiling ? "—" : String(chaseNowCount)}</div>
-          <div class="nb-stat-label">Chase now</div>
-        </div>
-      </div>
-      <div class="nb-stat-pill">
-        <div class="nb-stat-icon" style="background:rgba(146,64,14,.1)">&#128197;</div>
-        <div>
-          <div class="nb-stat-num" style="color:#92400e">${isCompiling ? "—" : String(closingThisWeek)}</div>
-          <div class="nb-stat-label">Closing this week</div>
-        </div>
-      </div>
-      <div class="nb-stat-pill">
-        <div class="nb-stat-icon" style="background:rgba(59,130,246,.1)">&#128176;</div>
-        <div>
-          <div class="nb-stat-num" style="color:#1e40af">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue))+"+" : "—"}</div>
-          <div class="nb-stat-label">Total awarded value</div>
-        </div>
-      </div>
-      <div class="nb-stat-pill">
-        <div class="nb-stat-icon" style="background:rgba(168,85,247,.1)">&#127963;</div>
-        <div>
-          <div class="nb-stat-num" style="color:#6b21a8">${isCompiling ? "—" : String(uniqueBuyers)}</div>
-          <div class="nb-stat-label">Unique buyers</div>
-        </div>
-      </div>
+    <p class="ob-lede">Contracts you can chase now. Public notices scored against this desk profile.</p>
+  </div>
+  <div class="ob-stats">
+    <div class="ob-stat">
+      <div class="ob-stat-num" style="color:#4ade80">${isCompiling ? "—" : String(allOpen.length)}<span class="ob-live-dot"></span></div>
+      <div class="ob-stat-label">Open Notices</div>
+    </div>
+    <div class="ob-stat">
+      <div class="ob-stat-num" style="color:#D4A95A">${isCompiling ? "—" : String(chaseNowCount)}</div>
+      <div class="ob-stat-label">Chase Now</div>
+    </div>
+    <div class="ob-stat">
+      <div class="ob-stat-num" style="color:#FBBF24">${isCompiling ? "—" : String(closingThisWeek)}</div>
+      <div class="ob-stat-label">Closing This Week</div>
+    </div>
+    <div class="ob-stat">
+      <div class="ob-stat-num" style="color:#93C5FD">${isCompiling ? "—" : totalValue > 0 ? escapeHtml(fmtMoney(totalValue))+"+" : "—"}</div>
+      <div class="ob-stat-label">Awarded Value</div>
+    </div>
+    <div class="ob-stat">
+      <div class="ob-stat-num" style="color:#C5C9BC">${isCompiling ? "—" : String(uniqueBuyers)}</div>
+      <div class="ob-stat-label">Unique Buyers</div>
     </div>
   </div>
 </section>
