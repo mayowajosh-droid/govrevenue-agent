@@ -167,6 +167,25 @@ export async function sendBriefingEmail(input: {
   });
 }
 
+export async function sendWelcomeEmail(email: string, plan: string, setupUrl: string) {
+  const planLabel = plan === "payg" ? "Pay as you go" : plan === "agency" ? "Agency" : "Pro";
+  await sendEmail({
+    to: email,
+    subject: `You're in — set your GovRevenue password`,
+    text: [
+      `Welcome to GovRevenue.`,
+      ``,
+      `Your ${planLabel} account has been created. Set your password to access your reports and account:`,
+      ``,
+      `${setupUrl}`,
+      ``,
+      `This link expires in 7 days. If you have any questions, reply to this email.`,
+      ``,
+      `— GovRevenue`
+    ].join("\n")
+  });
+}
+
 export async function sendWeeklyAlert(input: {
   subscriptionId: string;
   companyName: string;

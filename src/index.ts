@@ -22,7 +22,7 @@ import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { renderWorldClassDashboard } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject } from "./lib/pdfStorage.js";
-import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail } from "./lib/emailNotifications.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail } from "./lib/emailNotifications.js";
 import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
@@ -51,7 +51,7 @@ import {
   type ChaseStats as OppChaseStats,
 } from "./lib/opportunityEngine.js";
 type ScanStatus = "pending" | "running" | "completed" | "failed";
-type UserTier = "free" | "pro" | "agency";
+type UserTier = "free" | "payg" | "pro" | "agency";
 type UserRecord = {
   id: string;
   email: string;
@@ -61,6 +61,9 @@ type UserRecord = {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_subscription_status: string | null;
+  role: string;
+  setup_token: string | null;
+  setup_token_expires: string | null;
 };
 type ScanRecord = {
   id: string;
@@ -193,6 +196,7 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || "";
 const STRIPE_AGENCY_PRICE_ID = process.env.STRIPE_AGENCY_PRICE_ID || "";
+const STRIPE_PAYG_PRICE_ID = process.env.STRIPE_PAYG_PRICE_ID || "";
 const BASE_URL = process.env.BASE_URL || "https://govrevenue-agent-production.up.railway.app";
 const REDIS_URL = process.env.REDIS_URL || null;
 const RUN_WEB = process.env.RUN_WEB !== "false";
@@ -1062,12 +1066,25 @@ async function initDb() {
       tier TEXT NOT NULL DEFAULT 'free',
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
-      stripe_subscription_status TEXT
+      stripe_subscription_status TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      setup_token TEXT,
+      setup_token_expires TIMESTAMPTZ
     );
   `);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token_expires TIMESTAMPTZ`);
+
+  // Rename alert-subscriptions table if the old name still exists
+  await pool.query(`DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname='public' AND tablename='subscriptions')
+       AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname='public' AND tablename='alert_subscriptions')
+    THEN ALTER TABLE subscriptions RENAME TO alert_subscriptions; END IF;
+  END $$`);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS subscriptions (
+    CREATE TABLE IF NOT EXISTS alert_subscriptions (
       id TEXT PRIMARY KEY,
       scan_id TEXT NOT NULL,
       company_name TEXT NOT NULL,
@@ -1133,6 +1150,41 @@ async function initDb() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_visitor_logs_visited ON visitor_logs (visited_at DESC);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      stripe_session_id TEXT NOT NULL UNIQUE,
+      stripe_payment_intent TEXT,
+      plan TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'gbp',
+      status TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      stripe_event_id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      payload JSONB NOT NULL,
+      status TEXT NOT NULL DEFAULT 'processed',
+      processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_audit (
+      id BIGSERIAL PRIMARY KEY,
+      admin_user_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target TEXT,
+      meta_json JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 
   console.log("[db] ready");
 }
@@ -1548,7 +1600,7 @@ async function createSubscription(
 
   if (pool) {
     await pool.query(
-      `INSERT INTO subscriptions (id, scan_id, company_name, email, input_json, alerted_notice_ids, active, created_at, last_alerted_at)
+      `INSERT INTO alert_subscriptions (id, scan_id, company_name, email, input_json, alerted_notice_ids, active, created_at, last_alerted_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [record.id, record.scan_id, record.company_name, record.email, record.input_json,
        record.alerted_notice_ids, record.active, record.created_at, record.last_alerted_at]
@@ -1561,7 +1613,7 @@ async function createSubscription(
 
 async function getSubscription(id: string): Promise<SubscriptionRecord | null> {
   if (pool) {
-    const result = await pool.query(`SELECT * FROM subscriptions WHERE id=$1`, [id]);
+    const result = await pool.query(`SELECT * FROM alert_subscriptions WHERE id=$1`, [id]);
     return result.rows[0] || null;
   }
   return subMemStore.get(id) || null;
@@ -1571,7 +1623,7 @@ async function updateSubscriptionAlerted(id: string, noticeIds: string[]) {
   const now = nowIso();
   if (pool) {
     await pool.query(
-      `UPDATE subscriptions SET alerted_notice_ids=$2, last_alerted_at=$3 WHERE id=$1`,
+      `UPDATE alert_subscriptions SET alerted_notice_ids=$2, last_alerted_at=$3 WHERE id=$1`,
       [id, noticeIds, now]
     );
   } else {
@@ -1582,7 +1634,7 @@ async function updateSubscriptionAlerted(id: string, noticeIds: string[]) {
 
 async function deactivateSubscription(id: string) {
   if (pool) {
-    await pool.query(`UPDATE subscriptions SET active=FALSE WHERE id=$1`, [id]);
+    await pool.query(`UPDATE alert_subscriptions SET active=FALSE WHERE id=$1`, [id]);
   } else {
     const sub = subMemStore.get(id);
     if (sub) subMemStore.set(id, { ...sub, active: false });
@@ -1591,7 +1643,7 @@ async function deactivateSubscription(id: string) {
 
 async function listAllSubscriptions(): Promise<SubscriptionRecord[]> {
   if (pool) {
-    const result = await pool.query(`SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT 200`);
+    const result = await pool.query(`SELECT * FROM alert_subscriptions ORDER BY created_at DESC LIMIT 200`);
     return result.rows;
   }
   return Array.from(subMemStore.values()).sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -1658,6 +1710,53 @@ async function updateUserTier(userId: string, tier: UserTier, stripeCustomerId?:
   await pool.query(
     `UPDATE users SET tier=$2, stripe_customer_id=COALESCE($3,stripe_customer_id), stripe_subscription_id=COALESCE($4,stripe_subscription_id), stripe_subscription_status=COALESCE($5,stripe_subscription_status) WHERE id=$1`,
     [userId, tier, stripeCustomerId ?? null, stripeSubId ?? null, stripeSubStatus ?? null]
+  );
+}
+
+async function createUserFromWebhook(
+  email: string, stripeCustomerId: string, tier: UserTier,
+  stripeSubId?: string, stripeSubStatus?: string
+): Promise<UserRecord> {
+  if (!pool) throw new Error("Database required");
+  const id = makeId();
+  const tempHash = await bcrypt.hash(globalThis.crypto.randomUUID(), 10);
+  const setupToken = makeId() + makeId();
+  const setupExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const r = await pool.query<UserRecord>(
+    `INSERT INTO users (id, email, password_hash, tier, stripe_customer_id, stripe_subscription_id, stripe_subscription_status, setup_token, setup_token_expires)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [id, email.toLowerCase().trim(), tempHash, tier, stripeCustomerId, stripeSubId ?? null, stripeSubStatus ?? null, setupToken, setupExpires]
+  );
+  return r.rows[0];
+}
+
+async function createOrder(userId: string, sessionId: string, paymentIntent: string | null, plan: string, amount: number, status: string) {
+  if (!pool) return;
+  const id = makeId();
+  await pool.query(
+    `INSERT INTO orders (id, user_id, stripe_session_id, stripe_payment_intent, plan, amount, status) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (stripe_session_id) DO NOTHING`,
+    [id, userId, sessionId, paymentIntent, plan, amount, status]
+  );
+}
+
+async function ensureWebhookEvent(eventId: string, type: string, payload: string): Promise<boolean> {
+  if (!pool) return false;
+  try {
+    await pool.query(
+      `INSERT INTO webhook_events (stripe_event_id, type, payload) VALUES ($1,$2,$3)`,
+      [eventId, type, payload]
+    );
+    return false;
+  } catch {
+    return true; // duplicate key = already processed
+  }
+}
+
+async function logAdminAudit(adminUserId: string, action: string, target: string, meta?: object) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO admin_audit (admin_user_id, action, target, meta_json) VALUES ($1,$2,$3,$4)`,
+    [adminUserId, action, target, meta ? JSON.stringify(meta) : null]
   );
 }
 
@@ -6015,6 +6114,52 @@ app.post("/logout", (req, res) => {
   res.redirect("/");
 });
 
+// Account setup — for users created via Stripe webhook (no password yet)
+app.get("/account/setup", asyncRoute(async (req, res) => {
+  const token = String(req.query.token || "");
+  if (!token || !pool) { res.redirect("/login"); return; }
+  const err = req.query.err ? escapeHtml(String(req.query.err)) : "";
+  const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE setup_token=$1`, [token]);
+  const user = r.rows[0];
+  if (!user || !user.setup_token_expires || new Date(user.setup_token_expires) < new Date()) {
+    res.type("html").send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Link expired</title><style>${authCss}</style></head><body><div class="auth-wrap"><div class="auth-box"><h1 class="auth-title">Link expired</h1><p class="auth-sub">This setup link has expired or already been used. <a href="/login">Sign in</a> or <a href="/register">create an account</a>.</p></div></div></body></html>`);
+    return;
+  }
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set your password — GovRevenue</title><style>${authCss}</style></head>
+<body><div class="auth-wrap"><div class="auth-box">
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Gov<b>Revenue</b></a></div></nav>
+<h1 class="auth-title">Set your password</h1>
+<p class="auth-sub">Welcome to GovRevenue. Set a password for <strong>${escapeHtml(user.email)}</strong> to access your account.</p>
+${err ? `<div class="auth-err">${err}</div>` : ""}
+<form method="POST" action="/account/setup">
+<input type="hidden" name="token" value="${escapeHtml(token)}">
+<div class="field"><label>Password</label><input type="password" name="password" required autocomplete="new-password" placeholder="At least 8 characters" minlength="8"></div>
+<div class="field"><label>Confirm password</label><input type="password" name="confirm" required autocomplete="new-password" placeholder="Same password again"></div>
+<button class="btn-primary" type="submit">Set password &amp; enter</button>
+</form>
+</div></div></body></html>`);
+}));
+
+app.post("/account/setup", asyncRoute(async (req, res) => {
+  const token = String(req.body?.token || "");
+  const password = String(req.body?.password || "");
+  const confirm = String(req.body?.confirm || "");
+  if (!token || !pool) { res.redirect("/login"); return; }
+  if (password.length < 8) { res.redirect(`/account/setup?token=${encodeURIComponent(token)}&err=Password+must+be+at+least+8+characters`); return; }
+  if (password !== confirm) { res.redirect(`/account/setup?token=${encodeURIComponent(token)}&err=Passwords+do+not+match`); return; }
+  const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE setup_token=$1`, [token]);
+  const user = r.rows[0];
+  if (!user || !user.setup_token_expires || new Date(user.setup_token_expires) < new Date()) {
+    res.redirect("/login?err=Setup+link+expired");
+    return;
+  }
+  const hash = await bcrypt.hash(password, 10);
+  await pool.query(`UPDATE users SET password_hash=$2, setup_token=NULL, setup_token_expires=NULL WHERE id=$1`, [user.id, hash]);
+  const jwtToken = signToken(user);
+  res.cookie("gr_token", jwtToken, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
+  res.redirect("/account?welcome=1");
+}));
+
 // ── Account / dashboard ──────────────────────────────────────────────────────
 
 app.get("/account", requireAuth, asyncRoute(async (req, res) => {
@@ -6079,7 +6224,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 
   const completedCount = userScans.filter((s: any) => s.status === "completed").length;
   const memberSince = new Date(user.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-  const tierLabel: Record<UserTier, string> = { free: "Free", pro: "Pro", agency: "Agency" };
+  const tierLabel: Record<UserTier, string> = { free: "Free", payg: "Pay as you go", pro: "Pro", agency: "Agency" };
   const isPaid = user.tier !== "free";
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -6519,21 +6664,43 @@ ${pageShellFoot()}
 
 // ── Stripe billing ────────────────────────────────────────────────────────────
 
-app.get("/billing/checkout", requireAuth, asyncRoute(async (req, res) => {
+app.get("/billing/checkout", asyncRoute(async (req, res) => {
   if (!stripe) { res.redirect("/pricing"); return; }
-  const auth = getAuthUser(req)!;
+  const auth = getAuthUser(req);
   const plan = String(req.query.plan || "pro");
-  const priceId = plan === "agency" ? STRIPE_AGENCY_PRICE_ID : STRIPE_PRO_PRICE_ID;
-  if (!priceId) { res.redirect("/pricing?err=Stripe+not+configured"); return; }
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
+
+  let priceId: string;
+  let mode: "payment" | "subscription";
+  let successUrl: string;
+
+  if (plan === "payg") {
+    priceId = STRIPE_PAYG_PRICE_ID;
+    mode = "payment";
+    successUrl = `${BASE_URL}/scan?paid=1`;
+  } else if (plan === "agency") {
+    priceId = STRIPE_AGENCY_PRICE_ID;
+    mode = "subscription";
+    successUrl = `${BASE_URL}/account?upgraded=1`;
+  } else {
+    priceId = STRIPE_PRO_PRICE_ID;
+    mode = "subscription";
+    successUrl = `${BASE_URL}/account?upgraded=1`;
+  }
+
+  if (!priceId) { res.redirect(`/checkout?plan=${encodeURIComponent(plan)}&err=not_configured`); return; }
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    mode,
     payment_method_types: ["card"],
-    customer_email: auth.email,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${BASE_URL}/account?upgraded=1`,
-    cancel_url: `${BASE_URL}/pricing`,
-    metadata: { userId: auth.userId, plan },
-  });
+    success_url: successUrl,
+    cancel_url: `${BASE_URL}/checkout?plan=${plan}`,
+    metadata: { plan, ...(auth ? { userId: auth.userId } : {}) },
+    allow_promotion_codes: true,
+  };
+  if (auth?.email) sessionParams.customer_email = auth.email;
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
   res.redirect(session.url!);
 }));
 
@@ -6558,11 +6725,43 @@ app.post("/billing/webhook", express.raw({ type: "application/json" }), asyncRou
   } catch {
     res.status(400).json({ error: "Webhook signature failed" }); return;
   }
+
+  // Idempotency: skip if this event was already processed
+  const alreadySeen = await ensureWebhookEvent(event.id, event.type, JSON.stringify(event.data));
+  if (alreadySeen) { res.json({ received: true }); return; }
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.metadata?.userId;
-    const plan = (session.metadata?.plan || "pro") as UserTier;
-    if (userId) await updateUserTier(userId, plan, session.customer as string, session.subscription as string, "active");
+    const plan = ((session.metadata?.plan as string) || "pro") as UserTier;
+    const stripeCustomerId = session.customer as string;
+    const stripeSubId = (session.subscription as string | null) ?? undefined;
+    const paymentIntent = (session.payment_intent as string | null) ?? null;
+    const amountTotal = session.amount_total || 0;
+    const email = session.customer_details?.email ?? session.customer_email ?? "";
+
+    let userId = session.metadata?.userId;
+
+    if (userId) {
+      await updateUserTier(userId, plan, stripeCustomerId, stripeSubId, "active");
+    } else if (email) {
+      const existing = await getUserByEmail(email);
+      if (existing) {
+        userId = existing.id;
+        await updateUserTier(existing.id, plan, stripeCustomerId, stripeSubId, "active");
+      } else {
+        const newUser = await createUserFromWebhook(email, stripeCustomerId, plan, stripeSubId, stripeSubId ? "active" : undefined);
+        userId = newUser.id;
+        if (newUser.setup_token) {
+          const setupUrl = `${BASE_URL}/account/setup?token=${encodeURIComponent(newUser.setup_token)}`;
+          sendWelcomeEmail(email, plan, setupUrl).catch(err => console.error("[webhook] welcome email failed", err));
+        }
+      }
+    }
+
+    if (userId) {
+      await createOrder(userId, session.id, paymentIntent, plan, amountTotal, "paid");
+    }
+
   } else if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
     const sub = event.data.object as Stripe.Subscription;
     if (sub.status !== "active" && sub.status !== "trialing") {
@@ -6863,9 +7062,10 @@ app.get("/pricing", (_req, res) => {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
-  --base:#ECE7DA;--surface:#FBF9F3;--surface-2:#F6F2E8;
-  --brand:#B4924E;--text:#1B1E19;--text-mid:#3A3E36;--muted:#86897E;--faint:#9AA093;
-  --border:rgba(27,30,25,.10);--border-2:rgba(27,30,25,.16);--border-3:rgba(27,30,25,.22);
+  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;--surface-3:#1E2A3A;
+  --brand:#A0522D;--brand-hot:#B8673A;
+  --text:#E9EEF5;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
+  --border:#1E2A3A;--border-2:#222E40;--border-3:#2A3848;
   --sans:"Libre Franklin",system-ui,sans-serif;
   --serif:"Newsreader",Georgia,serif;
   --mono:"Spline Sans Mono",ui-monospace,monospace;
@@ -6874,7 +7074,7 @@ app.get("/pricing", (_req, res) => {
 body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .wrap{padding:0 32px;max-width:960px;margin:0 auto}
-header{background:rgba(236,231,218,0.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .logo{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text)}
 .logo-dot{width:9px;height:9px;background:var(--brand);border-radius:50%}
 .logo b{color:var(--brand)}
@@ -6886,12 +7086,12 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 0 80px}
 .plan{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface);position:relative;transition:border-color .2s,box-shadow .2s;display:flex;flex-direction:column}
-.plan:hover{border-color:var(--border-3);box-shadow:0 6px 24px rgba(27,30,25,.08)}
-.plan.featured{border-color:rgba(180,146,78,.4);box-shadow:0 0 0 1px rgba(180,146,78,.2)}
-.plan.featured:hover{border-color:rgba(180,146,78,.6)}
-.plan-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--brand);color:#10110D;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;white-space:nowrap;font-weight:600}
+.plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.4)}
+.plan.featured{border-color:rgba(160,82,45,.4);box-shadow:0 0 0 1px rgba(160,82,45,.2)}
+.plan.featured:hover{border-color:rgba(160,82,45,.6)}
+.plan-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;white-space:nowrap;font-weight:600}
 .plan-name{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-.plan-price{font-family:var(--serif);font-size:42px;font-weight:400;letter-spacing:-.02em;line-height:1;margin-bottom:6px;color:var(--text)}
+.plan-price{font-family:var(--mono);font-size:42px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:6px;color:var(--text)}
 .plan-price sup{font-size:22px;vertical-align:top;margin-top:6px}
 .plan-period{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:24px}
 .plan-desc{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)}
@@ -6901,11 +7101,15 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .plan li:last-child{border-bottom:none}
 .tick{color:var(--brand);font-size:12px;flex-shrink:0}
 .dash{color:var(--faint);font-size:12px;flex-shrink:0}
-.btn{display:block;text-align:center;font-family:var(--sans);font-size:14px;font-weight:600;padding:14px 20px;transition:.18s;letter-spacing:.01em}
-.btn-primary{background:#102A1E;color:#F3EFE6;border:1px solid #102A1E}
-.btn-primary:hover{background:#0A1C12}
+.btn{display:block;text-align:center;font-family:var(--mono);font-size:13px;font-weight:600;padding:14px 20px;transition:.18s;letter-spacing:.06em;text-transform:uppercase}
+.btn-primary{background:var(--brand);color:#fff;border:1px solid var(--brand)}
+.btn-primary:hover{background:var(--brand-hot);border-color:var(--brand-hot)}
 .btn-outline{border:1px solid var(--border-3);color:var(--text-mid)}
-.btn-outline:hover{background:var(--surface-2);border-color:var(--brand)}
+.btn-outline:hover{background:var(--surface-2);border-color:var(--brand);color:var(--text)}
+.plan-talk{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;letter-spacing:.04em}
+.plan-talk:hover{color:var(--muted)}
+.plan-sample{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px}
+.plan-sample:hover{color:var(--muted)}
 .faq{padding:0 0 80px}
 .faq h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:32px;color:var(--text)}
 .faq-item{border-top:1px solid var(--border);padding:20px 0}
@@ -6918,9 +7122,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
   .wrap{padding:0 14px}
   h1{font-size:22px}
   .hero{padding:28px 0 24px}
-  .hero-sub{font-size:14px}
   .plan{padding:20px}
-  .plan-name{font-size:16px}
   .plan-price{font-size:32px}
   .plan li{font-size:13px}
   .faq h2{font-size:20px}
@@ -6944,18 +7146,19 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
     <div class="plan">
       <div class="plan-name">Pay as you go</div>
       <div class="plan-price"><sup>£</sup>29</div>
-      <div class="plan-period">per scan</div>
-      <div class="plan-desc">A single full scan. Get the 10-section report, buyer watchlist, and PDF — no subscription needed.</div>
+      <div class="plan-period">per scan &middot; one-time</div>
+      <div class="plan-desc">A single full scan. The 10-section report, buyer watchlist, and PDF — no subscription needed.</div>
       <ul>
         <li><span class="tick">&#10003;</span> Full 10-section intelligence report</li>
         <li><span class="tick">&#10003;</span> Buyer watchlist &amp; route-to-revenue map</li>
         <li><span class="tick">&#10003;</span> PDF export</li>
         <li><span class="tick">&#10003;</span> Evidence grade &amp; verdict</li>
-        <li><span class="dash">–</span> Weekly opportunity alerts</li>
-        <li><span class="dash">–</span> All 24 intelligence desks</li>
-        <li><span class="dash">–</span> Multiple firm profiles</li>
+        <li><span class="dash">&ndash;</span> Weekly opportunity alerts</li>
+        <li><span class="dash">&ndash;</span> All 24 intelligence desks</li>
+        <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
       </ul>
-      <a href="/register" class="btn btn-outline">Get started &rarr;</a>
+      <a href="/checkout?plan=payg" class="btn btn-outline">Get started &rarr;</a>
+      <a href="/scan/sample" class="plan-sample">See a sample report first &rarr;</a>
     </div>
     <div class="plan featured">
       <div class="plan-badge">Most popular</div>
@@ -6969,10 +7172,10 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
         <li><span class="tick">&#10003;</span> All 24 intelligence desks</li>
         <li><span class="tick">&#10003;</span> Full reports &amp; PDF exports</li>
         <li><span class="tick">&#10003;</span> Buyer watchlist monitoring</li>
-        <li><span class="dash">–</span> Multiple firm profiles</li>
-        <li><span class="dash">–</span> Team access</li>
+        <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
+        <li><span class="dash">&ndash;</span> Team access</li>
       </ul>
-      <a href="/billing/checkout?plan=pro" class="btn btn-primary">Get started &rarr;</a>
+      <a href="/checkout?plan=pro" class="btn btn-primary">Get started &rarr;</a>
     </div>
     <div class="plan">
       <div class="plan-name">Agency</div>
@@ -6988,7 +7191,8 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
         <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
         <li><span class="tick">&#10003;</span> Custom alert frequency</li>
       </ul>
-      <a href="mailto:hello@govrevenue.co.uk" class="btn btn-outline">Contact us &rarr;</a>
+      <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
+      <a href="mailto:hello@govrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
     </div>
   </div>
   <div class="faq">
@@ -7010,15 +7214,278 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
       <div class="faq-a">After your first scan, you can subscribe to alerts. Each week the agent re-checks the public record for new contracts matching your firm's profile and emails you only the new ones — no noise, no re-sending contracts you've already seen.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Is this a guarantee I'll win contracts?</div>
+      <div class="faq-q">Do I need to create an account first?</div>
+      <div class="faq-a">No. Click Get started, pay via Stripe, and your account is created automatically from your payment email. No registration wall before you see value.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is this a guarantee I&rsquo;ll win contracts?</div>
       <div class="faq-a">No. GovRevenue is intelligence, not certainty. We surface what the public record shows and give you a structured assessment of fit. Winning still depends on your bid quality, track record, and pricing. We help you stop chasing the wrong ones.</div>
     </div>
   </div>
 </div>
 </main>
-<footer style="border-top:1px solid var(--line-strong);padding:32px">
-  <div class="caveat">Public record only &middot; Intelligence, not certainty &middot; <a href="/" style="text-decoration:underline">GovRevenue</a></div>
+<footer style="border-top:1px solid var(--border);padding:32px">
+  <div class="caveat">Public record only &middot; Intelligence, not certainty &middot; <a href="/" style="text-decoration:underline;color:var(--muted)">GovRevenue</a></div>
 </footer>
+</body>
+</html>`);
+});
+
+// ── Checkout order-confirmation page ─────────────────────────────────────────
+
+const PLAN_CONFIG: Record<string, { name: string; price: string; period: string; mode: string; items: string[] }> = {
+  payg: {
+    name: "Pay as you go",
+    price: "£29",
+    period: "one-time",
+    mode: "payment",
+    items: ["Full 10-section intelligence report", "Buyer watchlist & route-to-revenue map", "PDF export", "Evidence grade & verdict"],
+  },
+  pro: {
+    name: "Pro",
+    price: "£79",
+    period: "per month — cancel anytime",
+    mode: "subscription",
+    items: ["Unlimited scans", "Weekly opportunity alerts (email)", "All 24 intelligence desks", "Full reports & PDF exports", "Buyer watchlist monitoring"],
+  },
+  agency: {
+    name: "Agency",
+    price: "£249",
+    period: "per month",
+    mode: "subscription",
+    items: ["Everything in Pro", "Up to 10 firm profiles", "Team access (3 seats)", "Client-ready PDF reports", "Priority support", "Dedicated desk monitoring"],
+  },
+};
+
+app.get("/checkout", (req, res) => {
+  const planKey = String(req.query.plan || "pro");
+  const plan = PLAN_CONFIG[planKey];
+  if (!plan) { res.redirect("/pricing"); return; }
+  const err = req.query.err === "not_configured" ? "Payment is not yet configured. Please contact us." : "";
+
+  const itemsHtml = plan.items.map(i => `
+    <div class="oi"><span class="oi-tick">&#10003;</span><span>${escapeHtml(i)}</span></div>`).join("");
+
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order — GovRevenue</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+:root{
+  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;--surface-3:#1E2A3A;
+  --brand:#A0522D;--brand-hot:#B8673A;
+  --text:#E9EEF5;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
+  --border:#1E2A3A;--border-2:#222E40;--green:#22C55E;
+  --sans:"Inter",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:inherit;text-decoration:none}
+header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:17px;font-weight:500}
+.logo-dot{width:8px;height:8px;background:var(--brand);border-radius:50%}
+.logo b{color:var(--brand)}
+.back{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted)}
+.back:hover{color:var(--text-mid)}
+.page{max-width:860px;margin:0 auto;padding:48px 24px 80px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+.col-left{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface)}
+.col-right{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface)}
+.order-label{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.order-label::after{content:'';flex:1;height:1px;background:var(--border-2)}
+.plan-name{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text);margin-bottom:4px}
+.plan-price{font-family:var(--mono);font-size:42px;font-weight:600;color:var(--text);letter-spacing:-.02em;line-height:1;margin:16px 0 4px}
+.plan-period{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--border-2)}
+.oi{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-mid)}
+.oi:last-child{border-bottom:none}
+.oi-tick{color:var(--green);font-size:12px;flex-shrink:0;font-family:var(--mono)}
+.caveat{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:24px;letter-spacing:.02em}
+.pay-head{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+.pay-sub{font-size:13px;color:var(--muted);margin-bottom:32px;line-height:1.6}
+.btn-pay{display:block;width:100%;text-align:center;background:var(--brand);color:#fff;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:18px 24px;border:none;cursor:pointer;transition:.18s;text-decoration:none}
+.btn-pay:hover{background:var(--brand-hot)}
+.pay-note{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.6}
+.pay-note a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;font-family:var(--mono);font-size:12px;padding:12px 16px;margin-bottom:20px}
+@media(max-width:680px){.page{grid-template-columns:1fr;gap:24px;padding:24px 16px 60px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a href="/pricing" class="back">&larr; Plans</a>
+</header>
+<div class="page">
+  <div class="col-left">
+    <div class="order-label">Order summary</div>
+    <div class="plan-name">${escapeHtml(plan.name)}</div>
+    <div class="plan-price">${escapeHtml(plan.price)}</div>
+    <div class="plan-period">${escapeHtml(plan.period)}</div>
+    ${itemsHtml}
+    <div class="caveat">Intelligence, not certainty. Public record only.</div>
+  </div>
+  <div class="col-right">
+    <div class="order-label">Payment</div>
+    ${err ? `<div class="err">${escapeHtml(err)}</div>` : ""}
+    <div class="pay-head">Secure checkout via Stripe</div>
+    <div class="pay-sub">Your account is created automatically from your payment email — no separate registration step.</div>
+    <a href="/billing/checkout?plan=${encodeURIComponent(planKey)}" class="btn-pay">Proceed to payment &rarr;</a>
+    <div class="pay-note">
+      Secured by Stripe &middot; Card or Apple Pay<br>
+      By proceeding you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>`);
+});
+
+// ── Sample report (Ticket 1 — placeholder until Bulloughs PDF is supplied) ────
+
+app.get("/scan/sample", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sample Report — GovRevenue</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
+:root{
+  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;
+  --brand:#A0522D;--brand-hot:#B8673A;
+  --text:#E9EEF5;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
+  --border:#1E2A3A;--border-2:#222E40;
+  --redact-1:#A0522D;--redact-2:#1a1a1a;
+  --sans:"Inter",system-ui,sans-serif;--serif:"Newsreader",Georgia,serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:17px;font-weight:500}
+.logo-dot{width:8px;height:8px;background:var(--brand);border-radius:50%}
+.logo b{color:var(--brand)}
+.back{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted)}
+/* Specimen ribbon */
+.ribbon{background:var(--redact-2);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between}
+.ribbon-cta a{color:#fff;background:var(--brand);padding:6px 16px;font-size:10px;letter-spacing:.12em}
+.ribbon-cta a:hover{background:var(--brand-hot)}
+/* Watermark */
+.report-wrap{position:relative;max-width:860px;margin:0 auto;padding:40px 24px 80px}
+.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:var(--mono);font-size:clamp(60px,12vw,120px);font-weight:700;color:rgba(160,82,45,.06);pointer-events:none;white-space:nowrap;letter-spacing:.1em;z-index:0}
+/* Redaction bars */
+.rx{display:inline-block;background:var(--redact-2);color:transparent;user-select:none;border-radius:1px;vertical-align:middle}
+.rx-s{height:14px;width:110px}
+.rx-m{height:14px;width:180px}
+.rx-l{height:14px;width:280px}
+.rx-xl{height:18px;width:340px}
+.rx-brand{background:var(--redact-1)}
+/* Report sections */
+.section{position:relative;z-index:1;margin-bottom:36px;border:1px solid var(--border-2);background:var(--surface);padding:28px 32px}
+.section-label{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px}
+.section-title{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text)}
+.edp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.edp-card{background:var(--surface-2);border:1px solid var(--border-2);padding:16px 18px}
+.edp-card-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.edp-card-val{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text)}
+.evidence-bar{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.evidence-bar:last-child{border-bottom:none}
+.ev-label{font-family:var(--mono);font-size:11px;color:var(--muted);width:160px;flex-shrink:0}
+.ev-val{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text)}
+.buyer-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.buyer-row:last-child{border-bottom:none}
+.money-map-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
+.money-map-row:last-child{border-bottom:none}
+.mm-route{color:var(--text-mid)}
+.mm-val{font-family:var(--mono);font-size:13px;font-weight:600}
+/* CTA Banner */
+.cta-banner{position:relative;z-index:1;background:var(--surface-2);border:2px solid var(--brand);padding:32px;text-align:center;margin-bottom:36px}
+.cta-banner-label{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.cta-banner-text{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4}
+.cta-banner a{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px}
+.cta-banner a:hover{background:var(--brand-hot)}
+@media(max-width:640px){.edp-grid{grid-template-columns:1fr 1fr}.report-wrap{padding:24px 14px 60px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="logo-dot"></span>Gov<b>Revenue</b></a>
+  <a href="/pricing" class="back">&larr; Pricing</a>
+</header>
+<div class="ribbon">
+  <span>SPECIMEN &mdash; REDACTED SAMPLE &mdash; ILLUSTRATIVE DATA ONLY</span>
+  <span class="ribbon-cta"><a href="/pricing">Run your scan &rarr;</a></span>
+</div>
+<div class="watermark">SAMPLE</div>
+<div class="report-wrap">
+
+  <div class="section">
+    <div class="section-label">Section 1 of 10</div>
+    <div class="section-title">Executive Decision Panel</div>
+    <div class="edp-grid">
+      <div class="edp-card"><div class="edp-card-label">Verdict</div><div class="edp-card-val" style="color:#22C55E">Strong</div></div>
+      <div class="edp-card"><div class="edp-card-label">Evidence grade</div><div class="edp-card-val">A</div></div>
+      <div class="edp-card"><div class="edp-card-label">Can they win now?</div><div class="edp-card-val">Yes</div></div>
+    </div>
+    <div class="evidence-bar"><span class="ev-label">Recommended route</span><span class="ev-val"><span class="rx rx-l rx-brand">&nbsp;</span></span></div>
+    <div class="evidence-bar"><span class="ev-label">Contracts found</span><span class="ev-val">47 awarded &middot; 12 open</span></div>
+    <div class="evidence-bar"><span class="ev-label">Est. market size</span><span class="ev-val"><span class="rx rx-m rx-brand">&nbsp;</span></span></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Section 2 of 10</div>
+    <div class="section-title">Evidence Grade &amp; Scan Basis</div>
+    <p style="color:var(--muted);font-size:14px;line-height:1.7">Grade A — strong public-record evidence. <span class="rx rx-l">&nbsp;</span> matching contracts found across Contracts Finder and Find a Tender. CPV-code verification confirmed sector alignment. Buyer concentration assessed across <span class="rx rx-s">&nbsp;</span> unique authorities.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Section 5 of 10 &mdash; Money Map</div>
+    <div class="section-title">Best Routes to Revenue</div>
+    <div class="money-map-row"><span class="mm-route">Direct award via <span class="rx rx-m">&nbsp;</span> framework</span><span class="mm-val" style="color:#22C55E"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
+    <div class="money-map-row"><span class="mm-route">Open tender — <span class="rx rx-s">&nbsp;</span> category</span><span class="mm-val"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
+    <div class="money-map-row"><span class="mm-route">Consortium route via <span class="rx rx-m">&nbsp;</span></span><span class="mm-val"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
+    <div style="margin-top:20px;padding:20px;background:var(--surface-2);border-left:3px solid var(--brand)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px">Redacted</div>
+      <div style="font-size:14px;color:var(--muted)">Exact award values, buyer contacts, and framework reference numbers are visible in the full unredacted report.</div>
+    </div>
+  </div>
+
+  <div class="cta-banner">
+    <div class="cta-banner-label">This is where your real buyers would be listed</div>
+    <div class="cta-banner-text">Run a scan to see the unredacted buyer watchlist, money map routes, and 30-day activation plan for your firm.</div>
+    <a href="/pricing">Run your scan &rarr;</a>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Section 6 of 10 &mdash; Buyer Watchlist</div>
+    <div class="section-title">Active Buyers in Your Category</div>
+    <div class="buyer-row" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em"><span>Buyer</span><span>Est. annual</span><span>Contracts</span></div>
+    <div class="buyer-row"><span><span class="rx rx-l">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">8</span></div>
+    <div class="buyer-row"><span><span class="rx rx-xl">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">5</span></div>
+    <div class="buyer-row"><span><span class="rx rx-m">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">3</span></div>
+    <div style="margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ <span class="rx rx-s">&nbsp;</span> more buyers in the full report</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Sections 7–10</div>
+    <div class="section-title">Bid Readiness, Contracts to Avoid, Activation Plan &amp; QA</div>
+    <p style="color:var(--muted);font-size:14px;line-height:1.7">These sections contain your bid readiness score, a list of contracts the evidence says to avoid, a 30-day activation checklist, and QA notes on source quality and data caveats. All sourced, dated, and evidence-graded.</p>
+    <div style="margin-top:20px;padding:20px;background:var(--surface-2);border-left:3px solid var(--brand)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px">Full report only</div>
+      <div style="font-size:14px;color:var(--muted)">All four sections are visible in the unredacted report. The sample above shows the shape of the output, not the intelligence.</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:40px 0;border-top:1px solid var(--border-2)">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px">Ready to run yours?</div>
+    <a href="/pricing" style="display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:16px 40px">Get started from £29 &rarr;</a>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:16px">No account needed until payment. Intelligence, not certainty.</div>
+  </div>
+
+</div>
 </body>
 </html>`);
 });
@@ -10873,7 +11340,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM homepage_signals`),
     safePool(`SELECT id, scan_id, company_name, email, active, created_at, last_alerted_at,
       cardinality(alerted_notice_ids) AS alerted_count
-    FROM subscriptions ORDER BY created_at DESC LIMIT 200`),
+    FROM alert_subscriptions ORDER BY created_at DESC LIMIT 200`),
     safePool(`SELECT * FROM briefing_subscribers ORDER BY created_at DESC`),
     safePool(`SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT ip)::int AS unique_ips
     FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' GROUP BY day ORDER BY day DESC`),
@@ -11077,6 +11544,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     ["ANTHROPIC_API_KEY",       !!process.env.ANTHROPIC_API_KEY],
     ["OPENAI_API_KEY",          !!process.env.OPENAI_API_KEY],
     ["STRIPE_SECRET_KEY",       !!process.env.STRIPE_SECRET_KEY],
+    ["STRIPE_PAYG_PRICE_ID",    !!process.env.STRIPE_PAYG_PRICE_ID],
+    ["STRIPE_PRO_PRICE_ID",     !!process.env.STRIPE_PRO_PRICE_ID],
+    ["STRIPE_AGENCY_PRICE_ID",  !!process.env.STRIPE_AGENCY_PRICE_ID],
     ["RESEND_API_KEY",          !!process.env.RESEND_API_KEY],
     ["COMPANIES_HOUSE_API_KEY", !!process.env.COMPANIES_HOUSE_API_KEY],
     ["SLACK_WEBHOOK_URL",       !!process.env.SLACK_WEBHOOK_URL],
