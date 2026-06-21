@@ -9716,12 +9716,12 @@ html{scroll-behavior:smooth}
 /* Market Pulse strip */
 .dp-pulse{background:var(--surface);border-bottom:1px solid var(--border)}
 .dp-pulse-inner{padding:0 56px;display:flex}
-.dp-pulse-stat{flex:1;padding:20px 24px;border-right:1px solid var(--border)}
+.dp-pulse-stat{flex:1;padding:20px 24px;border-right:1px solid var(--border);text-align:center}
 .dp-pulse-stat:last-child{border-right:none}
 .dp-pulse-val{display:block;font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--text);line-height:1.1}
 .dp-pulse-label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-top:6px}
 .dp-pulse-urgent .dp-pulse-val{color:var(--brand)}
-.dp-pulse-urgent .dp-pulse-label{color:var(--brand-dim)}
+.dp-pulse-urgent .dp-pulse-label{color:var(--brand)}
 /* Urgency strip */
 .urgency-strip{background:var(--brand-dim);border:1px solid rgba(180,146,78,.25);padding:12px 16px;margin-bottom:16px}
 .urgency-strip-head{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:10px;display:flex;align-items:center;gap:4px}
