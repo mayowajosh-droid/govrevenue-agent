@@ -9590,16 +9590,11 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
 
   const analyticsHtml = profile.live && !isCompiling ? `
   <section class="analytics-section">
-    <div class="analytics-inner">
+    <div class="analytics-inner analytics-inner--single">
       <div>
         <div class="analytics-head">12-MONTH SPEND TREND</div>
         <p style="font-size:13px;color:var(--muted);margin-bottom:20px;letter-spacing:.01em">Monthly awarded contract value &mdash; public record</p>
         ${spendChartHtml}
-      </div>
-      <div>
-        <div class="analytics-head">CATEGORY BREAKDOWN</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:24px;letter-spacing:.01em">Top sub-sectors by awarded spend (12 months)</p>
-        ${catBreakdownHtml}
       </div>
     </div>
   </section>` : "";
@@ -9674,7 +9669,7 @@ ${pageShellCss()}
 html{scroll-behavior:smooth}
 /* Masthead */
 .dm-mast{padding:60px 0 56px;background:radial-gradient(120% 160% at 80% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6}
-.dm-mast-inner{padding:0 56px;display:grid;grid-template-columns:1fr 360px;gap:72px;align-items:start}
+.dm-mast-inner{padding:0 56px;display:grid;grid-template-columns:1fr 1fr 300px;gap:56px;align-items:start}
 .dm-mast-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
 .dm-mast h1{font-family:var(--serif);font-size:clamp(36px,4.2vw,56px);font-weight:400;line-height:1.02;letter-spacing:-.02em;margin-bottom:20px;color:#ECE6D6}
 .dm-mast-lede{font-size:17px;color:#C5C9BC;line-height:1.65;margin-bottom:20px;max-width:42em}
@@ -9683,6 +9678,17 @@ html{scroll-behavior:smooth}
 .dm-mast-cta p{font-size:14px;line-height:1.55;margin-bottom:16px;color:#C5C9BC}
 .btn-cta{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--brand);color:#10110D;font-family:var(--sans);font-size:14px;font-weight:600;padding:14px;transition:.18s}
 .btn-cta:hover{background:var(--brand-hot)}
+/* Hero category chart */
+.dm-hero-chart{display:flex;flex-direction:column;padding-top:6px}
+.dm-hero-chart-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(180,146,78,.65);margin-bottom:18px}
+.dm-hero-chart-bars{display:flex;align-items:flex-end;gap:10px;height:160px;border-bottom:1px solid rgba(236,230,214,.1);padding-bottom:0}
+.dm-hero-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;cursor:default}
+.dm-hero-bar-val{font-family:var(--mono);font-size:8px;color:rgba(180,146,78,.65);margin-bottom:4px;text-align:center;white-space:nowrap}
+.dm-hero-bar{width:100%;background:linear-gradient(to top,rgba(180,146,78,.35),rgba(180,146,78,.72));border-radius:2px 2px 0 0;transition:opacity .15s}
+.dm-hero-col:hover .dm-hero-bar{opacity:.8}
+.dm-hero-col:hover .dm-hero-bar-val{color:rgba(180,146,78,.9)}
+.dm-hero-bar-label{font-family:var(--mono);font-size:7.5px;color:rgba(236,230,214,.38);text-align:center;padding:8px 2px 0;line-height:1.45;overflow:hidden;max-width:100%}
+.dm-hero-chart-foot{font-family:var(--mono);font-size:8.5px;color:rgba(236,230,214,.25);margin-top:10px;letter-spacing:.04em}
 /* Three panels — dark intelligence surface */
 .dp-panels{background:var(--base);border-bottom:1px solid rgba(255,255,255,.04)}
 .dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--border)}
@@ -9736,6 +9742,7 @@ html{scroll-behavior:smooth}
 /* Analytics section — dark zone continuation */
 .analytics-section{background:var(--base);padding:56px 0;border-bottom:1px solid var(--border)}
 .analytics-inner{padding:0 56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+.analytics-inner--single{grid-template-columns:1fr;max-width:680px}
 .analytics-head{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
 /* Spend trend chart */
 .trend-chart{background:var(--surface-2);border:1px solid var(--border-2);padding:28px 24px 0}
@@ -9849,6 +9856,7 @@ html{scroll-behavior:smooth}
   .dp-pulse-inner,.analytics-inner,.awards-inner{padding-left:16px;padding-right:16px}
   .dm-mast{padding:32px 0 28px}
   .dm-mast-inner{grid-template-columns:1fr;gap:0}
+  .dm-hero-chart{display:none}
   .dm-mast h1{font-size:24px}
   .dm-mast-lede{font-size:14px}
   .dp-panels-inner{grid-template-columns:1fr;border-left:none}
@@ -9907,6 +9915,21 @@ ${pageShellHeader(profile, authCtx)}
         <span>Public record only. Sourced from Contracts Finder and Find a Tender.</span>
       </div>
     </div>
+    ${profile.live && !isCompiling && topCats.length >= 2 ? `<div class="dm-hero-chart">
+      <div class="dm-hero-chart-eyebrow">CATEGORY SPEND &mdash; 12M</div>
+      <div class="dm-hero-chart-bars">
+        ${topCats.map(c => {
+          const pct = Math.max(Math.round((c.value / maxCatVal) * 100), 5);
+          const label = c.label.replace(/&.*$/, "").replace(/\s*\(.*\)/, "").trim().slice(0, 16);
+          return `<div class="dm-hero-col" title="${escapeHtml(c.label + ": " + fmtShort(c.value))}">
+            <div class="dm-hero-bar-val">${escapeHtml(fmtShort(c.value))}</div>
+            <div class="dm-hero-bar" style="height:${pct}%"></div>
+            <div class="dm-hero-bar-label">${escapeHtml(label)}</div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="dm-hero-chart-foot">Awarded spend by category &mdash; public record</div>
+    </div>` : `<div></div>`}
     <div class="dm-mast-cta">
       <p>Find out if your firm fits this desk. A scan compares your services against live ${escapeHtml(profile.label)} procurement and returns a sourced verdict in minutes.</p>
       <a class="btn-cta" href="/scan">RUN A SCAN &nbsp;&rarr;</a>
