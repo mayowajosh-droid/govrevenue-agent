@@ -792,16 +792,21 @@ export function renderChaseNowPanel(
 
   const renderGroup = (title: string, notices: ScoredOpportunity[], showWinBrief: boolean) => {
     if (notices.length === 0) return "";
-    return `<div style="margin-bottom:32px">
-  <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line)">${esc(title)} <span style="opacity:.6">(${notices.length})</span></div>
-  ${notices.map(n => renderOpportunityCard(n, { showWinBrief, scanContext: context })).join("")}
+    return `<div class="chase-group">
+  <div class="chase-group-head">
+    <span class="chase-group-label">${esc(title)}</span>
+    <span class="chase-group-count">${notices.length}</span>
+  </div>
+  <div class="chase-cards-grid">
+    ${notices.map(n => renderOpportunityCard(n, { showWinBrief, scanContext: context })).join("")}
+  </div>
 </div>`;
   };
 
   const ignoreListHtml = ignore.length > 0
-    ? `<div style="margin-bottom:24px">
-  <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Ignore / low confidence (${ignore.length})</div>
-  <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.8">
+    ? `<div class="chase-ignore">
+  <div class="chase-ignore-head">Low confidence / ignore (${ignore.length})</div>
+  <ul class="chase-ignore-list">
     ${ignore.slice(0, 8).map(n => `<li>${esc(n.title.slice(0, 80))} &mdash; ${esc(n.fitLabel)}</li>`).join("")}
     ${ignore.length > 8 ? `<li>+ ${ignore.length - 8} more low-confidence matches</li>` : ""}
   </ul>
@@ -809,17 +814,19 @@ export function renderChaseNowPanel(
 
   return `<div class="chase-now-panel no-print">
 <div class="chase-now-head">
-  <div class="chase-eyebrow">CONTRACTS YOU CAN CHASE NOW</div>
+  <div class="chase-eyebrow"><span class="chase-eyebrow-dot"></span>CONTRACTS YOU CAN CHASE NOW</div>
   <h2 class="chase-title">Matched opportunities from the public record</h2>
-  <p class="chase-sub">Matched from live public notices against your services, regions, capacity, evidence and likely buyer fit. <strong>Matched against the submitted profile. This is a pursuit signal, not a guarantee.</strong></p>
-  <p class="chase-caveat">Public record only. No insider information. Verify on the source before acting.</p>
+  <p class="chase-sub">Scored against your submitted profile: services, region, capacity, and buyer fit. <strong>Pursuit signal only — not a guarantee.</strong></p>
+  <p class="chase-caveat">Public record only &middot; No insider information &middot; Verify on source before acting</p>
 </div>
+<div class="chase-body">
 ${renderGroup("Chase now", chaseNow, true)}
 ${renderGroup("Prepare first", prepareFirst, true)}
 ${renderGroup("Partner route", partnerRoute, false)}
 ${renderGroup("Watchlist", watchlist, false)}
 ${ignoreListHtml}
-<p style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:16px">Public record only &middot; No insider information &middot; Verify on the source before acting &middot; Matched against the submitted profile</p>
+<p class="chase-foot">Public record only &middot; No insider information &middot; Verify on the source before acting &middot; Matched against the submitted profile</p>
+</div>
 </div>`;
 }
 
@@ -1031,12 +1038,36 @@ export function deskOpportunityCss(): string {
 
 export function reportChaseNowCss(): string {
   return `
-.chase-now-panel{margin:32px 0;padding:28px;background:var(--cream);border:1px solid var(--line)}
-.chase-now-head{margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--line)}
-.chase-eyebrow{font-family:var(--mono,"IBM Plex Mono",monospace);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted,#5A6B7B);margin-bottom:8px}
-.chase-title{font-family:var(--serif,"Spectral","Iowan Old Style",Georgia,serif);font-size:22px;font-weight:600;margin:0 0 8px}
-.chase-sub{font-size:14px;line-height:1.6;color:var(--ink,#0B0F14);margin-bottom:6px}
-.chase-caveat{font-family:var(--mono,"IBM Plex Mono",monospace);font-size:11px;color:var(--muted,#5A6B7B)}
+/* ── Light-mode island: bridge tokens scoped to panel ── */
+.chase-now-panel{
+  --paper:#fff;--paper-2:#F6F2E8;
+  --ink:#1B1714;--slate:#6B6358;
+  --accent:#B4924E;
+  --line:rgba(180,146,78,.15);--line-strong:rgba(0,0,0,.10);
+  margin:48px 0;
+  background:#FFFDFB;
+  border:1px solid rgba(180,146,78,.22);
+  border-top:3px solid #B4924E;
+  overflow:hidden;
+}
+.chase-now-head{padding:32px 40px 26px;background:linear-gradient(160deg,#FBF9F3 0%,#FFFDFB 100%);border-bottom:1px solid rgba(180,146,78,.15)}
+.chase-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B4924E;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.chase-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:#B4924E;opacity:.8;flex-shrink:0}
+.chase-title{font-family:var(--serif);font-size:26px;font-weight:600;color:#1B1714;margin:0 0 10px;letter-spacing:-.02em;line-height:1.15}
+.chase-sub{font-size:13.5px;line-height:1.65;color:#5C5248;max-width:72ch;margin-bottom:8px}
+.chase-caveat{font-family:var(--mono);font-size:10.5px;color:#9A9490;margin:0}
+.chase-body{padding:32px 40px 40px}
+.chase-group{margin-bottom:38px}
+.chase-group:last-child{margin-bottom:0}
+.chase-group-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid rgba(180,146,78,.18)}
+.chase-group-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#1B1714;font-weight:600}
+.chase-group-count{font-family:var(--mono);font-size:10px;color:#9A9490;background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.2);padding:2px 8px;border-radius:3px}
+.chase-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.chase-ignore{margin-top:8px;padding:18px 22px;background:rgba(0,0,0,.02);border:1px solid rgba(0,0,0,.07)}
+.chase-ignore-head{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9A9490;margin-bottom:10px}
+.chase-ignore-list{margin:0;padding-left:18px;font-size:12.5px;color:#6B6358;line-height:1.8}
+.chase-foot{font-family:var(--mono);font-size:10.5px;color:#9A9490;margin-top:28px;padding-top:18px;border-top:1px solid rgba(0,0,0,.07)}
+@media(max-width:820px){.chase-cards-grid{grid-template-columns:1fr}.chase-now-head,.chase-body{padding-left:22px;padding-right:22px}}
 `;
 }
 
