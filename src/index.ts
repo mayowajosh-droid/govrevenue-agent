@@ -4796,7 +4796,7 @@ a{color:inherit;text-decoration:none}
 .art-nav-cta{background:var(--brand);color:#fff;font-size:12px;font-weight:600;padding:9px 18px;letter-spacing:.03em;transition:opacity .15s}
 .art-nav-cta:hover{opacity:.85}
 /* article shell */
-.art-shell{max-width:740px;margin:0 auto;padding:0 28px}
+.art-shell{padding:0 28px}
 /* title block */
 .art-titleblock{padding:72px 0 0}
 .art-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--brand);margin-bottom:18px;display:block}
@@ -4892,7 +4892,40 @@ a{color:inherit;text-decoration:none}
   .art-pullquote{padding:20px 22px}.art-pullquote p{font-size:21px}
   .art-cta-strip{flex-direction:column;align-items:flex-start}
   .art-nav-links{gap:16px;font-size:12px}
-}`;
+}
+/* --- three-col article grid --- */
+.art-outer{display:grid;grid-template-columns:240px minmax(0,760px) 260px;align-items:start;justify-content:center;max-width:1340px;margin:0 auto}
+.art-sidebar{padding:40px 14px 60px;position:sticky;top:72px;max-height:calc(100vh - 80px);overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none}
+.art-sidebar::-webkit-scrollbar{display:none}
+.sw{background:var(--surface);border:1px solid var(--border);margin-bottom:14px;overflow:hidden}
+.sw-head{font-family:var(--mono);font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--brand);padding:12px 14px;border-bottom:1px solid var(--border)}
+.sw-body{padding:14px}
+.sw-scan{background:var(--text);border:none;padding:20px 16px;margin-bottom:14px}
+.sw-scan-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,233,.42);margin-bottom:9px}
+.sw-scan-title{font-family:var(--serif);font-size:16px;font-weight:500;color:rgba(244,241,233,.92);line-height:1.38;margin-bottom:15px}
+.sw-scan-btn{display:block;background:var(--brand);color:#fff;font-family:var(--sans);font-size:12px;font-weight:600;padding:11px 14px;text-align:center;letter-spacing:.02em;transition:opacity .15s;text-decoration:none}
+.sw-scan-btn:hover{opacity:.85}
+.sw-toc-list{list-style:none;padding:0;margin:0}
+.sw-toc-item{border-bottom:1px solid var(--border)}
+.sw-toc-item:last-child{border-bottom:none}
+.sw-toc-link{display:block;font-family:var(--sans);font-size:12px;color:var(--muted);padding:8px 14px;line-height:1.4;transition:color .12s;text-decoration:none}
+.sw-toc-link:hover,.sw-toc-link.toc-active{color:var(--brand);background:var(--brand-dim)}
+.sw-nav-link{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);font-family:var(--sans);font-size:12px;color:var(--text-mid);text-decoration:none;transition:background .1s}
+.sw-nav-link:last-child{border-bottom:none}
+.sw-nav-link:hover{background:var(--surface-2);color:var(--brand)}
+.sw-nav-arrow{font-family:var(--mono);font-size:10px;color:var(--brand);opacity:.65}
+.sw-signal-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--border)}
+.sw-signal-row:last-child{border-bottom:none}
+.sw-signal-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:5px;animation:pulse 2.4s ease-in-out infinite}
+.sw-signal-text{font-family:var(--sans);font-size:11px;color:var(--muted);line-height:1.45}
+.sw-signal-text strong{color:var(--text-mid);font-weight:500}
+.sw-email-input{width:100%;padding:9px 11px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--mono);font-size:11px;outline:none;box-sizing:border-box;margin-bottom:7px}
+.sw-email-input:focus{border-color:var(--brand)}
+.sw-email-btn{width:100%;background:var(--brand);color:#fff;font-family:var(--sans);font-size:11px;font-weight:600;padding:9px;border:none;cursor:pointer;transition:opacity .15s;letter-spacing:.02em}
+.sw-email-btn:hover{opacity:.86}
+@media(max-width:1120px){.art-sidebar--left{display:none}.art-outer{grid-template-columns:minmax(0,760px) 260px}}
+@media(max-width:900px){.art-outer{display:block}.art-sidebar{display:none}}
+`;
 }
 
 function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: CommentRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
@@ -4906,6 +4939,7 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
       : "";
 
   const pubDate = article.published_at ? new Date(article.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const deskSlug = article.desk ? article.desk.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") : "";
 
   // Build threaded comment tree (one level deep)
   const topLevel = comments.filter(c => !c.parent_id);
@@ -4996,6 +5030,29 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
   </div>
 </nav>
 
+<div class="art-outer">
+
+<aside class="art-sidebar art-sidebar--left">
+  <div class="sw" id="sw-toc" style="display:none">
+    <div class="sw-head">In this article</div>
+    <ul class="sw-toc-list" id="sw-toc-list"></ul>
+  </div>
+  <div class="sw">
+    <div class="sw-head">Navigate</div>
+    ${deskSlug ? `<a class="sw-nav-link" href="/desk/${deskSlug}"><span>${escapeHtml(article.desk ?? "")} Intelligence</span><span class="sw-nav-arrow">→</span></a>` : ""}
+    <a class="sw-nav-link" href="/desks"><span>All desks</span><span class="sw-nav-arrow">→</span></a>
+    <a class="sw-nav-link" href="/articles"><span>All articles</span><span class="sw-nav-arrow">→</span></a>
+    <a class="sw-nav-link" href="/signals"><span>Live signals</span><span class="sw-nav-arrow">→</span></a>
+  </div>
+  <div class="sw">
+    <div class="sw-head">About GovRevenue</div>
+    <div class="sw-body">
+      <p style="font-family:var(--sans);font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px">Daily procurement intelligence for UK suppliers. We track Contracts Finder and Find a Tender so you can spend time winning, not searching.</p>
+      <a href="/scan" style="display:block;text-align:center;border:1px solid var(--border-2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:8px;text-decoration:none">Free scan →</a>
+    </div>
+  </div>
+</aside>
+
 <div class="art-shell">
   <div class="art-titleblock">
     ${article.eyebrow ? `<div class="art-eyebrow">${escapeHtml(article.eyebrow)}</div>` : ""}
@@ -5034,6 +5091,43 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
     ${commentsHtml}
     ${commentFormHtml}
   </div>
+</div>
+
+<aside class="art-sidebar art-sidebar--right">
+  <div class="sw-scan">
+    <div class="sw-scan-eyebrow">GovRevenue Intelligence</div>
+    <p class="sw-scan-title">Is your business positioned for this contract market?</p>
+    <a href="/scan" class="sw-scan-btn">Run a free scan →</a>
+  </div>
+  ${deskSlug ? `<div class="sw">
+    <div class="sw-head">Live signals${article.desk ? ` · ${escapeHtml(article.desk)}` : ""}</div>
+    <div class="sw-body">
+      <div class="sw-signal-row"><span class="sw-signal-dot"></span><span class="sw-signal-text"><strong>Active tenders</strong> updated hourly from Contracts Finder</span></div>
+      <div class="sw-signal-row"><span class="sw-signal-dot"></span><span class="sw-signal-text"><strong>Buyer watchlist</strong> tracking contract awards and spending</span></div>
+      <div class="sw-signal-row"><span class="sw-signal-dot"></span><span class="sw-signal-text"><strong>Framework openings</strong> for new suppliers right now</span></div>
+      <a href="/desk/${deskSlug}" style="display:block;margin-top:10px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--brand);text-decoration:none">View ${escapeHtml(article.desk ?? "")} desk →</a>
+    </div>
+  </div>` : ""}
+  <div class="sw">
+    <div class="sw-head">Weekly briefing</div>
+    <div class="sw-body">
+      <p style="font-family:var(--sans);font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">New public contracts in your sector. Every Monday, free.</p>
+      <form method="POST" action="/subscribe/briefing">
+        <input class="sw-email-input" type="email" name="email" placeholder="your@email.com" required value="${escapeHtml(authCtx?.email ?? "")}">
+        <button class="sw-email-btn" type="submit">Subscribe free</button>
+      </form>
+    </div>
+  </div>
+  <div class="sw">
+    <div class="sw-head">Full intelligence</div>
+    <div class="sw-body">
+      <p style="font-family:var(--sans);font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:12px">Sector reports, weekly alerts, and buyer data. From £29.</p>
+      <a href="/pricing" style="display:block;text-align:center;background:var(--brand-dim);border:1px solid var(--brand);color:var(--brand);font-family:var(--sans);font-size:11px;font-weight:600;padding:9px;letter-spacing:.02em;text-decoration:none;margin-bottom:7px">See pricing →</a>
+      <a href="/scan/sample" style="display:block;text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px;text-decoration:none;letter-spacing:.04em">View sample report →</a>
+    </div>
+  </div>
+</aside>
+
 </div>
 
 <footer class="art-foot">
@@ -5076,6 +5170,39 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.art-comment-like[data-id]').forEach(function(btn) {
     if (localStorage.getItem('liked_c_' + btn.dataset.id)) btn.classList.add('liked');
   });
+  // Build sticky table of contents from article H2s
+  (function() {
+    var headings = document.querySelectorAll('.art-body h2');
+    if (headings.length < 2) return;
+    var list = document.getElementById('sw-toc-list');
+    var toc = document.getElementById('sw-toc');
+    if (!list || !toc) return;
+    headings.forEach(function(h, i) {
+      var id = 'art-s-' + i;
+      h.id = id;
+      var li = document.createElement('li');
+      li.className = 'sw-toc-item';
+      var a = document.createElement('a');
+      a.href = '#' + id;
+      a.className = 'sw-toc-link';
+      a.textContent = h.textContent || '';
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    toc.style.display = '';
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) {
+            document.querySelectorAll('.sw-toc-link').forEach(function(l) { l.classList.remove('toc-active'); });
+            var lnk = list.querySelector('[href="#' + e.target.id + '"]');
+            if (lnk) lnk.classList.add('toc-active');
+          }
+        });
+      }, { rootMargin: '-8% 0px -82% 0px' });
+      headings.forEach(function(h) { obs.observe(h); });
+    }
+  })();
 });
 </script>
 </body></html>`;
@@ -5329,8 +5456,9 @@ table.a-tbl tr:hover td{background:var(--brand-dim)}
 .art-select{width:100%;padding:10px 13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;outline:none;border-radius:5px}
 .art-actions{display:flex;gap:10px;align-items:center;padding:18px 28px;border-top:1px solid var(--border)}
 /* ——— COMMENTS ——— */
+.cmt-tabs{display:flex;gap:8px;padding:12px 28px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-wrap:wrap}
 .cmt-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:10px}
-.cmt-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.cmt-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cmt-body{font-family:var(--inter);font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px}
 .cmt-actions{display:flex;gap:8px;flex-wrap:wrap}
 /* ——— MISC ——— */
@@ -5346,18 +5474,24 @@ table.a-tbl tr:hover td{background:var(--brand-dim)}
   .sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.14)}
   .sidebar.open #sb-close{display:block!important}
   .hb-btn{display:flex}
-  .topbar{padding:12px 16px;gap:10px}
+  .topbar{padding:12px 16px;gap:8px}
+  .topbar-right{gap:8px}
   .topbar-title{font-size:16px}
   .topbar-crumb,.clock-chip{display:none}
   .tbl-wrap{margin:0 16px 20px}
   .art-editor{grid-template-columns:1fr;height:auto}
+  .art-source{min-height:280px}
+  .art-preview-pane{min-height:200px}
   .art-fields{grid-template-columns:1fr}
   .a-alert{margin:0 16px 14px}
-  .ad-section{padding:16px 16px 24px}
-  .art-actions{padding:14px 16px}
+  .ad-section{padding:14px 16px 24px}
+  .art-actions{padding:12px 16px;flex-wrap:wrap}
+  .cmt-tabs{padding:10px 16px}
+  .cmt-row{padding:14px 14px}
 }
 @media(max-width:480px){
-  .tbl-wrap{margin:0 12px 16px}
+  .tbl-wrap{margin:0 0 16px;border-radius:0;border-left:none;border-right:none}
+  .a-btn{padding:5px 9px;font-size:8.5px}
 }
 </style>`;
 }
@@ -5510,13 +5644,13 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
 
   const extraActions = !isNew ? `
     <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/publish?token=${encodeURIComponent(token)}" style="display:inline">
-      <button class="al-btn al-btn-primary" type="submit">${v.status === "published" ? "Update published" : "Publish"}</button>
+      <button class="a-btn a-btn-primary" type="submit">${v.status === "published" ? "Update published" : "Publish"}</button>
     </form>
     <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/unpublish?token=${encodeURIComponent(token)}" style="display:inline">
-      <button class="al-btn" type="submit">Unpublish</button>
+      <button class="a-btn" type="submit">Unpublish</button>
     </form>
     <form method="POST" action="/admin/articles/${encodeURIComponent(id)}/render-images?token=${encodeURIComponent(token)}" style="display:inline">
-      <button class="al-btn" type="submit">Render images</button>
+      <button class="a-btn" type="submit">Render images</button>
     </form>` : "";
 
   return `<!DOCTYPE html>
@@ -5524,143 +5658,131 @@ function adminArticleEditorPage(article: Partial<ArticleRow> | null, token: stri
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${isNew ? "New article" : escapeHtml(v.title ?? "Edit article")} — Admin — GovRevenue</title>
-<style>${adminArticleCss()}</style>
+${adminArticleCss()}
 </head>
 <body>
-<div id="al-sb-overlay" class="al-sb-overlay" onclick="alCloseSidebar()"></div>
-<div class="al-shell">
-  <aside class="al-sidebar" id="al-sidebar">
-    <div class="al-brand">
-      <div class="al-brand-row">
-        <span class="al-dot"></span>
-        <span class="al-logo">Gov<span>Revenue</span></span>
-        <button onclick="alCloseSidebar()" id="al-sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+<div id="sb-overlay" class="sb-overlay" onclick="closeSidebar()"></div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo-row">
+        <span class="sb-dot"></span>
+        <span class="sb-logo">Gov<b>Revenue</b></span>
+        <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
       </div>
-      <div class="al-tag">ADMIN PANEL</div>
+      <div class="sb-tag">Admin Panel</div>
     </div>
-    <div class="al-nav-sec">Navigation</div>
-    <nav class="al-nav">
-      <a href="/admin/scans?token=${encodeURIComponent(token)}"><span>⬅ Scans Dashboard</span></a>
-      <div class="al-nav-div"></div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}"><span>Articles</span></a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"${isNew ? ' class="active"' : ""}><span>+ New article</span></a>
-      <div class="al-nav-div"></div>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}"><span>Comment queue</span></a>
+    <nav class="sb-nav">
+      <div class="sb-group">Intelligence</div>
+      <a href="/admin/scans?token=${encodeURIComponent(token)}" class="sb-link">Overview</a>
+      <div class="sb-group">Content</div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="sb-link${isNew ? " active" : ""}">+ New article</a>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link">Comment queue</a>
     </nav>
   </aside>
-  <div class="al-main">
-    <div class="al-topbar">
-      <div>
-        <div class="al-crumb">Admin <span>›</span> <a href="/admin/articles?token=${encodeURIComponent(token)}" style="color:var(--muted)">Articles</a> <span>›</span> <b>${isNew ? "New" : "Edit"}</b></div>
-        <div class="al-topbar-title">${isNew ? "New article" : "Edit article"}</div>
+  <div style="min-width:0;overflow-x:hidden">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-crumb">Admin <span>›</span> <a href="/admin/articles?token=${encodeURIComponent(token)}">Articles</a> <span>›</span> <b>${isNew ? "New" : "Edit"}</b></div>
+        <div class="topbar-title">${isNew ? "New article" : "Edit article"}</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="al-hb-btn" onclick="alOpenSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
-        ${!isNew ? `<a href="/articles/${slug}" target="_blank" class="al-btn al-btn-live">View live ↗</a>` : ""}
+      <div class="topbar-right">
+        <button class="hb-btn" onclick="openSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
+        <div class="clock-chip"><span class="live-dot"></span><span id="admin-clock"></span></div>
+        ${!isNew ? `<a href="/articles/${slug}" target="_blank" class="a-btn a-btn-ok">View live ↗</a>` : ""}
       </div>
     </div>
-    ${msg ? `<div class="al-alert al-alert-ok">${escapeHtml(msg)}</div>` : ""}
-
-    <form method="POST" action="${formAction}" id="article-form">
-      <div class="al-fields">
-        <div class="al-field al-field-full">
-          <label class="al-label">Title</label>
-          <input class="al-input" name="title" value="${titleEsc}" required placeholder="The £369bn nobody told you about">
+    ${msg ? `<div class="a-alert a-alert-ok">✓ ${escapeHtml(msg)}</div>` : ""}
+    <div class="ad-section">
+      <form method="POST" action="${formAction}" id="article-form">
+        <div class="art-fields">
+          <div class="art-field art-field-full">
+            <label class="art-label">Title</label>
+            <input class="art-input" name="title" value="${titleEsc}" required placeholder="The £369bn nobody told you about">
+          </div>
+          <div class="art-field art-field-full">
+            <label class="art-label">Dek (mono, sienna — one witty line)</label>
+            <input class="art-input" name="dek" value="${dekEsc}" placeholder="A quiet horror story about the public money sitting in plain sight.">
+          </div>
+          <div class="art-field">
+            <label class="art-label">Eyebrow</label>
+            <input class="art-input" name="eyebrow" value="${eyebrowEsc}" placeholder="Procurement">
+          </div>
+          <div class="art-field">
+            <label class="art-label">Desk / tag</label>
+            <input class="art-input" name="desk" value="${deskEsc}" placeholder="Digital & IT">
+          </div>
+          <div class="art-field">
+            <label class="art-label">Status</label>
+            <select class="art-select" name="status">
+              <option value="draft"${v.status === "draft" || !v.status ? " selected" : ""}>Draft</option>
+              <option value="scheduled"${v.status === "scheduled" ? " selected" : ""}>Scheduled</option>
+              <option value="published"${v.status === "published" ? " selected" : ""}>Published</option>
+            </select>
+          </div>
+          <div class="art-field">
+            <label class="art-label">Schedule date (if scheduled)</label>
+            <input class="art-input" name="scheduled_at" type="datetime-local" value="${schedEsc}">
+          </div>
+          <div class="art-field art-field-full">
+            <label class="art-label">Hero image prompt (DALL-E 3)</label>
+            <input class="art-input" name="hero_prompt" value="${heroPromptEsc}" placeholder="Real UK street scene, natural light, documentary photo">
+          </div>
+          ${!isNew ? `<div class="art-field">
+            <label class="art-label">Slug</label>
+            <input class="art-input" name="slug" value="${slug}">
+          </div>` : ""}
         </div>
-        <div class="al-field al-field-full">
-          <label class="al-label">Dek (mono, sienna — one witty line)</label>
-          <input class="al-input" name="dek" value="${dekEsc}" placeholder="A quiet horror story about the public money sitting in plain sight.">
-        </div>
-        <div class="al-field">
-          <label class="al-label">Eyebrow</label>
-          <input class="al-input" name="eyebrow" value="${eyebrowEsc}" placeholder="Procurement">
-        </div>
-        <div class="al-field">
-          <label class="al-label">Desk / tag</label>
-          <input class="al-input" name="desk" value="${deskEsc}" placeholder="Digital & IT">
-        </div>
-        <div class="al-field">
-          <label class="al-label">Status</label>
-          <select class="al-select" name="status">
-            <option value="draft"${v.status === "draft" || !v.status ? " selected" : ""}>Draft</option>
-            <option value="scheduled"${v.status === "scheduled" ? " selected" : ""}>Scheduled</option>
-            <option value="published"${v.status === "published" ? " selected" : ""}>Published</option>
-          </select>
-        </div>
-        <div class="al-field">
-          <label class="al-label">Schedule date (if scheduled)</label>
-          <input class="al-input" name="scheduled_at" type="datetime-local" value="${schedEsc}">
-        </div>
-        <div class="al-field al-field-full">
-          <label class="al-label">Hero image prompt (DALL-E 3)</label>
-          <input class="al-input" name="hero_prompt" value="${heroPromptEsc}" placeholder="Real UK street scene, natural light, documentary photo — e.g. 'An empty council chamber in a grey British town hall, fluorescent lights, 2024'">
-        </div>
-        ${!isNew ? `<div class="al-field">
-          <label class="al-label">Slug</label>
-          <input class="al-input" name="slug" value="${slug}">
-        </div>` : ""}
+      </form>
+      <div class="art-actions">
+        <button class="a-btn a-btn-primary" type="submit" form="article-form" name="action" value="save">Save draft</button>
+        ${extraActions}
+        ${isNew ? `<button class="a-btn a-btn-primary" type="submit" form="article-form" name="action" value="publish">Publish now</button>` : ""}
+        <a href="/admin/articles?token=${encodeURIComponent(token)}" class="a-btn">Cancel</a>
       </div>
-    </form>
-    <div class="al-actions" style="margin-bottom:14px">
-      <button class="al-btn al-btn-primary" type="submit" form="article-form" name="action" value="save">Save draft</button>
-      ${extraActions}
-      ${isNew ? `<button class="al-btn al-btn-primary" type="submit" form="article-form" name="action" value="publish">Publish now</button>` : ""}
-      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="al-btn">Cancel</a>
     </div>
-
-    <div class="al-editor">
-      <div class="al-editor-pane">
-        <div class="al-editor-pane-head">SOURCE — markdown + shortcodes</div>
-        <textarea class="al-source" id="source" placeholder="Start writing...&#10;&#10;:::image{prompt=&quot;...&quot; ratio=&quot;16:9&quot;}&#10;Caption goes here.&#10;:::&#10;&#10;:::record&#10;GovRevenue indexes £369bn across 17,939 notices.&#10;source: GovRevenue desk index&#10;:::&#10;&#10;:::quote&#10;The money is right there.&#10;:::">${bodyEsc}</textarea>
+    <div class="art-editor">
+      <div class="art-editor-pane">
+        <div class="art-pane-head">SOURCE — markdown + shortcodes</div>
+        <textarea class="art-source" id="source" placeholder="Start writing...">${bodyEsc}</textarea>
       </div>
-      <div class="al-editor-pane">
-        <div class="al-editor-pane-head">PREVIEW</div>
-        <iframe class="al-preview-iframe" id="preview-frame" src="about:blank"></iframe>
+      <div class="art-editor-pane art-preview-pane">
+        <div class="art-pane-head">PREVIEW</div>
+        <iframe class="art-preview-iframe" id="preview-frame" src="about:blank"></iframe>
       </div>
     </div>
   </div>
 </div>
 <script>
 (function(){
-  var sidebar=document.getElementById('al-sidebar');
-  var overlay=document.getElementById('al-sb-overlay');
-  var sbClose=document.getElementById('al-sb-close');
-  var hbBtn=document.querySelector('.al-hb-btn');
-  function alOpenSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
-  function alCloseSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
-  window.alOpenSidebar=alOpenSidebar;window.alCloseSidebar=alCloseSidebar;
-  if(window.innerWidth<=900&&hbBtn)hbBtn.style.display='flex';
-  window.addEventListener('resize',function(){if(hbBtn)hbBtn.style.display=window.innerWidth<=900?'flex':'none';});
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('sb-overlay');
+  var cl=document.getElementById('sb-close');
+  var hb=document.querySelector('.hb-btn');
+  function openSidebar(){sb.classList.add('open');ov.classList.add('open');if(cl)cl.style.display='block';}
+  function closeSidebar(){sb.classList.remove('open');ov.classList.remove('open');if(cl)cl.style.display='none';}
+  window.openSidebar=openSidebar;window.closeSidebar=closeSidebar;
+  if(window.innerWidth<=900&&hb)hb.style.display='flex';
+  window.addEventListener('resize',function(){if(hb)hb.style.display=window.innerWidth<=900?'flex':'none';});
+  var clk=document.getElementById('admin-clock');
+  function tick(){if(clk){var d=new Date();clk.textContent=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/London'});}}
+  tick();setInterval(tick,1000);
 })();
-const src = document.getElementById('source');
-const frame = document.getElementById('preview-frame');
-const form = document.getElementById('article-form');
+const src=document.getElementById('source');
+const frame=document.getElementById('preview-frame');
+const form=document.getElementById('article-form');
 let previewTimer;
-
-function updatePreview() {
-  const body = src.value;
-  fetch('/api/articles/preview', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ body })
-  }).then(r => r.text()).then(html => {
-    const doc = frame.contentDocument || frame.contentWindow.document;
-    doc.open(); doc.write(html); doc.close();
-  }).catch(() => {});
+function updatePreview(){
+  fetch('/api/articles/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:src.value})})
+    .then(r=>r.text()).then(html=>{const doc=frame.contentDocument||frame.contentWindow.document;doc.open();doc.write(html);doc.close();}).catch(()=>{});
 }
-
-src.addEventListener('input', () => {
-  clearTimeout(previewTimer);
-  previewTimer = setTimeout(updatePreview, 600);
+src.addEventListener('input',()=>{clearTimeout(previewTimer);previewTimer=setTimeout(updatePreview,600);});
+form.addEventListener('submit',()=>{
+  let h=form.querySelector('[name="body_md"]');
+  if(!h){h=document.createElement('input');h.type='hidden';h.name='body_md';form.appendChild(h);}
+  h.value=src.value;
 });
-
-// Wire body textarea into form on submit
-form.addEventListener('submit', () => {
-  let hidden = form.querySelector('[name="body_md"]');
-  if (!hidden) { hidden = document.createElement('input'); hidden.type='hidden'; hidden.name='body_md'; form.appendChild(hidden); }
-  hidden.value = src.value;
-});
-
 updatePreview();
 </script>
 </body></html>`;
@@ -5669,36 +5791,36 @@ updatePreview();
 function adminCommentsPage(comments: CommentRow[], token: string, filter: string, msg?: string): string {
   const rows = comments.map(c => {
     const date = new Date(c.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
-    const pill = `<span class="al-pill al-pill-${c.status}">${c.status}</span>`;
-    const isAuthorRep = c.is_author_reply ? `<span class="al-pill al-pill-published" style="font-size:8px">Author</span>` : "";
-    return `<div class="al-comment-row">
-  <div class="al-comment-meta">
+    const pill = `<span class="pill pill-${c.status}">${c.status}</span>`;
+    const isAuthorRep = c.is_author_reply ? `<span class="pill pill-approved" style="font-size:8px">Author</span>` : "";
+    return `<div class="cmt-row">
+  <div class="cmt-meta">
     ${pill}${isAuthorRep}
     <span>${escapeHtml(c.author_email ?? c.guest_name ?? "Guest")}</span>
-    <span>on <a href="/articles/${escapeHtml(c.article_slug ?? "")}" style="color:var(--brand)" target="_blank">${escapeHtml(c.article_title ?? c.article_id)}</a></span>
+    <span>on <a href="/articles/${escapeHtml(c.article_slug ?? "")}" target="_blank">${escapeHtml(c.article_title ?? c.article_id)}</a></span>
     <span>${date}</span>
     <span>♥ ${c.like_count}</span>
   </div>
-  <div class="al-comment-body-text">${escapeHtml(c.body)}</div>
-  <div class="al-comment-actions">
-    ${c.status === "pending" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/approve?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:9px;padding:5px 10px;background:var(--green-bg);border-color:var(--green-border);color:var(--green)">Approve</button></form>` : ""}
-    <button class="al-btn" style="font-size:10px;padding:5px 10px" onclick="toggleReply('${escapeHtml(c.id)}')">Reply</button>
-    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/like?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">♥ Author like</button></form>
-    ${c.status !== "hidden" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/hide?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn" style="font-size:10px;padding:5px 10px">Hide</button></form>` : ""}
-    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/spam?token=${encodeURIComponent(token)}" style="display:inline"><button class="al-btn al-btn-danger" style="font-size:10px;padding:5px 10px">Spam</button></form>
-    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete comment?')" style="display:inline"><button class="al-btn al-btn-danger" style="font-size:10px;padding:5px 10px">Delete</button></form>
+  <div class="cmt-body">${escapeHtml(c.body)}</div>
+  <div class="cmt-actions">
+    ${c.status === "pending" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/approve?token=${encodeURIComponent(token)}" style="display:inline"><button class="a-btn a-btn-ok" style="font-size:9px;padding:5px 10px">Approve</button></form>` : ""}
+    <button class="a-btn" style="font-size:9px;padding:5px 10px" onclick="toggleReply('${escapeHtml(c.id)}')">Reply</button>
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/like?token=${encodeURIComponent(token)}" style="display:inline"><button class="a-btn" style="font-size:9px;padding:5px 10px">♥ Like</button></form>
+    ${c.status !== "hidden" ? `<form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/hide?token=${encodeURIComponent(token)}" style="display:inline"><button class="a-btn" style="font-size:9px;padding:5px 10px">Hide</button></form>` : ""}
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/spam?token=${encodeURIComponent(token)}" style="display:inline"><button class="a-btn a-btn-danger" style="font-size:9px;padding:5px 10px">Spam</button></form>
+    <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/delete?token=${encodeURIComponent(token)}" onsubmit="return confirm('Delete comment?')" style="display:inline"><button class="a-btn a-btn-danger" style="font-size:9px;padding:5px 10px">Delete</button></form>
   </div>
   <div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px">
     <form method="POST" action="/admin/articles/comments/${escapeHtml(c.id)}/reply?token=${encodeURIComponent(token)}">
       <textarea name="body" placeholder="Your reply (posts as GovRevenue author)..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--inter);font-size:13px;resize:vertical;outline:none;border-radius:5px"></textarea><br>
-      <button class="al-btn al-btn-primary" type="submit" style="margin-top:6px;font-size:10px">Post reply</button>
+      <button class="a-btn a-btn-primary" type="submit" style="margin-top:6px;font-size:10px">Post reply</button>
     </form>
   </div>
 </div>`;
   }).join("");
 
   const tabs = ["pending", "approved", "all"].map(t =>
-    `<a href="/admin/articles/comments?token=${encodeURIComponent(token)}&filter=${t}" class="al-btn${filter === t ? " al-btn-primary" : ""}" style="font-size:10px;padding:5px 10px">${t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}</a>`
+    `<a href="/admin/articles/comments?token=${encodeURIComponent(token)}&filter=${t}" class="a-btn${filter === t ? " a-btn-primary" : ""}" style="font-size:10px;padding:5px 12px">${t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}</a>`
   ).join("");
 
   return `<!DOCTYPE html>
@@ -5706,65 +5828,65 @@ function adminCommentsPage(comments: CommentRow[], token: string, filter: string
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Comment queue — Admin — GovRevenue</title>
-<style>${adminArticleCss()}</style>
+${adminArticleCss()}
 </head>
 <body>
-<div id="al-sb-overlay" class="al-sb-overlay" onclick="alCloseSidebar()"></div>
-<div class="al-shell">
-  <aside class="al-sidebar" id="al-sidebar">
-    <div class="al-brand">
-      <div class="al-brand-row">
-        <span class="al-dot"></span>
-        <span class="al-logo">Gov<span>Revenue</span></span>
-        <button onclick="alCloseSidebar()" id="al-sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
+<div id="sb-overlay" class="sb-overlay" onclick="closeSidebar()"></div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo-row">
+        <span class="sb-dot"></span>
+        <span class="sb-logo">Gov<b>Revenue</b></span>
+        <button onclick="closeSidebar()" id="sb-close" style="display:none;margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" aria-label="Close menu">✕</button>
       </div>
-      <div class="al-tag">ADMIN PANEL</div>
+      <div class="sb-tag">Admin Panel</div>
     </div>
-    <div class="al-nav-sec">Navigation</div>
-    <nav class="al-nav">
-      <a href="/admin/scans?token=${encodeURIComponent(token)}"><span>⬅ Scans Dashboard</span></a>
-      <div class="al-nav-div"></div>
-      <a href="/admin/articles?token=${encodeURIComponent(token)}"><span>Articles</span></a>
-      <a href="/admin/articles/new?token=${encodeURIComponent(token)}"><span>+ New article</span></a>
-      <div class="al-nav-div"></div>
-      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="active"><span>Comment queue</span></a>
+    <nav class="sb-nav">
+      <div class="sb-group">Intelligence</div>
+      <a href="/admin/scans?token=${encodeURIComponent(token)}" class="sb-link">Overview</a>
+      <div class="sb-group">Content</div>
+      <a href="/admin/articles?token=${encodeURIComponent(token)}" class="sb-link">Articles</a>
+      <a href="/admin/articles/new?token=${encodeURIComponent(token)}" class="sb-link">+ New article</a>
+      <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="sb-link active">Comment queue</a>
     </nav>
   </aside>
-  <div class="al-main">
-    <div class="al-topbar">
-      <div>
-        <div class="al-crumb">Admin <span>›</span> Articles <span>›</span> <b>Comments</b></div>
-        <div class="al-topbar-title">Comment queue</div>
+  <div style="min-width:0">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-crumb">Admin <span>›</span> Articles <span>›</span> <b>Comments</b></div>
+        <div class="topbar-title">Comment queue</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="al-hb-btn" onclick="alOpenSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
-        ${tabs}
+      <div class="topbar-right">
+        <button class="hb-btn" onclick="openSidebar()" aria-label="Menu" style="display:none">&#9776;</button>
+        <div class="clock-chip"><span class="live-dot"></span><span id="admin-clock"></span></div>
       </div>
     </div>
-    <div style="padding:20px 28px 28px">
-    ${msg ? `<div class="al-alert al-alert-ok">✓ ${escapeHtml(msg)}</div>` : ""}
-    ${comments.length === 0
-      ? `<p class="al-empty">No comments in this queue.</p>`
-      : rows}
+    <div class="cmt-tabs">${tabs}</div>
+    ${msg ? `<div class="a-alert a-alert-ok" style="margin:14px 28px 0">✓ ${escapeHtml(msg)}</div>` : ""}
+    <div class="ad-section">
+      ${comments.length === 0
+        ? `<p class="ad-empty">No comments in this queue.</p>`
+        : rows}
     </div>
   </div>
 </div>
 <script>
 (function(){
-  var sidebar=document.getElementById('al-sidebar');
-  var overlay=document.getElementById('al-sb-overlay');
-  var sbClose=document.getElementById('al-sb-close');
-  var hbBtn=document.querySelector('.al-hb-btn');
-  function alOpenSidebar(){sidebar.classList.add('open');overlay.classList.add('open');if(sbClose)sbClose.style.display='block';}
-  function alCloseSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');if(sbClose)sbClose.style.display='none';}
-  window.alOpenSidebar=alOpenSidebar;window.alCloseSidebar=alCloseSidebar;
-  if(window.innerWidth<=900&&hbBtn)hbBtn.style.display='flex';
-  window.addEventListener('resize',function(){if(hbBtn)hbBtn.style.display=window.innerWidth<=900?'flex':'none';});
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('sb-overlay');
+  var cl=document.getElementById('sb-close');
+  var hb=document.querySelector('.hb-btn');
+  function openSidebar(){sb.classList.add('open');ov.classList.add('open');if(cl)cl.style.display='block';}
+  function closeSidebar(){sb.classList.remove('open');ov.classList.remove('open');if(cl)cl.style.display='none';}
+  window.openSidebar=openSidebar;window.closeSidebar=closeSidebar;
+  if(window.innerWidth<=900&&hb)hb.style.display='flex';
+  window.addEventListener('resize',function(){if(hb)hb.style.display=window.innerWidth<=900?'flex':'none';});
+  var clk=document.getElementById('admin-clock');
+  function tick(){if(clk){var d=new Date();clk.textContent=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/London'});}}
+  tick();setInterval(tick,1000);
 })();
-function toggleReply(id) {
-  const el = document.getElementById('reply-'+id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
+function toggleReply(id){const el=document.getElementById('reply-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
 </script>
 </body></html>`;
 }
