@@ -5456,11 +5456,18 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .chartband{padding:52px 0}
 }
 @media(max-width:760px){
-  .gh-tag,.gh-live,.gh-auth-name,.gh-main-nav{display:none}
+  .gh-tag,.gh-live,.gh-auth-name{display:none}
   .gh-inner{padding-left:16px;padding-right:16px}
   .gh-auth{gap:10px}
   .gh-auth-cta{padding:8px 12px;font-size:12px}
   .gh-auth-link{font-size:13px}
+  .gh-top{flex-wrap:wrap;height:auto}
+  .gh-main-nav{order:3;flex-basis:100%;width:100%;border-top:1px solid var(--border);padding:0;scrollbar-width:none}
+  .gh-main-nav::-webkit-scrollbar{display:none}
+  .gh-main-nav a{height:34px;font-size:12px;padding:0 10px}
+  .gh-brand{order:1;height:52px}
+  .gh-auth{order:2}
+  .gh-nav{display:none}
   .desk-grid{grid-template-columns:1fr}
   .hero .wrap{min-height:auto;padding:48px 20px 40px}
   .hero h1{font-size:32px}
@@ -8381,7 +8388,7 @@ strong{font-weight:700}
 .pipe-cta{flex-shrink:0}
 .pipe-cta a{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#ECE6D6;border:1px solid rgba(236,230,214,.25);padding:12px 20px;transition:border-color .15s}
 .pipe-cta a:hover{border-color:#ECE6D6}
-.sec-eye{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#22C55E;margin-bottom:12px}
+.sec-eye{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
 .sec-h{font-family:var(--sans);font-size:clamp(22px,2.8vw,36px);font-weight:800;letter-spacing:-.03em;line-height:1.1;color:var(--text)}
 .sec-sub{font-size:14.5px;color:var(--muted);max-width:50em;margin-top:10px;line-height:1.65}
 .chart-sec{padding:64px 0;border-bottom:1px solid var(--border);background:var(--base)}
@@ -8389,10 +8396,10 @@ strong{font-weight:700}
 .chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px;flex-wrap:wrap}
 .tog-grp{display:flex;border:1px solid var(--border-2)}
 .tog{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:8px 18px;color:var(--muted);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s}
-.tog.tog-active{background:#22C55E;color:#081911}
+.tog.tog-active{background:var(--brand);color:#fff}
 .chart-legend{display:flex;gap:20px;align-items:center;margin-top:10px}
 .leg{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
-.leg-line{width:22px;height:2px;background:#22C55E}
+.leg-line{width:22px;height:2px;background:var(--brand)}
 .leg-dash{width:22px;height:0;border-bottom:2px dashed var(--green)}
 .chart-box{background:var(--surface-2);border:1px solid var(--border-2);overflow:hidden;position:relative}
 canvas#detailChart{display:block;width:100%}
@@ -8410,7 +8417,7 @@ canvas#detailChart{display:block;width:100%}
 .srank{font-family:var(--mono);font-size:10px;color:var(--faint);width:18px;flex-shrink:0;text-align:right}
 .sname{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbar-wrap{flex:1.5;height:4px;background:var(--border-2);border-radius:2px;overflow:hidden}
-.sbar-fill{height:100%;background:#22C55E;border-radius:2px;width:0;transition:width .9s ease}
+.sbar-fill{height:100%;background:var(--brand);border-radius:2px;width:0;transition:width .9s ease}
 .sval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:68px;text-align:right}
 .scnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:52px;text-align:right}
 /* buyers table */
@@ -8419,7 +8426,7 @@ canvas#detailChart{display:block;width:100%}
 .brow{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);border-left:1px solid var(--border-2);border-right:1px solid var(--border-2);transition:background .15s}
 .brow:last-child{border-bottom:1px solid var(--border-2)}
 .brow:hover{background:var(--surface-3)}
-.brank{font-family:var(--mono);font-size:11px;font-weight:700;color:#22C55E;width:22px;flex-shrink:0}
+.brank{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brand);width:22px;flex-shrink:0}
 .bname{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bval{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;width:70px;text-align:right}
 .bcnt{font-family:var(--mono);font-size:10px;color:var(--faint);width:60px;text-align:right;white-space:nowrap}
@@ -8429,13 +8436,13 @@ canvas#detailChart{display:block;width:100%}
 .brief-art{display:grid;grid-template-columns:100px 1fr;gap:0 52px;padding:52px 0;border-top:1px solid var(--border)}
 .brief-num{font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:3px}
 .brief-num span{display:block;font-family:var(--sans);font-size:56px;font-weight:800;color:rgba(255,255,255,.04);letter-spacing:-.04em;line-height:1;margin-bottom:3px}
-.brief-tag{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#22C55E;margin-bottom:14px}
+.brief-tag{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
 .brief-h{font-family:var(--sans);font-size:clamp(18px,2vw,24px);font-weight:700;letter-spacing:-.02em;color:var(--text);margin-bottom:16px;line-height:1.25}
 .brief-body{font-family:var(--sans);font-size:15.5px;line-height:1.85;color:var(--muted)}
 .brief-body p+p{margin-top:16px}
 .brief-body strong{color:var(--text)}
 .brief-body em{font-style:italic}
-.pull{margin:24px 0;padding:18px 22px 18px 18px;border-left:3px solid #22C55E;background:rgba(34,197,94,.05)}
+.pull{margin:24px 0;padding:18px 22px 18px 18px;border-left:3px solid var(--brand);background:rgba(180,146,78,.05)}
 .pull p{font-family:var(--sans);font-size:16px;color:var(--text);line-height:1.55;letter-spacing:-.01em}
 .brief-refs{margin-top:44px;padding-top:18px;border-top:1px solid var(--border)}
 .nl-sec{padding:52px 0;background:var(--surface-2);border-top:1px solid var(--border)}
@@ -10361,7 +10368,6 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
       <nav class="gh-main-nav">
         <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
-        <a href="/charts">Intelligence</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
