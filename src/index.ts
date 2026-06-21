@@ -12871,7 +12871,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       const h = n === 0 ? 2 : Math.max(4, Math.round((n / maxSPerDay) * 64));
       const isToday = d === new Date().toISOString().slice(0, 10);
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${d}: ${n} scans">
-        <div style="width:100%;height:${h}px;background:${isToday ? "#7B1A3A" : "rgba(123,26,58,.28)"};border-radius:2px 2px 0 0;min-height:2px;${isToday ? "box-shadow:0 0 8px rgba(123,26,58,.35)" : ""}"></div>
+        <div style="width:100%;height:${h}px;background:${isToday ? "#B4924E" : "rgba(180,146,78,.32)"};border-radius:2px 2px 0 0;min-height:2px;${isToday ? "box-shadow:0 0 8px rgba(180,146,78,.4)" : ""}"></div>
         <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${d.slice(8)}</div>
       </div>`;
     }).join("")}
@@ -12907,7 +12907,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
           <span style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px;flex-shrink:0">${Number(p.visits).toLocaleString()}</span>
         </div>
         <div style="height:3px;background:rgba(0,0,0,.08);border-radius:2px">
-          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#7B1A3A;opacity:.7;border-radius:2px"></div>
+          <div style="width:${Math.round((Number(p.visits)/maxPathV)*100)}%;height:100%;background:#B4924E;opacity:.75;border-radius:2px"></div>
         </div>
       </div>`).join("");
 
@@ -13052,11 +13052,13 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --burg:#7B1A3A;--burg-2:#9B2E50;--burg-3:#B85070;
-  --burg-dim:rgba(123,26,58,.06);--burg-mid:rgba(123,26,58,.14);--burg-border:rgba(123,26,58,.22);
-  --base:#F5F1EE;--surface:#FFFFFF;--surface-2:#FAF8F6;--surface-3:#F2EEE9;
-  --border:#E4DDD6;--border-2:#CEC5BB;
-  --text:#1A100C;--muted:#7A6660;--muted-2:#A8948C;
+  /* website brand — gold stays primary */
+  --brand:#B4924E;--brand-dim:rgba(180,146,78,.1);--brand-mid:rgba(180,146,78,.28);--brand-border:rgba(180,146,78,.32);
+  /* burgundy — accent/gradient use only */
+  --burg:#7B1A3A;--burg-3:#C06080;
+  --base:#F4F1E9;--surface:#FFFFFF;--surface-2:#FAF8F4;--surface-3:#F2EDE5;
+  --border:#E5DED4;--border-2:#CEC5B8;
+  --text:#1A1208;--muted:#7D6B50;--muted-2:#A8957C;
   --green:#166534;--green-bg:rgba(22,101,52,.08);--green-border:rgba(22,101,52,.22);
   --red:#B91C1C;--red-bg:rgba(185,28,28,.07);--red-border:rgba(185,28,28,.2);
   --amber:#92400E;--amber-bg:rgba(146,64,14,.08);--amber-border:rgba(146,64,14,.2);
@@ -13066,60 +13068,63 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   --inter:'Inter',system-ui,sans-serif;
 }
 html,body{height:100%;background:var(--base);color:var(--text);font-family:var(--inter);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-a{color:var(--burg);text-decoration:none}
+a{color:var(--brand);text-decoration:none}
 a:hover{text-decoration:underline}
-::selection{background:rgba(123,26,58,.15);color:var(--burg)}
+::selection{background:rgba(180,146,78,.18);color:var(--text)}
 ::-webkit-scrollbar{width:7px;height:7px}
 ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:4px}
 ::-webkit-scrollbar-track{background:transparent}
 .shell{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
 /* ——— SIDEBAR ——— */
 .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:200}
-.sb-brand{padding:20px 20px 16px;background:linear-gradient(145deg,rgba(123,26,58,.05) 0%,rgba(255,255,255,0) 60%);border-bottom:1px solid var(--border)}
+/* faint gold tint on sidebar brand area — no burgundy */
+.sb-brand{padding:20px 20px 16px;background:linear-gradient(145deg,rgba(180,146,78,.06) 0%,rgba(255,255,255,0) 65%);border-bottom:1px solid var(--border)}
 .sb-logo-row{display:flex;align-items:center;gap:9px}
-.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--burg);box-shadow:0 0 8px rgba(123,26,58,.5);flex-shrink:0}
+/* dot: gold with brand glow */
+.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 8px rgba(180,146,78,.55);flex-shrink:0}
 .sb-logo{font-family:var(--sg);font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
-.sb-logo span{color:var(--burg)}
+.sb-logo span{color:var(--brand)}
 .sb-tag{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);margin-top:8px;padding-left:17px}
 .sb-nav{padding:8px 0;flex:1}
 .sb-group{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);padding:14px 18px 5px}
 .sb-link{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-family:var(--inter);font-size:13px;font-weight:500;color:var(--muted);text-decoration:none!important;transition:color .11s,background .11s;border-left:2px solid transparent;margin:1px 0}
 .sb-link:hover{color:var(--text);background:var(--surface-2);text-decoration:none}
-.sb-link.active{color:var(--burg);border-left-color:var(--burg);background:var(--burg-dim)}
-.sb-link.active .sb-count{background:var(--burg-dim);color:var(--burg);border-color:var(--burg-border)}
+.sb-link.active{color:var(--brand);border-left-color:var(--brand);background:var(--brand-dim)}
+.sb-link.active .sb-count{background:var(--brand-dim);color:var(--brand);border-color:var(--brand-border)}
 .sb-count{font-family:var(--mono);font-size:10px;background:var(--base);border:1px solid var(--border);padding:1px 7px;border-radius:20px;color:var(--muted);flex-shrink:0}
 .sb-foot{padding:14px;border-top:1px solid var(--border);margin-top:auto}
 .sb-token{display:flex;align-items:center;gap:8px;background:var(--surface-3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:10px}
 .sb-token span:first-child{color:var(--muted-2);font-size:9px;letter-spacing:.06em}
 .sb-action{display:block;width:100%;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;text-align:center;margin-bottom:6px;transition:.12s;text-decoration:none;border-radius:6px}
-.sb-action:hover{background:var(--burg-dim);border-color:var(--burg-border);color:var(--burg);text-decoration:none}
+.sb-action:hover{background:var(--brand-dim);border-color:var(--brand-border);color:var(--brand);text-decoration:none}
 /* ——— TOPBAR ——— */
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 28px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:sticky;top:0;z-index:150}
 .topbar-left{display:flex;flex-direction:column;gap:2px}
 .topbar-crumb{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em}
 .topbar-crumb span{color:var(--border-2)}
-.topbar-crumb b{color:var(--burg)}
+.topbar-crumb b{color:var(--brand)}
 .topbar-title{font-family:var(--sg);font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
 .topbar-right{display:flex;align-items:center;gap:10px}
 .clock-chip{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:7px 12px;background:var(--surface-2)}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:lp 2.2s infinite}
 @keyframes lp{0%,100%{opacity:1}50%{opacity:.2}}
 .tb-btn{display:flex;align-items:center;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:7px 13px;border-radius:6px;cursor:pointer;transition:.12s;background:var(--surface);text-decoration:none}
-.tb-btn:hover{border-color:var(--burg-border);color:var(--burg);background:var(--burg-dim);text-decoration:none}
+.tb-btn:hover{border-color:var(--brand-border);color:var(--brand);background:var(--brand-dim);text-decoration:none}
 /* ——— SECTIONS ——— */
 .section{padding:28px 28px 0}
 .s-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border)}
-.s-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--burg);margin-bottom:5px}
+.s-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:5px}
 .s-title{font-family:var(--sg);font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.05;color:var(--text)}
 .s-sub{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
 /* ——— KPI GRID ——— */
 .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
 .kpi{background:var(--surface);padding:18px 16px 15px;position:relative}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--burg) 0%,var(--burg-3) 100%);opacity:.35}
+/* burgundy gradient accent: the one place burg shows as a designed feature */
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--brand) 0%,var(--burg) 100%);opacity:.55}
 .kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-bottom:9px}
 .kpi-val{font-family:var(--sg);font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1;color:var(--text)}
 .kpi-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:7px}
-.kpi-burg{color:var(--burg)}.kpi-green{color:var(--green)}.kpi-red{color:var(--red)}.kpi-amber{color:var(--amber)}.kpi-blue{color:var(--blue)}
+.kpi-gold{color:var(--brand)}.kpi-green{color:var(--green)}.kpi-red{color:var(--red)}.kpi-amber{color:var(--amber)}.kpi-blue{color:var(--blue)}
 /* ——— STAT STRIP ——— */
 .stat-row{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .stat-cell{background:var(--surface-2);padding:14px 18px}
@@ -13145,14 +13150,14 @@ table.a-tbl{border-collapse:collapse;width:100%;font-size:12px}
 table.a-tbl th{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;background:var(--surface-3);position:sticky;top:0;z-index:10}
 table.a-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
 table.a-tbl tr:last-child td{border-bottom:none}
-table.a-tbl tr:hover td{background:var(--burg-dim)}
+table.a-tbl tr:hover td{background:var(--brand-dim)}
 /* ——— PILLS ——— */
 .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:20px;font-weight:600;border:1px solid}
 .pill-completed{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .pill-failed{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 .pill-running,.pill-pending{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
 .pill-free{background:var(--base);color:var(--muted);border-color:var(--border-2)}
-.pill-pro{background:var(--burg-dim);color:var(--burg);border-color:var(--burg-border)}
+.pill-pro{background:var(--brand-dim);color:var(--brand);border-color:var(--brand-border)}
 .pill-agency{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
 .pill-active{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .pill-inactive{background:var(--base);color:var(--muted);border-color:var(--border)}
@@ -13163,8 +13168,8 @@ table.a-tbl tr:hover td{background:var(--burg-dim)}
 .a-btn-danger:hover{background:var(--red-bg);border-color:rgba(185,28,28,.4)}
 .a-btn-ok{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
 .a-btn-ok:hover{background:var(--green-bg);border-color:rgba(22,101,52,.4)}
-.a-btn-burg{border-color:var(--burg-border);color:var(--burg);background:var(--burg-dim)}
-.a-btn-burg:hover{background:rgba(123,26,58,.1);border-color:rgba(123,26,58,.35)}
+.a-btn-burg{border-color:var(--brand-border);color:var(--brand);background:var(--brand-dim)}
+.a-btn-burg:hover{background:rgba(180,146,78,.15);border-color:var(--brand-mid)}
 /* ——— SEL BAR ——— */
 #sel-bar{display:none;align-items:center;gap:10px;padding:9px 28px;background:rgba(185,28,28,.05);border-bottom:1px solid rgba(185,28,28,.12);position:sticky;top:52px;z-index:140}
 #sel-bar.visible{display:flex}
@@ -13177,7 +13182,7 @@ table.a-tbl tr:hover td{background:var(--burg-dim)}
 .env-unset{color:var(--muted-2);font-family:var(--mono);font-size:10px;opacity:.6}
 .env-val{font-family:var(--mono);font-size:10px;color:var(--text)}
 .gap{height:32px}
-input[type=checkbox]{accent-color:var(--burg);width:13px;height:13px;cursor:pointer}
+input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:pointer}
 .insight-num{font-family:var(--sg);font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1;color:var(--text)}
 .insight-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:5px}
 .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px}
@@ -13320,12 +13325,12 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Open Signals</div>
-      <div class="kpi-val kpi-burg">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div>
+      <div class="kpi-val kpi-gold">${Number(sigs.open_count || 0).toLocaleString("en-GB")}</div>
       <div class="kpi-sub">${sigs.new_24h || 0} new &middot; ${sigs.closing_7d || 0} closing soon</div>
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Open Value</div>
-      <div class="kpi-val kpi-burg" style="font-size:22px">${fmtMoney(Number(sigs.open_value || 0))}</div>
+      <div class="kpi-val kpi-gold" style="font-size:22px">${fmtMoney(Number(sigs.open_value || 0))}</div>
       <div class="kpi-sub">${sigs.categories || 0} active desks</div>
     </div>
     <div class="kpi">
@@ -13339,7 +13344,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div class="card">
       <div class="card-head">User Breakdown <span class="card-head-val">${us.total || 0} total</span></div>
       <div class="tier-row"><span class="tier-lbl">Free</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalFreeCount/totalUserCount)}%;background:var(--muted-2)"></div></div><span class="tier-n">${us.free_count || 0}</span></div>
-      <div class="tier-row"><span class="tier-lbl" style="color:var(--burg)">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--burg)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
+      <div class="tier-row"><span class="tier-lbl" style="color:var(--brand)">Pro</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalProCount/totalUserCount)}%;background:var(--brand)"></div></div><span class="tier-n">${us.pro_count || 0}</span></div>
       <div class="tier-row" style="margin-bottom:0"><span class="tier-lbl" style="color:var(--amber)">Agency</span><div class="tier-track"><div class="tier-fill" style="width:${Math.round(100*totalAgencyCount/totalUserCount)}%;background:var(--amber)"></div></div><span class="tier-n">${us.agency_count || 0}</span></div>
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
         <div class="tier-row"><span class="tier-lbl" style="color:var(--green);font-size:9px">Alerts</span><div class="tier-track"><div class="tier-fill" style="width:${Math.min(100,Math.round(100*activeSubCount/totalUserCount))}%;background:var(--green)"></div></div><span class="tier-n">${activeSubCount}</span></div>
@@ -13459,7 +13464,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   <div class="stat-row" style="grid-template-columns:repeat(6,1fr)">
     <div class="stat-cell"><div class="stat-val" style="color:var(--green)">${Number(sigs.open_count || 0).toLocaleString()}</div><div class="stat-lbl">Open now</div></div>
     <div class="stat-cell"><div class="stat-val" style="font-size:18px">${fmtMoney(Number(sigs.open_value || 0))}</div><div class="stat-lbl">Open value</div></div>
-    <div class="stat-cell"><div class="stat-val" style="color:var(--burg)">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
+    <div class="stat-cell"><div class="stat-val" style="color:var(--brand)">${sigs.new_24h || 0}</div><div class="stat-lbl">New 24h</div></div>
     <div class="stat-cell"><div class="stat-val" style="color:var(--amber)">${sigs.closing_7d || 0}</div><div class="stat-lbl">Closing &lt;7d</div></div>
     <div class="stat-cell"><div class="stat-val">${sigs.categories || 0}</div><div class="stat-lbl">Active desks</div></div>
     <div class="stat-cell"><div class="stat-val">${Number(sigs.total || 0).toLocaleString()}</div><div class="stat-lbl">Total indexed</div></div>
