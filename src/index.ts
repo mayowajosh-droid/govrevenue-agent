@@ -9916,7 +9916,7 @@ ${pageShellHeader(profile, authCtx)}
       </div>
     </div>
     ${profile.live && !isCompiling && trendData.length >= 2 ? `<div class="dm-hero-chart">
-      <div class="dm-hero-chart-eyebrow">MONTHLY AWARDED SPEND &mdash; 12M</div>
+      <div class="dm-hero-chart-eyebrow">MONTHLY AWARDED SPEND &mdash; 12 MONTHS</div>
       <div class="dm-hero-chart-bars">
         ${trendData.map(([key, val]) => {
           const pct = Math.max(Math.round((val / maxMonthVal) * 100), 3);
