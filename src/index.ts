@@ -7162,7 +7162,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .btn-primary:hover{background:var(--brand-hot);border-color:var(--brand-hot)}
 .btn-outline{border:1px solid var(--border-3);color:var(--text-mid)}
 .btn-outline:hover{background:var(--surface-2);border-color:var(--brand);color:var(--text)}
-.plan-talk{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;letter-spacing:.04em}
+.plan-talk{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:auto;padding-top:10px;margin-bottom:10px;letter-spacing:.04em}
 .plan-talk:hover{color:var(--muted)}
 .plan-sample{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px}
 .plan-sample:hover{color:var(--muted)}
@@ -7246,8 +7246,8 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
         <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
         <li><span class="tick">&#10003;</span> Custom alert frequency</li>
       </ul>
-      <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
       <a href="mailto:hello@govrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
+      <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
     </div>
   </div>
   <div class="faq">
