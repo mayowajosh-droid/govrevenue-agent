@@ -9697,7 +9697,7 @@ app.get("/signals", asyncRoute(async (req, res) => {
     signals = r.rows;
 
     const chartR = await pool.query<{ label: string; total_bn: number }>(`
-      SELECT to_char(date_trunc('month', notice_date), 'Mon') AS label,
+      SELECT to_char(date_trunc('month', notice_date), 'Mon YY') AS label,
              ROUND(COALESCE(SUM(value_amount) FILTER (WHERE value_amount > 0 AND value_amount < 2000000000), 0) / 1e9::numeric, 2)::float AS total_bn
       FROM homepage_signals
       WHERE notice_date > NOW() - INTERVAL '13 months' AND notice_date <= NOW()
@@ -9733,36 +9733,101 @@ app.get("/signals", asyncRoute(async (req, res) => {
   let chartSvgHtml = "";
   let chartLatestFmt = "";
   if (chartPoints.length >= 2) {
-    const W = 1000, top = 22, plotH = 188, base = top + plotH;
+    const LPAD = 68, PW = 932, TOTAL_W = 1000;
+    const top = 28, plotH = 168, base = top + plotH;
     const vals = chartPoints.map(p => p.total_bn);
     const maxVal = Math.max(...vals);
     const minVal = Math.min(...vals);
-    const minAdj = Math.max(0, minVal - (maxVal - minVal) * 0.08);
+    const minAdj = Math.max(0, minVal - (maxVal - minVal) * 0.12);
     const denom = maxVal - minAdj + 0.001;
     const n = vals.length;
-    const xFn = (i: number) => +(i * (W / (n - 1))).toFixed(1);
+    const xFn = (i: number) => +(LPAD + i * (PW / (n - 1))).toFixed(1);
     const yFn = (v: number) => +(top + (1 - (v - minAdj) / denom) * plotH).toFixed(1);
     const pts = vals.map((v, i) => [xFn(i), yFn(v)] as [number, number]);
     const linePts = pts.map(p => `${p[0]},${p[1]}`).join(" ");
-    const areaPath = `M0,${base} ${pts.map(p => `L${p[0]},${p[1]}`).join(" ")} L${W},${base} Z`;
+    const areaPath = `M${LPAD},${base} ${pts.map(p => `L${p[0]},${p[1]}`).join(" ")} L${LPAD + PW},${base} Z`;
     const lastPt = pts[n - 1];
     const peakIdx = vals.indexOf(maxVal);
+    const peakPt = pts[peakIdx];
     const latestBn = vals[n - 1];
     chartLatestFmt = latestBn >= 1 ? `£${latestBn.toFixed(1)}bn` : `£${Math.round(latestBn * 1000)}m`;
-    const monthLabels = chartPoints.map((p, i) =>
-      `<text x="${xFn(i)}" y="228" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}" font-family="monospace" font-size="10" fill="var(--muted)">${escapeHtml(p.label)}</text>`
+    const fmtV = (v: number) => v >= 1 ? `£${v.toFixed(1)}bn` : v >= 0.001 ? `£${Math.round(v * 1000)}m` : "£0m";
+    const peakFmt = fmtV(maxVal);
+    const yLevels = [0, 0.5, 1.0].map(t => {
+      const v = minAdj + t * (maxVal - minAdj);
+      return { v, y: yFn(v), dash: t === 0.5 };
+    });
+    const yGridHtml = yLevels.map(g =>
+      `<line x1="${LPAD}" y1="${g.y}" x2="${LPAD + PW}" y2="${g.y}" stroke="var(--border)" stroke-width="1"${g.dash ? ' stroke-dasharray="4,4"' : ""}/><text x="${LPAD - 6}" y="${g.y + 4}" text-anchor="end" font-family="monospace" font-size="10" fill="var(--muted)">${fmtV(g.v)}</text>`
     ).join("");
-    chartSvgHtml = `<svg viewBox="0 0 1000 236" style="width:100%;height:auto;display:block;overflow:visible">
-  <defs><linearGradient id="sgFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity="0.16"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0.01"/></linearGradient></defs>
-  <line x1="0" y1="${top}" x2="${W}" y2="${top}" stroke="var(--border)" stroke-width="1"/>
-  <line x1="0" y1="${top + Math.round(plotH * 0.5)}" x2="${W}" y2="${top + Math.round(plotH * 0.5)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4"/>
-  <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="var(--border-2)" stroke-width="1"/>
-  <path d="${areaPath}" fill="url(#sgFill)"/>
-  <polyline points="${linePts}" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="${xFn(peakIdx)}" cy="${yFn(maxVal)}" r="4" fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
-  <circle cx="${lastPt[0]}" cy="${lastPt[1]}" r="5" fill="var(--brand)"/>
-  ${monthLabels}
-</svg>`;
+    const monthLabels = chartPoints.map((p, i) => {
+      const anchor = i === 0 ? "start" : i === n - 1 ? "end" : "middle";
+      return `<text x="${xFn(i)}" y="210" text-anchor="${anchor}" font-family="monospace" font-size="10" fill="var(--muted)">${escapeHtml(p.label)}</text>`;
+    }).join("");
+    const peakAnchor = peakIdx < n / 2 ? "start" : "end";
+    const peakLX = peakPt[0] + (peakIdx < n / 2 ? 8 : -8);
+    const chartJson = JSON.stringify(chartPoints.map((p, i) => ({
+      lb: p.label,
+      xp: +((xFn(i) - LPAD) / PW).toFixed(4),
+      y: +yFn(p.total_bn).toFixed(1),
+      v: p.total_bn,
+      ch: i > 0 ? +((p.total_bn - vals[i - 1]) / (Math.abs(vals[i - 1]) + 0.001) * 100).toFixed(1) : null,
+    })));
+    const hitRects = pts.map((p, i) => {
+      const left = i === 0 ? LPAD : (xFn(i - 1) + p[0]) / 2;
+      const right = i === n - 1 ? LPAD + PW : (p[0] + xFn(i + 1)) / 2;
+      return `<rect x="${+left.toFixed(1)}" y="${top}" width="${+(right - left).toFixed(1)}" height="${plotH + 10}" fill="transparent" onmouseenter="sigShow(${i})"/>`;
+    }).join("");
+    chartSvgHtml = `<div id="sig-wrap" style="position:relative">
+<svg id="sig-svg" viewBox="0 0 ${TOTAL_W} 218" style="width:100%;height:auto;display:block;overflow:visible" onmouseleave="sigHide()">
+<defs><linearGradient id="sgFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity="0.14"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0.01"/></linearGradient></defs>
+${yGridHtml}
+<path d="${areaPath}" fill="url(#sgFill)"/>
+<polyline points="${linePts}" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="${peakPt[0]}" cy="${peakPt[1]}" r="4" fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
+<text x="${peakLX}" y="${peakPt[1] - 9}" text-anchor="${peakAnchor}" font-family="monospace" font-size="9" fill="var(--brand)" font-weight="600">&#9650; PEAK ${escapeHtml(peakFmt)}</text>
+<circle cx="${lastPt[0]}" cy="${lastPt[1]}" r="5" fill="var(--brand)"/>
+<line id="sig-hl" x1="${LPAD}" y1="${top}" x2="${LPAD}" y2="${base}" stroke="var(--brand)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
+<circle id="sig-hd" cx="${LPAD}" cy="${top}" r="5" fill="var(--surface)" stroke="var(--brand)" stroke-width="2" opacity="0"/>
+${hitRects}
+${monthLabels}
+</svg>
+<div id="sig-tip" style="display:none;position:absolute;top:4px;background:var(--surface);border:1px solid var(--border-2);border-radius:2px;padding:11px 15px;min-width:148px;box-shadow:0 4px 18px rgba(0,0,0,.10);pointer-events:none;z-index:10">
+<div id="sig-tip-mon" style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px"></div>
+<div id="sig-tip-val" style="font-family:var(--serif);font-size:21px;font-weight:500;color:var(--text);line-height:1"></div>
+<div id="sig-tip-ch" style="font-family:var(--mono);font-size:10px;margin-top:4px"></div>
+<div style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:6px;text-transform:uppercase;letter-spacing:.1em">Awarded</div>
+</div>
+<script>
+(function(){
+var D=${chartJson};
+var tip=document.getElementById('sig-tip');
+var hl=document.getElementById('sig-hl');
+var hd=document.getElementById('sig-hd');
+var wrap=document.getElementById('sig-wrap');
+window.sigShow=function(i){
+  var d=D[i];
+  var fv=d.v>=1?'£'+d.v.toFixed(1)+'bn':'£'+Math.round(d.v*1000)+'m';
+  document.getElementById('sig-tip-mon').textContent=d.lb;
+  document.getElementById('sig-tip-val').textContent=fv;
+  var cel=document.getElementById('sig-tip-ch');
+  if(d.ch!==null){cel.style.color=d.ch>=0?'var(--green)':'var(--red)';cel.textContent=(d.ch>=0?'▲ +':'')+d.ch+'% vs prev mo';}
+  else{cel.textContent='';}
+  hl.setAttribute('x1',${LPAD}+d.xp*${PW});hl.setAttribute('x2',${LPAD}+d.xp*${PW});hl.setAttribute('opacity','0.5');
+  hd.setAttribute('cx',${LPAD}+d.xp*${PW});hd.setAttribute('cy',d.y);hd.setAttribute('opacity','1');
+  tip.style.display='block';
+  var wW=wrap.offsetWidth;
+  var pxX=(${LPAD}/1000*wW)+(d.xp*(${PW}/1000)*wW);
+  tip.style.left=(pxX>wW*0.55?(pxX-tip.offsetWidth-10):(pxX+10))+'px';
+};
+window.sigHide=function(){
+  tip.style.display='none';
+  hl.setAttribute('opacity','0');
+  hd.setAttribute('opacity','0');
+};
+})();
+</script>
+</div>`;
   }
 
   const nowMs = Date.now();
