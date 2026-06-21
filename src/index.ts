@@ -8339,19 +8339,18 @@ strong{font-weight:700}
 .orb2{width:380px;height:380px;bottom:-40px;left:8%;background:radial-gradient(circle,rgba(34,197,94,0.05) 0%,transparent 70%);animation:fl2 15s ease-in-out infinite}
 @keyframes fl1{0%,100%{transform:translateY(0)}50%{transform:translateY(-36px)}}
 @keyframes fl2{0%,100%{transform:translateY(0)}50%{transform:translateY(28px)}}
-.hero-inner{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:56px 40px 48px;width:100%}
+.hero-inner{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:56px 40px;width:100%;display:grid;grid-template-columns:1fr 420px;gap:56px;align-items:center}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(180,146,78,.1);border:1px solid rgba(180,146,78,.3);padding:5px 14px 5px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--brand);margin-bottom:22px}
 .hero-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pdot 2s infinite}
 @keyframes pdot{0%,100%{opacity:1}50%{opacity:.25}}
-.hero-h1{font-family:var(--sans);font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.06;letter-spacing:-.04em;color:var(--text);margin-bottom:16px;max-width:780px}
+.hero-h1{font-family:var(--sans);font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.06;letter-spacing:-.04em;color:var(--text);margin-bottom:16px}
 .hero-h1 em{font-style:normal;color:var(--brand)}
-.hero-sub{font-size:16px;color:var(--muted);max-width:520px;line-height:1.65;margin-bottom:30px}
+.hero-sub{font-size:16px;color:var(--muted);line-height:1.65;margin-bottom:30px}
 .hero-ctas{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .btn-p{background:var(--brand);color:#fff;font-size:13px;font-weight:700;padding:12px 24px;transition:opacity .15s;border-radius:2px}.btn-p:hover{opacity:.88}
 .btn-s{border:1px solid var(--border-2);color:var(--text);font-size:13px;padding:11px 20px;background:transparent;transition:border-color .15s;border-radius:2px}.btn-s:hover{border-color:rgba(255,255,255,.35)}
-.kpi-band{padding:48px 0;background:var(--surface);border-bottom:1px solid var(--border)}
-.kpi-row{max-width:1320px;margin:0 auto;padding:0 40px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-.kcard{background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--border-2);padding:22px 24px 20px;transition:border-color .2s,transform .2s;cursor:default;position:relative;overflow:hidden}
+.hero-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kcard{background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--border-2);padding:20px 20px 18px;transition:border-color .2s,transform .2s;cursor:default;position:relative;overflow:hidden}
 .kcard:hover{border-color:rgba(255,255,255,.22);transform:translateY(-2px)}
 .kcard.gold{border-top-color:#B4924E}.kcard.grn{border-top-color:#22C55E}.kcard.warn{border-top-color:#EF4444}.kcard.blue{border-top-color:#3B82F6}.kcard.purple{border-top-color:#A78BFA}
 .kcard-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;display:block}
@@ -8449,18 +8448,18 @@ canvas#detailChart{display:block;width:100%}
 .nl-pl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-top:3px}
 .rv{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}.rv.in{opacity:1;transform:none}
 @media(max-width:1100px){
-  .kpi-row{grid-template-columns:repeat(3,1fr);gap:8px}
-  .hero-inner,.chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap{padding-left:24px;padding-right:24px}
+  .hero-inner{grid-template-columns:1fr;gap:36px;padding-left:24px;padding-right:24px}
+  .hero-kpis{max-width:600px}
+  .chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap{padding-left:24px;padding-right:24px}
 }
 @media(max-width:1024px){
   .sectors-wrap{grid-template-columns:1fr;gap:32px}
 }
 @media(max-width:768px){
-  .kpi-row{grid-template-columns:repeat(2,1fr);padding:0 16px;gap:8px}
-  .kpi-band{padding:32px 0}
-  .hero-inner,.chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap{padding-left:16px;padding-right:16px}
+  .hero-inner{padding:40px 16px 36px;gap:28px}
+  .hero-kpis{max-width:none}
+  .chart-wrap,.sectors-wrap,.brief-wrap,.nl-wrap{padding-left:16px;padding-right:16px}
   .hero-ch{min-height:auto}
-  .hero-inner{padding:40px 16px 36px}
   .hero-h1{font-size:28px}
   .hero-sub{font-size:15px}
   .pipe-band{padding:28px 0}
@@ -8477,9 +8476,11 @@ canvas#detailChart{display:block;width:100%}
   .chart-head{flex-direction:column;gap:14px}
 }
 @media(max-width:480px){
-  .kpi-row{grid-template-columns:1fr 1fr;padding:0 12px;gap:6px}
-  .kcard{padding:16px 14px}
+  .hero-inner{padding:32px 12px 28px;gap:20px}
+  .hero-kpis{gap:6px}
+  .kcard{padding:14px 12px 12px}
   .kcard-val{font-size:22px}
+  .kcard-sub{font-size:8.5px}
   .hero-h1{font-size:22px}
   .pipe-cells{flex-direction:column}
   .pipe-cell{padding:12px 14px}
@@ -8498,50 +8499,43 @@ ${pageShellHeader(null, getAuthUser(req))}
   <div class="hero-orb orb1" aria-hidden="true"></div>
   <div class="hero-orb orb2" aria-hidden="true"></div>
   <div class="hero-inner">
-    <div class="hero-badge" role="status">
-      <span class="hero-dot" aria-hidden="true"></span>
-      Live procurement intelligence &middot; Updated hourly
+    <div class="hero-text">
+      <div class="hero-badge" role="status">
+        <span class="hero-dot" aria-hidden="true"></span>
+        Live procurement intelligence &middot; Updated hourly
+      </div>
+      <h1 class="hero-h1">
+        <em>${fmtBnShort(totalAnnualM)}+</em> in UK public contracts.<br>See where the money moves.
+      </h1>
+      <p class="hero-sub">Public bodies publish every contract. Searchable, predictable, and entirely pre-tender. This is what the spend curve looks like when you actually read it.</p>
+      <div class="hero-ctas">
+        <a href="/scan" class="btn-p">Find your contracts &rarr;</a>
+        <a href="/signals" class="btn-s">Browse open notices</a>
+      </div>
     </div>
-    <h1 class="hero-h1">
-      <em>${fmtBnShort(totalAnnualM)}+</em> in UK public contracts.<br>See where the money moves.
-    </h1>
-    <p class="hero-sub">Public bodies publish every contract. Searchable, predictable, and entirely pre-tender. This is what the spend curve looks like when you actually read it.</p>
-    <div class="hero-ctas">
-      <a href="/scan" class="btn-p">Find your contracts &rarr;</a>
-      <a href="/signals" class="btn-s">Browse open notices</a>
-    </div>
-  </div>
-</section>
-
-<section class="kpi-band" aria-label="Key procurement metrics">
-  <div class="kpi-row">
-    <div class="kcard gold rv">
-      <span class="kcard-label">12-month awarded</span>
-      <span class="kcard-val c-gold">${fmtBnShort(totalAnnualM)}</span>
-      <span class="kcard-sub">${escapeHtml(reportMonthRange)} &middot; all 24 desks</span>
-      <div class="kcard-glow gold" aria-hidden="true"></div>
-    </div>
-    <div class="kcard grn rv">
-      <span class="kcard-label">Open pipeline now</span>
-      <span class="kcard-val c-grn">${fmtBnShort(openPipelineM)}</span>
-      <span class="kcard-sub">${totalOpenCount.toLocaleString()} live tenders accepting bids</span>
-      <div class="kcard-glow grn" aria-hidden="true"></div>
-    </div>
-    <div class="kcard warn rv">
-      <span class="kcard-label">Closing in 30 days</span>
-      <span class="kcard-val c-red">${closing30.toLocaleString()}</span>
-      <span class="kcard-sub">${closing60.toLocaleString()} within 60 days</span>
-      <div class="kcard-glow red" aria-hidden="true"></div>
-    </div>
-    <div class="kcard blue rv">
-      <span class="kcard-label">Monthly average</span>
-      <span class="kcard-val c-blue">${fmtBnShort(avgMonthlyM)}</span>
-      <span class="kcard-sub">Per month over the tracked period</span>
-    </div>
-    <div class="kcard purple rv">
-      <span class="kcard-label">Momentum</span>
-      <span class="kcard-val c-purple">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
-      <span class="kcard-sub">3-month trailing vs opening &middot; peak ${escapeHtml(peakPoint.label)}</span>
+    <div class="hero-kpis" aria-label="Key procurement metrics">
+      <div class="kcard gold rv">
+        <span class="kcard-label">12-month awarded</span>
+        <span class="kcard-val c-gold">${fmtBnShort(totalAnnualM)}</span>
+        <span class="kcard-sub">${escapeHtml(reportMonthRange)} &middot; all 24 desks</span>
+        <div class="kcard-glow gold" aria-hidden="true"></div>
+      </div>
+      <div class="kcard grn rv">
+        <span class="kcard-label">Open pipeline now</span>
+        <span class="kcard-val c-grn">${fmtBnShort(openPipelineM)}</span>
+        <span class="kcard-sub">${totalOpenCount.toLocaleString()} live tenders</span>
+        <div class="kcard-glow grn" aria-hidden="true"></div>
+      </div>
+      <div class="kcard blue rv">
+        <span class="kcard-label">Monthly average</span>
+        <span class="kcard-val c-blue">${fmtBnShort(avgMonthlyM)}</span>
+        <span class="kcard-sub">Per month over the tracked period</span>
+      </div>
+      <div class="kcard purple rv">
+        <span class="kcard-label">Momentum</span>
+        <span class="kcard-val c-purple">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}%</span>
+        <span class="kcard-sub">3-month trailing vs opening &middot; peak ${escapeHtml(peakPoint.label)}</span>
+      </div>
     </div>
   </div>
 </section>
