@@ -107,6 +107,7 @@ type ArticleRow = {
   body_md: string; desk: string | null; status: ArticleStatus; author_id: string;
   published_at: string | null; updated_at: string; views: number; reading_time: number;
   og_image: string | null; seo_title: string | null; seo_description: string | null;
+  like_count: number;
 };
 type ArticleAssetRow = {
   id: string; article_id: string; kind: "still" | "gif";
@@ -117,7 +118,7 @@ type ArticleAssetRow = {
 type CommentRow = {
   id: string; article_id: string; user_id: string; parent_id: string | null;
   body: string; status: CommentStatus; is_author_reply: boolean;
-  like_count: number; created_at: string;
+  like_count: number; created_at: string; guest_name?: string;
   author_email?: string; article_slug?: string; article_title?: string;
 };
 
@@ -1275,6 +1276,18 @@ async function initDb() {
     );
   `);
 
+  // Idempotent column migrations
+  await pool.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS like_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS guest_name TEXT`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS article_likes (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      fingerprint TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(article_id, fingerprint)
+    )
+  `);
   console.log("[db] ready");
 }
 
@@ -2016,7 +2029,7 @@ async function getArticleComments(articleId: string): Promise<CommentRow[]> {
   if (!pool) return [];
   const r = await pool.query<CommentRow>(
     `SELECT c.*, u.email AS author_email FROM comments c
-     JOIN users u ON u.id=c.user_id
+     LEFT JOIN users u ON u.id=c.user_id
      WHERE c.article_id=$1 AND c.status='approved'
      ORDER BY c.created_at ASC`,
     [articleId]
@@ -4836,9 +4849,15 @@ a{color:inherit;text-decoration:none}
 .art-comment-time{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
 .art-comment-text{font-family:var(--sans);font-size:15px;line-height:1.65;color:var(--text-mid)}
 .art-comment-actions{display:flex;gap:18px;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--muted-2)}
-.art-comment-like{cursor:pointer;background:none;border:none;color:var(--muted-2);font-family:var(--mono);font-size:11px;padding:0}
-.art-comment-like:hover{color:var(--brand)}
+.art-comment-like{cursor:pointer;background:none;border:none;color:var(--muted-2);font-family:var(--mono);font-size:11px;padding:0;transition:color .12s}
+.art-comment-like:hover,.art-comment-like.liked{color:var(--brand)}
 .art-comment-author-heart{color:var(--brand)}
+/* article like button */
+.art-like-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border-2);color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:4px 11px;cursor:pointer;transition:all .15s;margin-left:10px}
+.art-like-btn:hover,.art-like-btn.liked{background:var(--brand-dim,rgba(180,146,78,.12));border-color:var(--brand);color:var(--brand)}
+/* guest name input */
+.art-comment-form .guest-name-input{width:100%;padding:11px 16px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:14px;outline:none;margin-bottom:10px}
+.art-comment-form .guest-name-input:focus{border-color:var(--brand)}
 .art-replies{margin-left:28px;margin-top:10px;border-left:2px solid var(--border);padding-left:18px}
 .art-comment-form{margin-top:36px;padding:22px 26px;background:var(--surface);border:1px solid var(--border)}
 .art-comment-form-head{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
@@ -4864,7 +4883,9 @@ a{color:inherit;text-decoration:none}
 }
 
 function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: CommentRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
-  const bodyHtml = parseShortcodes(article.body_md, assets);
+  // Strip AI-generated FAQ sections — they belong in the prompt output, not the published article
+  const cleanedBodyMd = article.body_md.replace(/^#{1,3}\s*frequently asked questions[\s\S]*/im, "").trim();
+  const bodyHtml = parseShortcodes(cleanedBodyMd, assets);
   const heroHtml = article.hero_image_url
     ? `<div class="art-hero-img" style="width:100%;overflow:hidden;border:1px solid var(--border);margin-bottom:0"><img src="${escapeHtml(article.hero_image_url)}" alt="${escapeHtml(article.title)}" style="width:100%;max-height:520px;object-fit:cover;display:block"></div>`
     : article.hero_prompt
@@ -4886,19 +4907,30 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
 
   const renderComment = (c: CommentRow, isReply = false): string => {
     const reps = !isReply ? (replies.get(c.id) ?? []) : [];
+    const displayName = c.is_author_reply ? null
+      : escapeHtml(c.guest_name || (c.author_email ?? "").split("@")[0] || "Anonymous");
     const authorLabel = c.is_author_reply
       ? `<span class="art-comment-badge">GovRevenue</span>`
-      : `<span class="art-comment-author">${escapeHtml((c.author_email ?? "").split("@")[0])}</span>`;
+      : `<span class="art-comment-author">${displayName}</span>`;
     const likeHtml = c.is_author_reply
       ? `<span class="art-comment-author-heart">♥ ${c.like_count}</span>`
-      : `<button class="art-comment-like" onclick="likeComment('${escapeHtml(c.id)}',this)">♥ ${c.like_count}</button>`;
+      : `<button class="art-comment-like" data-id="${escapeHtml(c.id)}" onclick="likeComment('${escapeHtml(c.id)}',this)">♥ ${c.like_count}</button>`;
     const timeStr = new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const replyBox = !isReply ? `
+      <div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px">
+        <form method="POST" action="/articles/${escapeHtml(article.slug)}/comments" class="art-comment-form" style="margin-top:0;padding:14px 16px">
+          <input type="hidden" name="parent_id" value="${escapeHtml(c.id)}">
+          ${!authCtx ? `<input class="guest-name-input" name="guest_name" placeholder="Your name" maxlength="60" required style="margin-bottom:8px">` : ""}
+          <textarea name="body" placeholder="Your reply..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;outline:none" required></textarea>
+          <button type="submit" style="margin-top:6px;background:var(--brand);color:#fff;border:none;padding:8px 14px;font-size:12px;cursor:pointer">Post reply</button>
+        </form>
+      </div>` : "";
     return `<div class="art-comment" id="c-${escapeHtml(c.id)}">
   <div class="art-comment-body">
     <div class="art-comment-meta">${authorLabel}<span class="art-comment-time">${timeStr}</span></div>
     <div class="art-comment-text">${escapeHtml(c.body)}</div>
-    <div class="art-comment-actions">${likeHtml}${!isReply && authCtx ? `<button class="art-comment-like" onclick="showReply('${escapeHtml(c.id)}')">Reply</button>` : ""}</div>
-    ${!isReply && authCtx ? `<div id="reply-${escapeHtml(c.id)}" style="display:none;margin-top:12px"><form method="POST" action="/articles/${escapeHtml(article.slug)}/comments"><input type="hidden" name="parent_id" value="${escapeHtml(c.id)}"><textarea name="body" placeholder="Your reply..." style="width:100%;min-height:60px;padding:10px;background:var(--base);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;outline:none"></textarea><br><button type="submit" style="margin-top:6px;background:var(--brand);color:#fff;border:none;padding:8px 14px;font-size:12px;cursor:pointer">Post reply</button></form></div>` : ""}
+    <div class="art-comment-actions">${likeHtml}${!isReply ? `<button class="art-comment-like" onclick="showReply('${escapeHtml(c.id)}')">↩ Reply</button>` : ""}</div>
+    ${replyBox}
   </div>
   ${reps.length > 0 ? `<div class="art-replies">${reps.map(r => renderComment(r, true)).join("")}</div>` : ""}
 </div>`;
@@ -4908,15 +4940,14 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
     ? topLevel.map(c => renderComment(c)).join("")
     : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted)">No comments yet. Be the first.</p>`;
 
-  const commentFormHtml = authCtx
-    ? `<div class="art-comment-form">
+  const commentFormHtml = `<div class="art-comment-form">
   <div class="art-comment-form-head">&gt;_ Leave a comment</div>
   <form method="POST" action="/articles/${escapeHtml(article.slug)}/comments">
+    ${!authCtx ? `<input class="guest-name-input" name="guest_name" placeholder="Your name (required)" maxlength="60" required>` : ""}
     <textarea name="body" placeholder="Your comment..." required></textarea><br>
     <button type="submit">Post comment</button>
   </form>
-</div>`
-    : `<p class="art-sign-in-prompt"><a href="/login">Sign in</a> to leave a comment.</p>`;
+</div>`;
 
   const canonical = `https://govrevenue-agent-production.up.railway.app/articles/${escapeHtml(article.slug)}`;
   const ogImg = article.og_image || article.hero_image_url || "";
@@ -4962,6 +4993,7 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
       <span class="art-meta-dot">·</span>
       <span>${article.reading_time} min read</span>
       ${article.desk ? `<span class="art-meta-dot">·</span><span>${escapeHtml(article.desk)}</span>` : ""}
+      <button class="art-like-btn" id="art-like-btn" onclick="likeArticle('${escapeHtml(article.slug)}',this)">♥ <span id="art-like-count">${article.like_count ?? 0}</span></button>
     </div>
   </div>
 
@@ -4997,13 +5029,41 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
 </footer>
 <script>
 function likeComment(id, btn) {
+  if (localStorage.getItem('liked_c_' + id)) return;
   fetch('/articles/comments/' + id + '/like', { method: 'POST', credentials: 'same-origin' })
-    .then(r => r.json()).then(d => { if (d.count !== undefined) btn.textContent = '♥ ' + d.count; });
+    .then(r => r.json()).then(d => {
+      if (d.count !== undefined) {
+        btn.textContent = '♥ ' + d.count;
+        localStorage.setItem('liked_c_' + id, '1');
+        btn.classList.add('liked');
+      }
+    });
+}
+function likeArticle(slug, btn) {
+  if (localStorage.getItem('liked_a_' + slug)) return;
+  fetch('/articles/' + slug + '/like', { method: 'POST', credentials: 'same-origin' })
+    .then(r => r.json()).then(d => {
+      if (d.count !== undefined) {
+        document.getElementById('art-like-count').textContent = d.count;
+        localStorage.setItem('liked_a_' + slug, '1');
+        btn.classList.add('liked');
+      }
+    });
 }
 function showReply(id) {
   const el = document.getElementById('reply-' + id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
+document.addEventListener('DOMContentLoaded', function() {
+  var slug = '${escapeHtml(article.slug)}';
+  if (localStorage.getItem('liked_a_' + slug)) {
+    var ab = document.getElementById('art-like-btn');
+    if (ab) ab.classList.add('liked');
+  }
+  document.querySelectorAll('.art-comment-like[data-id]').forEach(function(btn) {
+    if (localStorage.getItem('liked_c_' + btn.dataset.id)) btn.classList.add('liked');
+  });
+});
 </script>
 </body></html>`;
 }
@@ -13327,37 +13387,58 @@ app.get("/articles/:slug", asyncRoute(async (req, res) => {
   res.send(articlePage(article, assets, comments, authCtx));
 }));
 
-app.post("/articles/:slug/comments", requireAuth, asyncRoute(async (req, res) => {
-  const authCtx = getAuthUser(req)!;
+app.post("/articles/:slug/like", asyncRoute(async (req, res) => {
+  const article = await getArticleBySlug(req.params.slug);
+  if (!article || article.status !== "published" || !pool) { res.json({ count: 0 }); return; }
+  const fp = String(req.ip ?? "unknown").replace(/[^a-zA-Z0-9.]/g, "_").slice(0, 40);
+  const likeId = `al_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    await pool.query(`INSERT INTO article_likes (id, article_id, fingerprint) VALUES ($1,$2,$3)`, [likeId, article.id, fp]);
+    await pool.query(`UPDATE articles SET like_count=like_count+1 WHERE id=$1`, [article.id]);
+  } catch { /* duplicate — ignore */ }
+  const r = await pool.query<{ like_count: number }>(`SELECT like_count FROM articles WHERE id=$1`, [article.id]);
+  res.json({ count: r.rows[0]?.like_count ?? 0 });
+}));
+
+app.post("/articles/:slug/comments", asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req);
   const article = await getArticleBySlug(req.params.slug);
   if (!article || article.status !== "published") { res.status(404).json({ error: "Not found" }); return; }
 
   const body = String(req.body.body ?? "").trim().slice(0, 2000);
   const parentId = req.body.parent_id ? String(req.body.parent_id) : null;
   if (!body) { res.redirect(`/articles/${article.slug}`); return; }
-
   if (!pool) { res.redirect(`/articles/${article.slug}`); return; }
 
   const commentId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const isPaying = authCtx.tier !== "free";
-  const status: CommentStatus = isPaying ? "approved" : "pending";
 
-  await pool.query(
-    `INSERT INTO comments (id, article_id, user_id, parent_id, body, status) VALUES ($1,$2,$3,$4,$5,$6)`,
-    [commentId, article.id, authCtx.userId, parentId, body, status]
-  );
+  if (authCtx) {
+    const status: CommentStatus = authCtx.tier !== "free" ? "approved" : "pending";
+    await pool.query(
+      `INSERT INTO comments (id, article_id, user_id, parent_id, body, status) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [commentId, article.id, authCtx.userId, parentId, body, status]
+    );
+  } else {
+    const guestName = String(req.body.guest_name ?? "").trim().slice(0, 60) || "Anonymous";
+    await pool.query(
+      `INSERT INTO comments (id, article_id, user_id, parent_id, body, status, guest_name) VALUES ($1,$2,$3,$4,$5,'pending',$6)`,
+      [commentId, article.id, `guest_${commentId}`, parentId, body, guestName]
+    );
+  }
+
   res.redirect(`/articles/${article.slug}#c-${commentId}`);
 }));
 
-app.post("/articles/comments/:id/like", requireAuth, asyncRoute(async (req, res) => {
-  const authCtx = getAuthUser(req)!;
+app.post("/articles/comments/:id/like", asyncRoute(async (req, res) => {
   if (!pool) { res.json({ count: 0 }); return; }
   const commentId = req.params.id;
+  const authCtx = getAuthUser(req);
+  const userId = authCtx?.userId ?? `ip_${String(req.ip ?? "unknown").replace(/[^a-zA-Z0-9.]/g, "_").slice(0, 40)}`;
   const likeId = `cl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   try {
     await pool.query(
       `INSERT INTO comment_likes (id, comment_id, user_id, is_author) VALUES ($1,$2,$3,false)`,
-      [likeId, commentId, authCtx.userId]
+      [likeId, commentId, userId]
     );
     await pool.query(`UPDATE comments SET like_count=like_count+1 WHERE id=$1`, [commentId]);
   } catch {
