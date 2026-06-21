@@ -9627,7 +9627,7 @@ app.get("/signals", asyncRoute(async (req, res) => {
   const sortCol = ["value", "deadline", "published"].includes(String(req.query.sort)) ? String(req.query.sort) : "published";
   const sortDir = req.query.dir === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
-  const PER_PAGE = 50;
+  const PER_PAGE = 10;
   const offset = (page - 1) * PER_PAGE;
 
   const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
