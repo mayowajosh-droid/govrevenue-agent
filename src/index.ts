@@ -12036,6 +12036,17 @@ app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
   res.type("html").send(subPage(profile, matchCat, matchSub, cached, getAuthUser(req)));
 }));
 
+app.get("/desk/:slug/category/:cat", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
+  const cat = profile.categories.find(c => slugify(c.label) === req.params.cat);
+  if (!cat) { res.status(404).type("html").send(notFoundHtml("Category not found", getAuthUser(req))); return; }
+  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
+  res.type("html").send(categoryDrillPage(profile, cat, cached, getAuthUser(req)));
+}));
+
 app.get("/desk/:slug/notices", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
@@ -12133,6 +12144,176 @@ function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCateg
     }
   }
   return result;
+}
+
+function categoryDrillPage(
+  profile: DeskProfile,
+  cat: DeskCategory,
+  cached: { data: ProcurementData; cached_at: string } | null,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const data = cached?.data;
+
+  const matchTitle = (n: ProcurementNotice) => {
+    const title = n.title.toLowerCase();
+    return cat.keywords.some(kw => title.includes(kw));
+  };
+
+  const allAwarded: ProcurementNotice[] = (data?.contractsFinder.awarded || [])
+    .filter(matchTitle)
+    .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
+
+  const allOpen: ProcurementNotice[] = dedupeNoticesSoft(
+    (data?.contractsFinder.open || []).concat(data?.findTender?.notices || []).filter(matchTitle)
+  ).sort((a, b) => new Date(b.publishedDate || "").getTime() - new Date(a.publishedDate || "").getTime());
+
+  const totalAwardedValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+  const cachedAt = cached ? new Date(cached.cached_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null;
+
+  const fmtV = (v: number | null) => {
+    if (!v || v <= 0) return "—";
+    if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`;
+    if (v >= 1_000) return `£${Math.round(v / 1_000)}k`;
+    return `£${v.toLocaleString("en-GB")}`;
+  };
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  const backUrl = `/desk/${escapeHtml(profile.slug)}`;
+  const catSlug = slugify(cat.label);
+
+  const awardedRows = allAwarded.map(n => {
+    const supplier = n.awardedSupplier && n.awardedSupplier !== "Not stated" && n.awardedSupplier.trim()
+      ? escapeHtml(n.awardedSupplier.slice(0, 60))
+      : `<span class="cd-muted">Not published</span>`;
+    const srcBadge = n.source === "Find a Tender" ? `<span class="cd-badge cd-badge-fts">FTS</span>` : `<span class="cd-badge cd-badge-cf">CF</span>`;
+    return `<tr>
+      <td><a class="cd-title-link" href="${escapeHtml(n.url)}" target="_blank" rel="noopener">${escapeHtml(n.title.slice(0, 90))}${n.title.length > 90 ? "…" : ""}</a></td>
+      <td>${escapeHtml((n.buyer || "—").slice(0, 55))}</td>
+      <td>${supplier}</td>
+      <td class="cd-num">${fmtV(n.awardedValue)}</td>
+      <td class="cd-num">${fmtDate(n.awardedDate || n.publishedDate)}</td>
+      <td>${srcBadge}</td>
+    </tr>`;
+  }).join("");
+
+  const openRows = allOpen.map(n => {
+    const deadline = n.deadlineDate ? fmtDate(n.deadlineDate) : "—";
+    const daysLeft = n.deadlineDate ? Math.ceil((new Date(n.deadlineDate).getTime() - Date.now()) / 86_400_000) : null;
+    const urgency = daysLeft !== null && daysLeft <= 7 && daysLeft >= 0
+      ? `<span class="cd-badge cd-badge-urgent">${daysLeft}d left</span>`
+      : daysLeft !== null && daysLeft < 0 ? `<span class="cd-badge cd-badge-cf">Closed</span>` : "";
+    const srcBadge = n.source === "Find a Tender" ? `<span class="cd-badge cd-badge-fts">FTS</span>` : `<span class="cd-badge cd-badge-cf">CF</span>`;
+    const est = fmtV(n.valueHigh ?? n.valueLow);
+    return `<tr>
+      <td><a class="cd-title-link" href="${escapeHtml(n.url)}" target="_blank" rel="noopener">${escapeHtml(n.title.slice(0, 90))}${n.title.length > 90 ? "…" : ""}</a></td>
+      <td>${escapeHtml((n.buyer || "—").slice(0, 55))}</td>
+      <td class="cd-num">${est}</td>
+      <td class="cd-num">${deadline} ${urgency}</td>
+      <td>${srcBadge}</td>
+    </tr>`;
+  }).join("");
+
+  const suppliersWithData = allAwarded.filter(n => n.awardedSupplier && n.awardedSupplier !== "Not stated" && n.awardedSupplier.trim()).length;
+  const coveragePct = allAwarded.length > 0 ? Math.round((suppliersWithData / allAwarded.length) * 100) : 0;
+
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(cat.label)} — ${escapeHtml(profile.label)} — GovRevenue</title>
+${pageShellCss()}
+<style>
+.cd-wrap{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
+.cd-back{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;margin-bottom:28px}
+.cd-back:hover{color:var(--brand)}
+.cd-head{margin-bottom:32px}
+.cd-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.cd-h1{font-family:var(--serif);font-size:clamp(22px,3vw,32px);font-weight:700;color:var(--text);line-height:1.2;margin:0 0 8px}
+.cd-standfirst{font-size:15px;color:var(--text-mid);max-width:680px;line-height:1.6}
+.cd-stats{display:flex;flex-wrap:wrap;gap:16px;margin:28px 0 36px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--brand)}
+.cd-stat{display:flex;flex-direction:column;gap:3px}
+.cd-stat-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text)}
+.cd-stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cd-section{margin-bottom:48px}
+.cd-section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.cd-section-title{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--text)}
+.cd-count{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.05em}
+.cd-coverage{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.05em;margin-top:8px;margin-bottom:12px}
+.cd-table-wrap{overflow-x:auto}
+table.cd-table{width:100%;border-collapse:collapse;font-size:13px}
+table.cd-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:2px solid var(--border-2);white-space:nowrap}
+table.cd-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-mid);line-height:1.4}
+table.cd-table tr:hover td{background:var(--surface)}
+.cd-title-link{color:var(--text);text-decoration:none;font-weight:500}
+.cd-title-link:hover{color:var(--brand);text-decoration:underline}
+.cd-num{font-family:var(--mono);font-size:12px;white-space:nowrap}
+.cd-muted{color:var(--muted);font-style:italic;font-size:12px}
+.cd-badge{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.cd-badge-cf{background:rgba(180,146,78,.12);color:var(--brand);border:1px solid rgba(180,146,78,.25)}
+.cd-badge-fts{background:rgba(29,78,216,.08);color:#1d4ed8;border:1px solid rgba(29,78,216,.18)}
+.cd-badge-urgent{background:rgba(155,45,32,.1);color:var(--red);border:1px solid rgba(155,45,32,.2)}
+.cd-empty{padding:40px 24px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;background:var(--surface);border:1px solid var(--border)}
+.cd-note{margin-top:12px;padding:12px 16px;background:var(--surface-2);border-left:3px solid var(--border-2);font-size:12px;color:var(--muted);line-height:1.6}
+.cd-kw{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.cd-kw span{font-family:var(--mono);font-size:10px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:3px}
+@media(max-width:640px){table.cd-table th:nth-child(3),table.cd-table td:nth-child(3){display:none}table.cd-table th:nth-child(5),table.cd-table td:nth-child(5){display:none}}
+</style>
+</head><body>
+${pageShellHeader(profile, authCtx)}
+<div class="cd-wrap">
+  <a class="cd-back" href="${backUrl}">← ${escapeHtml(profile.label)} desk</a>
+  <div class="cd-head">
+    <div class="cd-eyebrow">${escapeHtml(profile.label)} · Category</div>
+    <h1 class="cd-h1">${escapeHtml(cat.label)}</h1>
+    <p class="cd-standfirst">All contracts matching this category from the ${escapeHtml(profile.label)} desk — awarded and open. Title-matched against category keywords.${cachedAt ? ` Data as of ${cachedAt}.` : ""}</p>
+  </div>
+
+  <div class="cd-stats">
+    <div class="cd-stat"><span class="cd-stat-val">${allAwarded.length}</span><span class="cd-stat-label">Awarded contracts</span></div>
+    <div class="cd-stat"><span class="cd-stat-val">${fmtV(totalAwardedValue || null)}</span><span class="cd-stat-label">Total awarded value</span></div>
+    <div class="cd-stat"><span class="cd-stat-val">${allOpen.length}</span><span class="cd-stat-label">Open tenders</span></div>
+    <div class="cd-stat"><span class="cd-stat-val">${coveragePct}%</span><span class="cd-stat-label">Supplier data published</span></div>
+  </div>
+
+  <div class="cd-section">
+    <div class="cd-section-head">
+      <span class="cd-section-title">Awarded Contracts</span>
+      <span class="cd-count">${allAwarded.length} contracts</span>
+    </div>
+    ${coveragePct < 100 ? `<p class="cd-coverage">Supplier name published for ${suppliersWithData} of ${allAwarded.length} contracts (${coveragePct}%). Contracts Finder only requires supplier disclosure on awards above threshold — smaller awards may not appear.</p>` : ""}
+    <div class="cd-table-wrap">
+    ${allAwarded.length > 0 ? `<table class="cd-table">
+      <thead><tr>
+        <th>Contract title</th><th>Buyer</th><th>Supplier</th><th>Value</th><th>Date</th><th>Src</th>
+      </tr></thead>
+      <tbody>${awardedRows}</tbody>
+    </table>` : `<div class="cd-empty">No awarded contracts found for this category in the current desk cache.</div>`}
+    </div>
+    <div class="cd-note">All data from Contracts Finder public record. Supplier names are as published by the buyer — some buyers do not disclose supplier names on all awards. Values reflect what was published; actual contract spend may differ.</div>
+  </div>
+
+  <div class="cd-section">
+    <div class="cd-section-head">
+      <span class="cd-section-title">Open Tenders</span>
+      <span class="cd-count">${allOpen.length} live</span>
+    </div>
+    <div class="cd-table-wrap">
+    ${allOpen.length > 0 ? `<table class="cd-table">
+      <thead><tr>
+        <th>Tender title</th><th>Buyer</th><th>Est. value</th><th>Deadline</th><th>Src</th>
+      </tr></thead>
+      <tbody>${openRows}</tbody>
+    </table>` : `<div class="cd-empty">No open tenders found for this category at the current time.</div>`}
+    </div>
+  </div>
+
+  <div class="cd-section">
+    <div class="cd-section-head"><span class="cd-section-title">Category Keywords</span></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px">Contracts are matched by these keywords appearing in the contract title:</p>
+    <div class="cd-kw">${cat.keywords.map(k => `<span>${escapeHtml(k)}</span>`).join("")}</div>
+  </div>
+</div>
+${sampleCtaBlock("compact")}
+${pageShellFoot()}
+</body></html>`;
 }
 
 function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null): string {
@@ -12674,7 +12855,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
       <div class="dm-card-head">
         <div class="dm-icon-wrap">${getCategoryIcon(cat.label)}</div>
         <div class="dm-card-title">
-          <span class="dm-name">${escapeHtml(cat.label)}</span>
+          <a class="dm-name" href="/desk/${profile.slug}/category/${slugify(cat.label)}">${escapeHtml(cat.label)}</a>
           ${count > 0 ? `<span class="dm-count">${count} ${count === 1 ? "notice" : "notices"}</span>` : ""}
         </div>
       </div>
@@ -12882,7 +13063,7 @@ html{scroll-behavior:smooth}
 .dm-icon-wrap{flex-shrink:0;width:36px;height:36px;background:var(--surface-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;padding:7px;color:var(--muted)}
 .dm-icon{width:100%;height:100%}
 .dm-card-title{flex:1;min-width:0}
-.dm-name{display:block;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--text)}
+.dm-name{display:block;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--text);text-decoration:none}.dm-name:hover{color:var(--brand);text-decoration:underline}
 .dm-count{font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:400;margin-top:3px;display:block}
 .dm-subs{list-style:none;font-size:12px;color:var(--muted);line-height:1.9;margin-top:4px}
 .dm-subs li{padding-left:0}
