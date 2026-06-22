@@ -7260,7 +7260,7 @@ a{color:inherit;text-decoration:none}
 .rrow{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(236,230,214,.08)}
 .rrow:last-child{border-bottom:0}
 .rrow .k{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:#8A9187;padding-top:2px}
-.rrow .v{text-align:right;font-family:var(--serif);font-size:12px;font-weight:400;color:#ECE6D6;max-width:65%;overflow-wrap:break-word;word-break:break-word}
+.rrow .v{text-align:right;font-family:var(--serif);font-size:12px;font-weight:400;color:#ECE6D6;max-width:65%;overflow-wrap:break-word;word-break:break-all;hyphens:auto}
 .rrow .v small{display:block;font-family:var(--mono);font-size:8.5px;color:#8A9187;margin-top:2px;font-weight:400}
 .figure{font-family:var(--serif);font-size:26px;font-weight:500;color:#ECE6D6}
 .verdict{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:rgba(180,146,78,.18);color:#D4A955;border:1px solid rgba(180,146,78,.35);padding:5px 11px}
