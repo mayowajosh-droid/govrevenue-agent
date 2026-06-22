@@ -4140,7 +4140,6 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                 subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating","Flat roof replacement","Pitched roof repair","Fascias & soffits","UPVC replacement","Sash restoration","Curtain walling","Stonework","Pointing & repointing","External rendering","Leadwork","Roof inspection"] },
       { label: "M&E, Plumbing & Electrical",            keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],          subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance","Hot water systems","Underfloor heating","Air conditioning","Switchgear","EV charging points","Solar panels","Mechanical ventilation","Data cabling","Emergency lighting","Sprinkler systems","Consumer units"] },
       { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "remediation", "fire door", "fire stopping", "fire risk", "aov"],         subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Access control & CCTV","Fire risk assessment","ACM cladding removal","EWS1 surveys","Waking watch","Compartmentalisation","Cavity barriers","Fire stopping","Smoke detectors","AOV systems","Fire suppression"] },
-      { label: "Decarbonisation & Retrofit",            keywords: ["retrofit", "decarb", "energy efficiency", "solar", "heat pump", "led upgrade", "net zero", "insulation"],       subcategories: ["Energy efficiency","Retrofit works","Heat pumps","Solar PV","LED upgrades","Insulation","Net zero works","Air source heat pumps","Ground source heat pumps","Cavity wall insulation","Solid wall insulation","Loft insulation","PAS 2035 retrofit","EPC improvements","Triple glazing","Demand response"] },
       { label: "Grounds, Civils & External Works",      keywords: ["grounds", "civil", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath"],    subcategories: ["Drainage","Surfacing","Landscaping","Fencing","Car parks","Playgrounds","Footpaths","Tarmac resurfacing","Block paving","Boundary walls","Security fencing","Cycle shelters","Bin stores","Street furniture","Retaining walls","Kerbing","SUDS drainage","Attenuation tanks"] },
       { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],        subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins","Timber & joinery","Ironmongery","Fixings & fasteners","Paint & coatings","Insulation materials","Roof materials","Floor coverings","Aggregates","Ready-mixed concrete","Skip hire","Temporary electrics"] },
       { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "construction project management", "architectural services", "quantity surveying", "structural engineering", "clerk of works"],  subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy","CDM coordination","Principal designer","Planning consultancy","Fire engineering","Mechanical design","Electrical design","Party wall surveying","Condition surveys","Asset management","Energy consultancy","Due diligence"] },
@@ -4158,11 +4157,10 @@ const DESK_PROFILES: DeskProfile[] = [
       mainGoal: "find facilities management contracts"
     }),
     categories: [
-      { label: "Hard FM",             keywords: ["hard fm", "mechanical", "electrical", "boiler", "heating", "hvac", "lift", "plumbing", "air conditioning"],  subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
-      { label: "Soft FM",             keywords: ["soft fm", "cleaning", "catering", "security", "portering", "reception", "helpdesk", "mailroom"],        subcategories: ["Cleaning","Catering","Security","Portering","Reception","Waste management","Mail room"] },
+      { label: "Hard FM",             keywords: ["hard fm", "mechanical maintenance", "electrical maintenance", "boiler servicing", "heating system", "hvac maintenance", "lift servicing", "plumbing maintenance", "air conditioning maintenance"],  subcategories: ["Mechanical services","Electrical services","Heating systems","Boiler maintenance","HVAC","Lift maintenance","BMS"] },
+      { label: "Soft FM",             keywords: ["soft fm", "cleaning", "portering", "reception", "helpdesk", "mailroom", "post room"],        subcategories: ["Cleaning","Portering","Reception","Waste management","Mail room"] },
       { label: "Managed Services",    keywords: ["total fm", "integrated fm", "facilities management", "facilities service", "building management", "estate management"], subcategories: ["Total FM","Integrated FM","Outsourced FM","TUPE transfers","KPI management"] },
-      { label: "Energy Management",   keywords: ["energy management", "energy efficiency", "utilities", "metering", "carbon reduction", "sustainability"], subcategories: ["Energy procurement","Utilities management","Smart metering","Carbon reporting","Sustainability"] },
-      { label: "Compliance & Safety", keywords: ["compliance", "fire safety", "asbestos", "legionella", "water treatment", "pat testing", "fire risk"],    subcategories: ["Fire safety","Asbestos management","Legionella control","Water treatment","PAT testing","Statutory compliance"] },
+      { label: "Compliance & Safety", keywords: ["compliance", "statutory compliance", "water treatment", "pat testing", "planned preventive maintenance"],    subcategories: ["Statutory compliance","Water treatment","PAT testing","Planned preventive maintenance","Building compliance"] },
     ]
   },
   {
@@ -4180,7 +4178,7 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "School Buildings & Estates", keywords: ["school", "academy", "classroom", "education", "raac", "school building", "teaching"],   subcategories: ["School refurbishment","RAAC remediation","Classroom fit-out","School expansion","Academy conversion","Caretaking","DDA works","Site security","Playground equipment","School gates"] },
       { label: "Education Technology",       keywords: ["learning platform", "education technology", "school software", "interactive display", "broadband school"], subcategories: ["MIS systems","Learning platforms","VLE","Interactive displays","Broadband in schools","IT hardware","Digital literacy","Tablets & devices","Filtering software","Staff training tech"] },
       { label: "Training & Skills",          keywords: ["training", "apprenticeship", "skills", "workforce development", "nvq", "cpd", "coaching", "upskilling", "employability"], subcategories: ["Apprenticeships","NVQ delivery","Leadership training","Digital skills","Workforce development","CPD programmes","Bootcamps","Functional skills","Sector-based work academies"] },
-      { label: "SEND & Alternative Provision", keywords: ["special educational", "alternative provision", "pupil referral", "ehcp", "send transport", "send provision", "sen support"], subcategories: ["SEND support","Alternative provision","Pupil referral units","Educational psychology","Specialist tutoring","EHCP provision","Short breaks","Post-16 SEND"] },
+      { label: "SEND & Alternative Provision", keywords: ["special educational", "alternative provision", "pupil referral", "ehcp", "send provision", "sen support", "education health care plan"], subcategories: ["SEND support","Alternative provision","Pupil referral units","Educational psychology","Specialist tutoring","EHCP provision","Short breaks","Post-16 SEND"] },
       { label: "Further & Higher Education", keywords: ["further education", "college", "higher education", "university", "adult education", "adult learning", "t-level", "esol"], subcategories: ["FE college services","HE procurement","Adult education budget","T-levels","Higher Technical Qualifications","Skills bootcamps","Multiply numeracy","ESOL provision"] },
     ]
   },
@@ -4196,7 +4194,7 @@ const DESK_PROFILES: DeskProfile[] = [
       mainGoal: "find passenger transport and SEND transport contracts"
     }),
     categories: [
-      { label: "SEND Transport",              keywords: ["send transport", "special educational", "home to school", "school transport", "sen transport", "school bus"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
+      { label: "SEND Transport",              keywords: ["send transport", "home to school", "school transport", "sen transport", "school bus", "pupil transport"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
       { label: "Passenger Transport",         keywords: ["passenger transport", "bus service", "community transport", "minibus", "dial-a-ride", "public transport", "shuttle"], subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport"] },
       { label: "Fleet & Vehicle Management",  keywords: ["fleet", "vehicle", "taxi", "wheelchair accessible", "transport contract", "vehicle hire"],  subcategories: ["Fleet management","Taxi commissioning","Wheelchair-accessible vehicles","Vehicle maintenance"] },
       { label: "Rail & Specialist",           keywords: ["rail", "coach", "transport service", "escort", "patient transport", "non-emergency transport"], subcategories: ["Rail contracts","Coach hire","Escorted journeys","School crossings"] },
@@ -4259,7 +4257,6 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Community & Primary Care",           keywords: ["primary care", "community health", "gp practice", "district nursing", "health visiting", "pharmacy", "vaccination"], subcategories: ["GP services","District nursing","Health visiting","Community physiotherapy","Community podiatry","Community cardiology","Primary care IT systems","Remote monitoring","Care navigation","Pharmacy (community)","Immunisation programmes","Cervical screening"] },
       { label: "Public Health Commissioning",        keywords: ["public health", "prevention", "sexual health", "substance misuse", "smoking", "obesity", "drug and alcohol", "screening"], subcategories: ["Sexual health services","Stop smoking","Drug & alcohol services","Obesity & weight management","Health improvement programmes","Screening programmes","Epidemiology & surveillance","Healthy start schemes","Falls prevention","Social prescribing","Health inequalities"] },
       { label: "Health Technology & Digital",        keywords: ["health technology", "nhs digital", "patient record", "clinical system", "telehealth", "telemedicine", "health informatics"], subcategories: ["Electronic patient records (EPR)","Clinical decision support","Patient flow systems","NHS app integration","Wearables & remote monitoring","Health data analytics","Cyber security (NHS)","Clinical coding","Workforce management systems","Telemedicine","AI diagnostics"] },
-      { label: "Care Commissioning & Social Care",   keywords: ["care home", "residential care", "domiciliary", "supported living", "adult social care", "reablement", "nursing home", "extra care"], subcategories: ["Domiciliary care","Residential care homes","Nursing homes","Supported living","Extra care housing","Reablement services","Learning disability services","Autistic spectrum (residential)","Discharge-to-assess","Personal assistants","Direct payments support","Carer support services"] },
     ]
   },
   { slug: "digital", label: "Digital & IT", standfirst: "Cloud, software, cyber security, networks, and digital transformation across the NHS, councils, and central government.", live: true,
@@ -4342,11 +4339,10 @@ const DESK_PROFILES: DeskProfile[] = [
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "legal services solicitor audit HR advisory procurement consultancy management consultancy compliance", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find legal and professional services contracts" }),
     categories: [
       { label: "Legal Services", keywords: ["legal services", "solicitor", "barrister", "counsel", "litigation", "planning legal"], subcategories: ["Property and conveyancing","Planning and environment","Litigation","Employment law","Contract law","Information law (FOI/DPA)","Public law","Child law","Adult social care law","Procurement law","Regulatory","Debt recovery","GDPR legal","Equality law"] },
-      { label: "External Audit", keywords: ["external audit", "financial audit", "statutory audit", "value for money", "audit firm"], subcategories: ["Statutory audit","Financial statements audit","Value for money review","Grant certification","Academy trust audit","Charity audit","Pension fund audit","Housing association audit","NHS audit","Auditor appointment","Assurance reviews","Interim audit"] },
       { label: "Internal Audit & Risk", keywords: ["internal audit", "risk management", "counter fraud", "corporate governance", "assurance"], subcategories: ["Internal audit service","Counter fraud","Risk management","Corporate governance","Assurance mapping","Data quality audit","IT audit","Compliance monitoring","Anti-bribery compliance","Whistleblowing","Risk register","Internal controls"] },
       { label: "HR & Employment Advisory", keywords: ["hr advisory", "employment advisory", "occupational health", "mediation", "workforce advisory"], subcategories: ["HR advisory","Employment relations","Occupational health","Mediation","Pay benchmarking","Job evaluation","Workforce planning","Redundancy support","TUPE advisory","HR transformation","Equality and diversity","Wellbeing at work"] },
-      { label: "Finance & Procurement Advisory", keywords: ["finance advisory", "procurement consultancy", "commercial advisory", "treasury advisory"], subcategories: ["Finance transformation","Procurement consultancy","Commercial advisory","Treasury management","Shared services","Accounts payable","Payroll","Business rates","Grant management","Financial modelling","VFM reviews","Category management"] },
-      { label: "Management Consultancy", keywords: ["management consultancy", "business case", "options appraisal", "process improvement", "lean"], subcategories: ["Options appraisal","Business cases","Process improvement","Lean and Six Sigma","Service redesign","Operating model","Benchmarking","Programme assurance","Benefits realisation","Post-project review","Change management","OD consultancy"] },
+      { label: "Procurement Advisory", keywords: ["procurement consultancy", "treasury advisory", "treasury management"], subcategories: ["Procurement consultancy","Treasury management","Shared services","Grant management","VFM reviews","Category management"] },
+      { label: "Management Consultancy", keywords: ["management consultancy", "options appraisal", "process improvement", "service improvement"], subcategories: ["Options appraisal","Business cases","Process improvement","Lean and Six Sigma","Service redesign","Operating model","Benchmarking","Programme assurance","Benefits realisation","Post-project review","Change management","OD consultancy"] },
     ]
   },
   { slug: "housing-support", label: "Housing & Homelessness", standfirst: "Homelessness prevention, rough sleeping, temporary accommodation, refuge, floating support, and housing development commissioned by councils.", live: true,
@@ -4374,7 +4370,7 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "comms", label: "Marketing & Comms", standfirst: "Public health campaigns, council communications, PR, print, digital marketing, and public engagement across the public sector.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "public health campaigns council communications PR media relations print design digital marketing engagement consultation", idealBuyers: "local authorities NHS trusts public health teams central government", mainGoal: "find communications and marketing contracts" }),
     categories: [
-      { label: "Public Health Campaigns", keywords: ["campaign", "health promotion", "behaviour change", "awareness", "public health"], subcategories: ["Smoking cessation campaigns","Drug and alcohol campaigns","Sexual health campaigns","Mental health awareness","Obesity prevention","COVID communications","Vaccination campaigns","NHS recruitment","Emergency communications","Suicide prevention messaging","Physical activity promotion","NHS 111 awareness"] },
+      { label: "Public Health Campaigns", keywords: ["campaign", "health promotion", "behaviour change", "awareness campaign", "health campaign"], subcategories: ["Smoking cessation campaigns","Drug and alcohol campaigns","Sexual health campaigns","Mental health awareness","Obesity prevention","COVID communications","Vaccination campaigns","NHS recruitment","Emergency communications","Suicide prevention messaging","Physical activity promotion","NHS 111 awareness"] },
       { label: "Council Communications", keywords: ["communications", "newsletter", "resident", "intranet", "corporate communications"], subcategories: ["Resident newsletters","Council website","Digital communications","Annual report","Budget consultation","Resident surveys","Neighbourhood comms","Ward briefings","Corporate publications","Intranet","Social media (council)","Corporate branding"] },
       { label: "PR & Media Relations", keywords: ["media relations", "press office", "public relations", "crisis comms", "reputation"], subcategories: ["Press office","Spokesperson training","Crisis communications","Media monitoring","Stakeholder relations","Reputation management","Parliamentary affairs","Lobbying support","Social media PR","Broadcast PR","Press release writing","Media training"] },
       { label: "Print & Design", keywords: ["print", "graphic design", "signage", "wayfinding", "publication", "branding", "design services"], subcategories: ["Graphic design","Brand identity","Print management","Signage and wayfinding","Exhibition materials","Annual reports","Leaflets and posters","Accessibility design","Large-format print","Corporate stationery","Environmental graphics","Translation and print"] },
@@ -4389,8 +4385,8 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Library Services", keywords: ["library", "lending", "library service", "book purchasing", "reading", "information service"], subcategories: ["Library management","Mobile libraries","Book purchasing","Self-service kiosks","Library IT systems","Reading groups","Rhyme time","Digital inclusion","Home delivery","Archive services","Library buildings","Community library"] },
       { label: "Arts & Culture", keywords: ["arts", "culture", "theatre", "gallery", "creative arts", "cultural programme", "arts development"], subcategories: ["Theatre management","Art gallery","Museum management","Heritage interpretation","Public art commissioning","Artist residencies","Arts development","Cultural programme","Community arts","Festival support","Arts fundraising","Cultural strategy"] },
       { label: "Parks & Open Spaces", keywords: ["parks", "open space", "playground", "outdoor recreation", "allotments", "nature reserve"], subcategories: ["Parks management","Play area maintenance","Allotments","Nature reserves","Sports pitches","Outdoor gym","Footpath maintenance","Countryside access","Urban green space","Biodiversity management","Ecology surveys","Green infrastructure"] },
-      { label: "Sports Development", keywords: ["sports development", "active travel", "cycling", "walking", "healthy active"], subcategories: ["Sports development","Active travel","Cycling programmes","Walking networks","Active communities","Disability sport","School sport","Club development","Workforce development (sport)","National governing bodies","Swim England","Move More"] },
-      { label: "Museums & Heritage", keywords: ["museum", "heritage", "conservation", "archive", "collection", "artefact"], subcategories: ["Museum collections","Conservation and restoration","Archive digitisation","Heritage consultancy","Listed building work","Archaeological surveys","Heritage at risk","Interpretation design","Loan services","Oral history","War memorial restoration","Historic environment"] },
+      { label: "Sports Development", keywords: ["sports development", "sports centre", "walking programme", "healthy active", "physical activity"], subcategories: ["Sports development","Active travel","Cycling programmes","Walking networks","Active communities","Disability sport","School sport","Club development","Workforce development (sport)","National governing bodies","Swim England","Move More"] },
+      { label: "Museums & Heritage", keywords: ["museum", "cultural heritage", "archive", "artefact", "gallery", "arts development"], subcategories: ["Museum collections","Conservation and restoration","Archive digitisation","Heritage consultancy","Listed building work","Archaeological surveys","Heritage at risk","Interpretation design","Loan services","Oral history","War memorial restoration","Historic environment"] },
     ]
   },
   { slug: "planning", label: "Planning & Regeneration", standfirst: "Planning consultancy, urban regeneration, economic development, heritage, transport planning, and land strategy for councils and combined authorities.", live: true,
@@ -4429,22 +4425,22 @@ const DESK_PROFILES: DeskProfile[] = [
   { slug: "research", label: "Research & Evaluation", standfirst: "Social research, policy evaluation, public health research, data analytics, consultation, and market research for government and NHS bodies.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "social research policy evaluation public health research data analytics consultation market research epidemiology", idealBuyers: "central government NHS England local authorities research councils", mainGoal: "find research and evaluation contracts" }),
     categories: [
-      { label: "Social Research", keywords: ["research", "qualitative", "quantitative", "survey", "focus group", "interview"], subcategories: ["Qualitative research","Quantitative surveys","Longitudinal studies","Ethnographic research","Focus groups","Depth interviews","Research panels","Mystery shopping","Citizen surveys","Public attitude research","Co-design research","Rapid evidence review"] },
-      { label: "Policy Evaluation", keywords: ["evaluation", "impact assessment", "programme evaluation", "theory of change", "evidence review"], subcategories: ["Summative evaluation","Formative evaluation","Process evaluation","Economic evaluation","Impact assessment","Theory of change","Logic model development","Evaluation framework","Realist evaluation","Contribution analysis","SROI","Rapid evidence review"] },
+      { label: "Social Research", keywords: ["social research", "qualitative research", "quantitative research", "research survey", "focus group", "depth interview"], subcategories: ["Qualitative research","Quantitative surveys","Longitudinal studies","Ethnographic research","Focus groups","Depth interviews","Research panels","Mystery shopping","Citizen surveys","Public attitude research","Co-design research","Rapid evidence review"] },
+      { label: "Policy Evaluation", keywords: ["policy evaluation", "impact assessment", "programme evaluation", "theory of change", "evidence review"], subcategories: ["Summative evaluation","Formative evaluation","Process evaluation","Economic evaluation","Impact assessment","Theory of change","Logic model development","Evaluation framework","Realist evaluation","Contribution analysis","SROI","Rapid evidence review"] },
       { label: "Public Health Research", keywords: ["public health research", "epidemiology", "needs assessment", "health inequality", "jsna"], subcategories: ["Epidemiological studies","Health needs assessment","JSNA support","Health inequalities research","Behavioural insights","Surveillance systems","Disease modelling","Screening evaluation","Preventive research","Pharmaceutical trials","Genomics","Health data linkage"] },
-      { label: "Data & Analytics", keywords: ["data analytics", "business intelligence", "data science", "predictive", "dashboard", "statistical"], subcategories: ["Data strategy","Business intelligence","Predictive modelling","Machine learning","Data visualisation","Power BI/Tableau","Open data","Statistical analysis","GIS analysis","Performance dashboards","Data governance","Data infrastructure"] },
-      { label: "Consultation & Participation", keywords: ["deliberative", "citizens assembly", "engagement research", "participation", "co-design"], subcategories: ["Deliberative panels","Citizens' assemblies","Online consultation platforms","Stakeholder mapping","Engagement strategy","Community research","Young people's participation","Hard-to-reach research","Equalities analysis","Accessibility research","JSNA consultation","Public panel management"] },
-      { label: "Market & Economic Research", keywords: ["market research", "economic analysis", "feasibility", "cost benefit", "appraisal"], subcategories: ["Feasibility studies","Cost-benefit analysis","Options appraisal","Market analysis","Demand forecasting","Competition analysis","Socioeconomic impact","ROI modelling","Wellbeing economics","Green Book appraisal","Economic modelling","Sector intelligence"] },
+      { label: "Data & Analytics", keywords: ["data analytics", "business intelligence", "data science", "predictive analytics", "statistical analysis"], subcategories: ["Data strategy","Business intelligence","Predictive modelling","Machine learning","Data visualisation","Power BI/Tableau","Open data","Statistical analysis","GIS analysis","Performance dashboards","Data governance","Data infrastructure"] },
+      { label: "Consultation & Participation", keywords: ["deliberative", "citizens assembly", "engagement research", "participatory research", "co-design research"], subcategories: ["Deliberative panels","Citizens' assemblies","Online consultation platforms","Stakeholder mapping","Engagement strategy","Community research","Young people's participation","Hard-to-reach research","Equalities analysis","Accessibility research","JSNA consultation","Public panel management"] },
+      { label: "Market & Economic Research", keywords: ["market research", "economic analysis", "feasibility study", "cost benefit analysis", "economic evaluation"], subcategories: ["Feasibility studies","Cost-benefit analysis","Options appraisal","Market analysis","Demand forecasting","Competition analysis","Socioeconomic impact","ROI modelling","Wellbeing economics","Green Book appraisal","Economic modelling","Sector intelligence"] },
     ]
   },
   { slug: "consulting", label: "Central Gov Consulting", standfirst: "Management consulting, digital transformation, programme delivery, policy development, and commercial advisory for central government departments.", live: true,
     pinnedProfile: intakeSchema.parse({ companyName: "GovRevenue Desk", mainServices: "management consulting digital transformation programme delivery policy development operating model commercial advisory cabinet office", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England", mainGoal: "find central government consulting contracts" }),
     categories: [
-      { label: "Digital Transformation", keywords: ["digital transformation", "digitisation", "digital strategy", "service redesign", "digital government"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
-      { label: "Programme & Project Delivery", keywords: ["programme", "project management", "pmo", "agile", "delivery", "gateway review"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
-      { label: "Organisational Transformation", keywords: ["transformation", "operating model", "restructuring", "shared services", "change management", "organisational"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Succession planning","Target operating model","Benchmarking","OD consulting","Arm's-length body reform"] },
-      { label: "Policy Development", keywords: ["policy", "regulatory", "strategy", "white paper", "green paper", "ministerial"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
-      { label: "Commercial & Procurement Advisory", keywords: ["commercial", "procurement advisory", "category management", "sourcing", "contract management"], subcategories: ["Category management","Strategic sourcing","Market engagement","Spend analysis","Commercial strategy","Contract management","Supplier development","Procurement transformation","Crown Commercial","Cabinet Office compliance","Make vs buy","Commercial assurance"] },
+      { label: "Digital Government & Strategy", keywords: ["digital government", "digitisation", "gds standards", "service redesign", "gov.uk", "digital leadership"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
+      { label: "Programme & Project Delivery", keywords: ["programme management", "project management", "pmo", "gateway review", "programme delivery", "delivery assurance"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
+      { label: "Organisational Transformation", keywords: ["operating model", "restructuring", "shared services", "change management", "organisational design", "target operating model"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Succession planning","Target operating model","Benchmarking","OD consulting","Arm's-length body reform"] },
+      { label: "Policy & Regulatory", keywords: ["policy development", "regulatory impact", "white paper", "green paper", "ministerial", "policy advisory"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
+      { label: "Commercial & Procurement Advisory", keywords: ["commercial advisory", "procurement advisory", "category management", "sourcing strategy", "contract management"], subcategories: ["Category management","Strategic sourcing","Market engagement","Spend analysis","Commercial strategy","Contract management","Supplier development","Procurement transformation","Crown Commercial","Cabinet Office compliance","Make vs buy","Commercial assurance"] },
       { label: "Financial & Economic Advisory", keywords: ["financial advisory", "business case", "green book", "spending review", "economic appraisal"], subcategories: ["Business case development","Green Book","Infrastructure financing","Spending review support","Economic appraisal","Value-for-money assessment","Financial modelling","ROAMEF","Cost modelling","Public accounts support","Fiscal analysis","CDEL/RDEL management"] },
     ]
   }
@@ -5058,8 +5054,8 @@ a{color:inherit;text-decoration:none}
 .rail-pricing-text{font-family:var(--sans);font-size:16px;line-height:1.5;color:var(--text-mid);margin-bottom:16px}
 .rail-pricing-btn{display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--gold-lt);color:var(--gold);font-family:var(--mono);font-size:13px;font-weight:600;padding:11px;border-radius:3px;text-decoration:none;margin-bottom:8px;transition:background .15s}
 .rail-pricing-btn:hover{background:#F6EFDD}
-.rail-sample-link{display:block;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px;text-decoration:none}
-.rail-sample-link:hover{color:var(--dark)}
+.rail-sample-link{display:block;text-align:center;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);padding:10px 16px;text-decoration:none;border:1px solid rgba(160,82,45,.3);background:rgba(160,82,45,.06);margin-top:8px;transition:background .15s}
+.rail-sample-link:hover{background:rgba(160,82,45,.12);color:var(--brand)}
 /* footer CTA band */
 .art-foot-cta{background:var(--dark)}
 .art-foot-cta-inner{max-width:1320px;margin:0 auto;padding:64px 48px;display:flex;align-items:center;justify-content:space-between;gap:32px;flex-wrap:wrap}
@@ -7180,9 +7176,7 @@ app.get("/", asyncRoute(async (req, res) => {
         <li>${topDeskLabel}</li>
         <li><b>Re-let signal</b> &middot; framework expiry clusters tracked</li>`;
 
-  const sampleLink = samplePdfUrl
-    ? `<a class="btn-ghost" href="${escapeHtml(samplePdfUrl)}" target="_blank" rel="noreferrer">See a sample report &rarr;</a>`
-    : `<a class="btn-ghost" href="/pricing" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#aeb8c0;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#ffffff30">See pricing &rarr;</a>`;
+  const sampleLink = `<a class="btn-ghost" href="/scan/sample">See a sample report &rarr;</a>`;
 
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
@@ -7408,6 +7402,24 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 ${chaseNowCss()}
 ${oppCardCss()}
+/* ── sample report CTA (homepage copy) ── */
+.scta{max-width:680px;margin:0 auto;border:1px solid rgba(236,230,214,.12);background:rgba(255,255,255,.03);position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
+.scta-inner{padding:32px 36px}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#ECE6D6;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:#aeb8c0;line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8e9a8a;padding:5px 0}
+.scta-item::before{content:'\\2713';color:#22C55E;font-weight:700;font-size:12px}
+.scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
+.scta-btn:hover{background:#B8673A}
+.scta-btn::after{content:'\\2192';font-size:14px}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B6F65}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:rgba(255,255,255,.02);border-top:1px solid rgba(236,230,214,.08);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#6B6F65}
+@media(max-width:600px){.scta-inner{padding:24px 20px}.scta-grid{grid-template-columns:1fr}.scta-foot{padding:8px 20px;flex-wrap:wrap;gap:4px}}
 </style>
 </head>
 <body>
@@ -7516,6 +7528,9 @@ ${chaseNowHtml}
     </div>
   </div>
 </section>
+<div class="wrap">
+${sampleCtaBlock("full")}
+</div>
 <section class="subscribe" id="subscribe">
   <div class="wrap">
     <div class="eyebrow">Join the briefing</div>
@@ -8017,6 +8032,10 @@ ${err ? `<div class="err">${err}</div>` : ""}
 <button class="btn-primary" type="submit">Create account</button>
 </form>
 <p class="auth-alt">Already have an account? <a href="/login${nextParam}">Sign in</a></p>
+<div style="margin-top:16px;padding:16px 20px;border:1px solid rgba(160,82,45,.25);background:rgba(160,82,45,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <div><div style="font-family:monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#A0522D;margin-bottom:4px">&#9679; Sample available</div><div style="font-size:12px;color:#888">Preview a full 10-section intelligence report</div></div>
+  <a href="/scan/sample" style="font-family:monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#A0522D;padding:8px 16px;text-decoration:none">View &rarr;</a>
+</div>
 </div></div></body></html>`);
 });
 
@@ -8053,6 +8072,10 @@ ${err ? `<div class="err">${err}</div>` : ""}
 <button class="btn-primary" type="submit">Sign in</button>
 </form>
 <p class="auth-alt">No account? <a href="/register">Create one free</a></p>
+<div style="margin-top:16px;padding:16px 20px;border:1px solid rgba(160,82,45,.25);background:rgba(160,82,45,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <div><div style="font-family:monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#A0522D;margin-bottom:4px">&#9679; Sample available</div><div style="font-size:12px;color:#888">Preview a full 10-section intelligence report</div></div>
+  <a href="/scan/sample" style="font-family:monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#A0522D;padding:8px 16px;text-decoration:none">View &rarr;</a>
+</div>
 </div></div></body></html>`);
 });
 
@@ -8407,7 +8430,23 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 .sector-shortcuts{display:flex;flex-wrap:wrap;gap:6px}
 .sector-btn{display:inline-block;padding:5px 11px;border:1px solid var(--border-2);font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mid);text-decoration:none;transition:.15s;background:var(--surface-2)}
 .sector-btn:hover{background:var(--surface-3);border-color:var(--border-3);color:var(--text)}
-@media(max-width:900px){.dash-grid{grid-template-columns:1fr}.mkt-strip{padding-left:16px;padding-right:16px}}
+.intel-tools-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.dash-auth-row{display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap}
+.dash-email{font-family:var(--mono);font-size:10px;color:#7a909e}
+.dash-new-scan{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;text-decoration:none;padding:5px 11px;border:1px solid rgba(255,255,255,.15);border-radius:2px}
+.onb-hero{margin-bottom:28px}
+.onb-hero-inner{display:grid;grid-template-columns:1fr 320px;gap:40px;background:var(--surface);border:1px solid var(--border-2);padding:36px 40px;align-items:start}
+.onb-hero-content{min-width:0}
+.onb-steps{display:flex;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+.onb-step{display:flex;align-items:center;gap:10px}
+.onb-step-num{width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0}
+.onb-step-text{font-family:var(--mono);font-size:11px;color:var(--text-mid);letter-spacing:.03em}
+.onb-cta{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:13px 28px;text-decoration:none;transition:background .15s}
+.onb-cta:hover{background:var(--brand-hot)}
+.onb-preview{background:var(--surface-2);border:1px solid var(--border-2);padding:20px 22px}
+.onb-preview-item{font-size:12.5px;color:var(--text-mid);padding:5px 0;display:flex;align-items:center;gap:8px}
+.onb-hero-side{min-width:0}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr}.mkt-strip{padding-left:16px;padding-right:16px}.onb-hero-inner{grid-template-columns:1fr;gap:24px;padding:28px 24px}.dash-email{display:none}}
 @media(max-width:760px){.scan-table th:nth-child(n+4),.scan-table td:nth-child(n+4){display:none}.dl-grid{grid-template-columns:1fr}}
 @media(max-width:480px){
   .mkt-strip{padding-left:12px;padding-right:12px;gap:12px;flex-direction:column;align-items:flex-start}
@@ -8415,6 +8454,17 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   .scan-table{font-size:12px}
   .tools-grid{grid-template-columns:1fr}
   .tool-card{padding:11px}
+  .onb-hero-inner{padding:20px 16px}
+  .onb-steps{flex-direction:column;gap:10px}
+  .pg-mast-inner{padding:20px 16px}
+  .pg-stats{flex-direction:column}
+  .pg-stat{border-right:none;border-bottom:1px solid var(--border);padding:10px 0}
+  .pg-stat:last-child{border-bottom:none}
+  .dash-auth-row{gap:8px}
+  .dash-new-scan{font-size:9px;padding:4px 8px}
+  .sector-shortcuts{gap:4px}
+  .sector-btn{font-size:8.5px;padding:4px 8px}
+  .intel-tools-grid{grid-template-columns:1fr}
 }
 `;
 
@@ -8433,10 +8483,10 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
         <a href="/" class="gh-logo">Gov<b>Revenue</b></a>
         <span class="gh-tag">Public-sector revenue intelligence</span>
       </div>
-      <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
-        <span style="font-family:var(--mono);font-size:10px;color:#7a909e">${escapeHtml(user.email)}</span>
+      <div class="dash-auth-row">
+        <span class="dash-email">${escapeHtml(user.email)}</span>
         <span class="tier-pill tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span>
-        <a href="/scan" style="font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aabb7;text-decoration:none;padding:5px 11px;border:1px solid rgba(255,255,255,.15);border-radius:2px">+ New scan</a>
+        <a href="/scan" class="dash-new-scan">+ New scan</a>
         <form method="POST" action="/logout" style="display:inline"><button type="submit" style="background:none;border:none;color:#9aabb7;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:0">Sign out</button></form>
       </div>
     </div>
@@ -8457,8 +8507,8 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
     <div class="pg-crumb"><a href="/">GovRevenue</a><span class="pg-crumb-sep">&rsaquo;</span><span class="pg-crumb-active">Dashboard</span></div>
     <h1>Intelligence Dashboard</h1>
     <div class="pg-stats">
-      <div class="pg-stat"><span class="pg-stat-val">${userScans.length || `<a href="/scan" style="color:var(--brand);text-decoration:none">Run first scan &rarr;</a>`}</span><span class="pg-stat-label">${userScans.length ? "Scans run" : "Get started"}</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">${completedCount || `<span style="font-size:14px;color:var(--muted)">Ready when you are</span>`}</span><span class="pg-stat-label">${completedCount ? "Reports complete" : "Reports"}</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${userScans.length || `<a href="/scan" style="color:var(--brand);text-decoration:none;font-size:14px">Run first scan &rarr;</a>`}</span><span class="pg-stat-label">${userScans.length ? "Scans run" : "Get started"}</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${completedCount || `<span style="font-size:14px;color:var(--muted)">&mdash;</span>`}</span><span class="pg-stat-label">${completedCount ? "Reports complete" : "Reports"}</span></div>
       <div class="pg-stat"><span class="pg-stat-val">${upcomingDeadlines.length > 0 ? upcomingDeadlines.length : totalOpenSignals > 0 ? totalOpenSignals.toLocaleString() : "&#8212;"}</span><span class="pg-stat-label">${upcomingDeadlines.length > 0 ? "Live deadlines" : "Open signals"}</span></div>
       <div class="pg-stat"><span class="pg-stat-val">${memberSince}</span><span class="pg-stat-label">Member since</span></div>
     </div>
@@ -8469,6 +8519,42 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 <div class="pg-body-inner">
 ${welcome ? `<div class="flash-ok">Account created &#8212; welcome to GovRevenue. Run your first intelligence scan to get started.</div>` : ""}
 ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite unlocked.</div>` : ""}
+
+${userScans.length === 0 ? `
+<div class="onb-hero">
+  <div class="onb-hero-inner">
+    <div class="onb-hero-content">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Welcome to GovRevenue</div>
+      <h2 style="font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:14px;line-height:1.3">See government demand before it becomes a tender</h2>
+      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">GovRevenue scans Contracts Finder and Find a Tender against your company profile. In under 5 minutes you get a 10-section intelligence report: which buyers are spending, where the money is going, and whether your firm can win.</p>
+      <div class="onb-steps">
+        <div class="onb-step"><span class="onb-step-num">1</span><span class="onb-step-text">Tell us about your company</span></div>
+        <div class="onb-step"><span class="onb-step-num">2</span><span class="onb-step-text">We scan live procurement data</span></div>
+        <div class="onb-step"><span class="onb-step-num">3</span><span class="onb-step-text">Get your intelligence report</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <a href="/scan" class="onb-cta">Run your first scan &rarr;</a>
+        <a href="/scan/sample" class="scta-btn" style="background:transparent;border:1px solid var(--border-2);color:var(--text-mid);font-size:11px;padding:10px 18px">View sample report</a>
+      </div>
+    </div>
+    <div class="onb-hero-side">
+      <div class="onb-preview">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">What you will get</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Executive Decision Panel</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Evidence Grade (A&#8211;E)</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Money Map: routes to revenue</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Buyer Watchlist with spend data</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> Bid Readiness Score</div>
+        <div class="onb-preview-item"><span style="color:#22C55E;font-weight:700">&#10004;</span> 30-Day Activation Plan</div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Every figure sourced from</div>
+          <div style="font-size:12px;color:var(--text-mid);line-height:1.5">Contracts Finder &middot; Find a Tender &middot; Companies House</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+` : ""}
 
 <div class="dash-grid">
 
@@ -8507,7 +8593,7 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
         ${!isPaid ? `<a href="/pricing" class="dash-btn" style="color:var(--accent);border-color:var(--accent)">Unlock with Pro &rarr;</a>` : ""}
       </div>
       <div class="dash-card-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="intel-tools-grid">
           <div style="padding:16px;border:1px solid var(--line-strong);border-radius:2px${!isPaid ? ";opacity:.7" : ""}">
             <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:6px">Capability Statement</div>
             <div style="font-size:12px;color:var(--slate);line-height:1.5">LLM-generated 2-page statement tailored to your profile and sector. PQQ and framework-ready.</div>
@@ -8614,7 +8700,7 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
       <div class="dash-card-body">
         <div class="tools-grid">
           <a href="/scan" class="tool-card"><span class="tool-card-title">New scan</span><span class="tool-card-desc">Run an intelligence scan for any company</span></a>
-          <a href="/desks" class="tool-card"><span class="tool-card-title">Sector desks</span><span class="tool-card-desc">24 live desks with procurement signals</span></a>
+          <a href="/desks" class="tool-card"><span class="tool-card-title">Sector desks</span><span class="tool-card-desc">${DESK_PROFILES.filter(d => d.live).length} live desks with procurement signals</span></a>
           <a href="/pricing" class="tool-card"><span class="tool-card-title">Pricing</span><span class="tool-card-desc">Free, Pro &amp; Agency plans compared</span></a>
           <a href="/" class="tool-card"><span class="tool-card-title">Home</span><span class="tool-card-desc">Homepage with live market signals</span></a>
         </div>
@@ -8625,6 +8711,7 @@ ${upgraded ? `<div class="flash-ok">Subscription active. Full intelligence suite
 </div>
 </div>
 </div>
+${sampleCtaBlock("compact")}
 ${pageShellFoot()}
 </body>
 </html>`);
@@ -9383,6 +9470,13 @@ ${pageShellHeader(null, getAuthUser(req))}
       <div class="faq-a">Every data point comes from two official sources: <strong>Contracts Finder</strong> (Crown Commercial Service) and the <strong>Find a Tender Service</strong> (Cabinet Office). We do not scrape private databases. <a href="/sources" style="color:var(--brand);text-decoration:underline">Read about our sources &rarr;</a></div>
     </div>
   </div>
+  ${sampleCtaBlock("full")}
+  <div style="text-align:center;padding:0 0 48px">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);line-height:1.8">
+      PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY<br>
+      All data sourced from <a href="/sources" style="color:var(--muted);text-decoration:underline;text-underline-offset:3px">Contracts Finder &amp; Find a Tender</a>
+    </div>
+  </div>
 </div>
 </main>
 ${pageShellFoot()}
@@ -9515,163 +9609,236 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 
 // ── Sample report (Ticket 1 — placeholder until Bulloughs PDF is supplied) ────
 
-app.get("/scan/sample", (_req, res) => {
+app.get("/scan/sample", (req, res) => {
+  const authCtx = getAuthUser(req);
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sample Report — GovRevenue</title>
+<title>Sample Report: Brightwell FM Ltd &mdash; GovRevenue</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
-:root{
-  --base:#0B1018;--surface:#111A26;--surface-2:#18222F;
-  --brand:#A0522D;--brand-hot:#B8673A;
-  --text:#E9EEF5;--text-mid:#B0BAC8;--muted:#8893A4;--faint:#566273;
-  --border:#1E2A3A;--border-2:#222E40;
-  --redact-1:#A0522D;--redact-2:#1a1a1a;
-  --sans:"Inter",system-ui,sans-serif;--serif:"Newsreader",Georgia,serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:17px;font-weight:500}
-.logo-dot{width:8px;height:8px;background:var(--brand);border-radius:50%}
-.logo b{color:var(--brand)}
-.back{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted)}
-/* Specimen ribbon */
-.ribbon{background:var(--redact-2);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between}
-.ribbon-cta a{color:#fff;background:var(--brand);padding:6px 16px;font-size:10px;letter-spacing:.12em}
-.ribbon-cta a:hover{background:var(--brand-hot)}
-/* Watermark */
-.report-wrap{position:relative;max-width:860px;margin:0 auto;padding:40px 24px 80px}
-.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:var(--mono);font-size:clamp(60px,12vw,120px);font-weight:700;color:rgba(160,82,45,.06);pointer-events:none;white-space:nowrap;letter-spacing:.1em;z-index:0}
-/* Redaction bars */
-.rx{display:inline-block;background:var(--redact-2);color:transparent;user-select:none;border-radius:1px;vertical-align:middle}
-.rx-s{height:14px;width:110px}
-.rx-m{height:14px;width:180px}
-.rx-l{height:14px;width:280px}
-.rx-xl{height:18px;width:340px}
-.rx-brand{background:var(--redact-1)}
-/* Report sections */
-.section{position:relative;z-index:1;margin-bottom:36px;border:1px solid var(--border-2);background:var(--surface);padding:28px 32px}
-.section-label{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px}
-.section-title{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text)}
-.edp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
-.edp-card{background:var(--surface-2);border:1px solid var(--border-2);padding:16px 18px}
-.edp-card-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.edp-card-val{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text)}
-.evidence-bar{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
-.evidence-bar:last-child{border-bottom:none}
-.ev-label{font-family:var(--mono);font-size:11px;color:var(--muted);width:160px;flex-shrink:0}
-.ev-val{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text)}
-.buyer-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
-.buyer-row:last-child{border-bottom:none}
-.money-map-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
-.money-map-row:last-child{border-bottom:none}
-.mm-route{color:var(--text-mid)}
-.mm-val{font-family:var(--mono);font-size:13px;font-weight:600}
-/* CTA Banner */
-.cta-banner{position:relative;z-index:1;background:var(--surface-2);border:2px solid var(--brand);padding:32px;text-align:center;margin-bottom:36px}
-.cta-banner-label{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
-.cta-banner-text{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4}
-.cta-banner a{display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px}
-.cta-banner a:hover{background:var(--brand-hot)}
-@media(max-width:640px){.edp-grid{grid-template-columns:1fr 1fr}.report-wrap{padding:24px 14px 60px}}
+${pageShellCss()}
+.sr-ribbon{background:rgba(180,146,78,.06);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sr-ribbon-cta a{color:#fff;background:var(--hero-cta);padding:6px 16px;font-size:10px;letter-spacing:.12em}
+.sr-ribbon-cta a:hover{opacity:.85}
+.sr-wrap{position:relative;max-width:860px;margin:0 auto;padding:40px 24px 80px}
+.sr-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:var(--mono);font-size:clamp(60px,12vw,120px);font-weight:700;color:rgba(180,146,78,.04);pointer-events:none;white-space:nowrap;letter-spacing:.1em;z-index:0}
+.sr-section{position:relative;z-index:1;margin-bottom:28px;border:1px solid var(--border-2);background:var(--surface);padding:28px 32px}
+.sr-label{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px}
+.sr-title{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:16px;color:var(--text)}
+.sr-edp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.sr-edp-card{background:var(--surface-2);border:1px solid var(--border-2);padding:16px 18px}
+.sr-edp-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.sr-edp-val{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text)}
+.sr-ev{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.sr-ev:last-child{border-bottom:none}
+.sr-ev-lbl{font-family:var(--mono);font-size:11px;color:var(--muted);width:170px;flex-shrink:0}
+.sr-ev-val{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text)}
+.sr-buyer{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.sr-buyer:last-child{border-bottom:none}
+.sr-mm{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
+.sr-mm:last-child{border-bottom:none}
+.sr-avoid{padding:10px 0;border-bottom:1px solid var(--border)}
+.sr-avoid:last-child{border-bottom:none}
+.sr-act{padding:8px 0;display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid var(--border)}
+.sr-act:last-child{border-bottom:none}
+.sr-act-num{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--brand);flex-shrink:0;padding-top:2px}
+.sr-bar{height:6px;border-radius:3px;background:var(--surface-2);margin-top:8px;margin-bottom:8px;overflow:hidden}
+.sr-bar-fill{height:100%;border-radius:3px}
+.sr-cta{position:relative;z-index:1;background:var(--surface-2);border:2px solid var(--brand);padding:32px;text-align:center;margin-bottom:28px}
+.sr-cta a{display:inline-block;background:var(--hero-cta);color:#F3EFE6;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px}
+.sr-cta a:hover{opacity:.85}
+.sr-p{font-size:14px;color:var(--text-mid);line-height:1.7}
+.sr-qa{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.sr-qa:last-child{border-bottom:none}
+.sr-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.sr-stat{background:var(--surface-2);padding:14px 16px;border:1px solid var(--border-2)}
+.sr-stat-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.sr-stat-val{font-family:var(--serif);font-size:24px;font-weight:500}
+.sr-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.sr-tbl th{text-align:left;padding:8px 8px 8px 0;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sr-tbl th:nth-child(3){text-align:right;padding:8px 0 8px 8px}
+.sr-tbl th:nth-child(4){text-align:center;padding:8px 0}
+.sr-tbl thead tr{border-bottom:2px solid var(--border-2)}
+.sr-tbl td{padding:10px 8px 10px 0;color:var(--text)}
+.sr-tbl td:nth-child(2){color:var(--text-mid)}
+.sr-tbl td:nth-child(3){text-align:right;padding:10px 0 10px 8px;font-family:var(--mono);color:var(--brand);font-weight:600}
+.sr-tbl td:nth-child(4){text-align:center}
+.sr-tbl tbody tr{border-bottom:1px solid var(--border)}
+.sr-tbl tbody tr:last-child{border-bottom:none}
+.sr-callout{padding:16px;background:var(--surface-2);border-left:3px solid var(--green)}
+@media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}}
 @media(max-width:480px){
-  header{padding:0 14px}
-  .ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
-  .ribbon-cta a{font-size:10px;padding:5px 12px}
-  .report-wrap{padding:16px 12px 48px}
-  .section{padding:20px 16px}
-  .section-title{font-size:18px}
-  .edp-grid{grid-template-columns:1fr 1fr}
-  .ev-label{width:110px;font-size:10px}
-  .buyer-row{grid-template-columns:1fr auto;font-size:13px}
-  .buyer-row span:last-child{display:none}
-  .money-map-row{flex-direction:column;align-items:flex-start;gap:4px}
-  .cta-banner{padding:20px 16px}
-  .cta-banner-text{font-size:17px}
+  .sr-ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
+  .sr-wrap{padding:16px 12px 48px}
+  .sr-section{padding:20px 16px}
+  .sr-title{font-size:18px}
+  .sr-edp-grid{grid-template-columns:1fr 1fr}
+  .sr-ev-lbl{width:110px;font-size:10px}
+  .sr-buyer{grid-template-columns:1fr auto;font-size:13px}
+  .sr-buyer span:last-child{display:none}
+  .sr-mm{flex-direction:column;align-items:flex-start;gap:4px}
+  .sr-cta{padding:20px 16px}
+  .sr-stat-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
-<header>
-  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
-  <a href="/pricing" class="back">&larr; Pricing</a>
-</header>
-<div class="ribbon">
-  <span>SPECIMEN &mdash; REDACTED SAMPLE &mdash; ILLUSTRATIVE DATA ONLY</span>
-  <span class="ribbon-cta"><a href="/pricing">Run your scan &rarr;</a></span>
+${pageShellHeader(null, authCtx)}
+<div class="sr-ribbon">
+  <span>ILLUSTRATIVE SAMPLE &mdash; Brightwell FM Ltd is a fictional company &mdash; all data is fabricated for demonstration</span>
+  <span class="sr-ribbon-cta"><a href="/scan">Run your scan &rarr;</a></span>
 </div>
-<div class="watermark">SAMPLE</div>
-<div class="report-wrap">
+<div class="sr-watermark">SAMPLE</div>
+<div class="sr-wrap">
 
-  <div class="section">
-    <div class="section-label">Section 1 of 10</div>
-    <div class="section-title">Executive Decision Panel</div>
-    <div class="edp-grid">
-      <div class="edp-card"><div class="edp-card-label">Verdict</div><div class="edp-card-val" style="color:#22C55E">Strong</div></div>
-      <div class="edp-card"><div class="edp-card-label">Evidence grade</div><div class="edp-card-val">A</div></div>
-      <div class="edp-card"><div class="edp-card-label">Can they win now?</div><div class="edp-card-val">Yes</div></div>
+  <div class="sr-section">
+    <div class="sr-label">Section 1 of 10</div>
+    <div class="sr-title">Executive Decision Panel</div>
+    <div class="sr-edp-grid">
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Verdict</div><div class="sr-edp-val" style="color:var(--green)">Strong</div></div>
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Evidence grade</div><div class="sr-edp-val">B+</div></div>
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Can they win now?</div><div class="sr-edp-val" style="color:var(--green)">Yes</div></div>
     </div>
-    <div class="evidence-bar"><span class="ev-label">Recommended route</span><span class="ev-val"><span class="rx rx-l rx-brand">&nbsp;</span></span></div>
-    <div class="evidence-bar"><span class="ev-label">Contracts found</span><span class="ev-val">47 awarded &middot; 12 open</span></div>
-    <div class="evidence-bar"><span class="ev-label">Est. market size</span><span class="ev-val"><span class="rx rx-m rx-brand">&nbsp;</span></span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Recommended route</span><span class="sr-ev-val">Direct award via Facilities frameworks (Pagabo, Procure Partnerships)</span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Contracts found</span><span class="sr-ev-val">38 awarded &middot; 9 open</span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Est. addressable market</span><span class="sr-ev-val">&pound;142m (next 12 months, reactive maintenance + planned works)</span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Top buyer concentration</span><span class="sr-ev-val">3 buyers account for 41% of awarded spend</span></div>
   </div>
 
-  <div class="section">
-    <div class="section-label">Section 2 of 10</div>
-    <div class="section-title">Evidence Grade &amp; Scan Basis</div>
-    <p style="color:var(--muted);font-size:14px;line-height:1.7">Grade A — strong public-record evidence. <span class="rx rx-l">&nbsp;</span> matching contracts found across Contracts Finder and Find a Tender. CPV-code verification confirmed sector alignment. Buyer concentration assessed across <span class="rx rx-s">&nbsp;</span> unique authorities.</p>
+  <div class="sr-section">
+    <div class="sr-label">Section 2 of 10</div>
+    <div class="sr-title">Evidence Grade &amp; Scan Basis</div>
+    <p class="sr-p">Grade <strong>B+</strong> &mdash; solid public-record evidence with minor gaps. 38 matching awarded contracts found across Contracts Finder and Find a Tender. CPV codes 50700000 (Repair and maintenance of building installations), 50710000 (Repair and maintenance of electrical and mechanical installations), and 45210000 (Building construction work) all confirmed active. 9 open opportunities currently accepting submissions. Buyer concentration assessed across 22 unique contracting authorities. Evidence gap: Find a Tender returned limited historical data for sub-&pound;120k awards in this category; some local authority micro-lots may be underrepresented.</p>
   </div>
 
-  <div class="section">
-    <div class="section-label">Section 5 of 10 &mdash; Money Map</div>
-    <div class="section-title">Best Routes to Revenue</div>
-    <div class="money-map-row"><span class="mm-route">Direct award via <span class="rx rx-m">&nbsp;</span> framework</span><span class="mm-val" style="color:#22C55E"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
-    <div class="money-map-row"><span class="mm-route">Open tender — <span class="rx rx-s">&nbsp;</span> category</span><span class="mm-val"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
-    <div class="money-map-row"><span class="mm-route">Consortium route via <span class="rx rx-m">&nbsp;</span></span><span class="mm-val"><span class="rx rx-s rx-brand">&nbsp;</span></span></div>
-    <div style="margin-top:20px;padding:20px;background:var(--surface-2);border-left:3px solid var(--brand)">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px">Redacted</div>
-      <div style="font-size:14px;color:var(--muted)">Exact award values, buyer contacts, and framework reference numbers are visible in the full unredacted report.</div>
+  <div class="sr-section">
+    <div class="sr-label">Section 3 of 10</div>
+    <div class="sr-title">Intelligence Dashboard Summary</div>
+    <div class="sr-stat-grid">
+      <div class="sr-stat"><div class="sr-stat-lbl">Total awarded (18 months)</div><div class="sr-stat-val">&pound;87.4m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Open contract value</div><div class="sr-stat-val">&pound;23.1m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Avg contract size</div><div class="sr-stat-val">&pound;2.3m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Unique buyers</div><div class="sr-stat-val">22</div></div>
+    </div>
+    <p class="sr-p">Facilities management spend is concentrated in Q1 and Q3 (financial year), with peak procurement activity in October and March. Reactive maintenance lots are the most frequently tendered, followed by planned maintenance and compliance-driven M&amp;E renewals.</p>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-label">Section 4 of 10</div>
+    <div class="sr-title">Source-Backed Evidence</div>
+    <p class="sr-p" style="margin-bottom:16px">Every contract below links to a live public notice. Brightwell FM&rsquo;s service mix (reactive repairs, planned maintenance, M&amp;E) aligns with the following awarded and open contracts:</p>
+    <div style="overflow-x:auto">
+    <table class="sr-tbl">
+      <thead><tr>
+        <th>Contract</th>
+        <th>Buyer</th>
+        <th>Value</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Responsive Repairs &amp; Voids Programme 2026&#8211;30</td><td>Southwark Council</td><td>&pound;18.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
+        <tr><td>Planned Maintenance and Cyclical Decorations</td><td>Peabody Trust</td><td>&pound;12.6m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
+        <tr><td>M&amp;E Servicing and Compliance</td><td>L&amp;Q Housing</td><td>&pound;8.9m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
+        <tr><td>Void Property Turnaround &amp; Minor Works</td><td>Lewisham Homes</td><td>&pound;4.1m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Open</span></td></tr>
+        <tr><td>Fire Door Replacement and Compartmentalisation</td><td>Hackney Council</td><td>&pound;3.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Open</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ 42 more contracts in the full evidence table</div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-label">Section 5 of 10</div>
+    <div class="sr-title">Best Routes to Revenue</div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">1. Direct award via Pagabo Repairs &amp; Maintenance framework</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">&pound;8&#8211;12m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">2. Open tender &mdash; Reactive repairs (housing associations)</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;4&#8211;8m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">3. Procure Partnerships framework &mdash; Planned maintenance lots</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;3&#8211;6m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">4. Sub-contract route via Tier 1 (Wates, Morgan Sindall)</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;1&#8211;3m/yr</span></div>
+    <div class="sr-callout" style="margin-top:16px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:6px">Recommended first move</div>
+      <div style="font-size:14px;color:var(--text-mid);line-height:1.6">Apply to Pagabo Repairs &amp; Maintenance framework (Lot 2: &pound;1m&#8211;&pound;5m). The next intake window opens in September. With Brightwell&rsquo;s track record and geographic coverage, this is the highest-probability route.</div>
     </div>
   </div>
 
-  <div class="cta-banner">
-    <div class="cta-banner-label">This is where your real buyers would be listed</div>
-    <div class="cta-banner-text">Run a scan to see the unredacted buyer watchlist, money map routes, and 30-day activation plan for your firm.</div>
-    <a href="/pricing">Run your scan &rarr;</a>
+  <div class="sr-section">
+    <div class="sr-label">Section 6 of 10</div>
+    <div class="sr-title">Buyer Watchlist</div>
+    <div class="sr-buyer" style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em"><span>Buyer</span><span>Total awarded</span><span>Contracts</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Southwark Council</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;18.2m</span><span style="font-family:var(--mono)">4</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Peabody Trust</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;14.8m</span><span style="font-family:var(--mono)">3</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">L&amp;Q Housing</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;12.1m</span><span style="font-family:var(--mono)">5</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Lewisham Homes</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;9.7m</span><span style="font-family:var(--mono)">3</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Hackney Council</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;7.4m</span><span style="font-family:var(--mono)">2</span></div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ 17 more buyers in the full report</div>
   </div>
 
-  <div class="section">
-    <div class="section-label">Section 6 of 10 &mdash; Buyer Watchlist</div>
-    <div class="section-title">Active Buyers in Your Category</div>
-    <div class="buyer-row" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em"><span>Buyer</span><span>Est. annual</span><span>Contracts</span></div>
-    <div class="buyer-row"><span><span class="rx rx-l">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">8</span></div>
-    <div class="buyer-row"><span><span class="rx rx-xl">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">5</span></div>
-    <div class="buyer-row"><span><span class="rx rx-m">&nbsp;</span></span><span style="font-family:var(--mono);color:var(--brand)"><span class="rx rx-s rx-brand">&nbsp;</span></span><span style="font-family:var(--mono)">3</span></div>
-    <div style="margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ <span class="rx rx-s">&nbsp;</span> more buyers in the full report</div>
-  </div>
-
-  <div class="section">
-    <div class="section-label">Sections 7–10</div>
-    <div class="section-title">Bid Readiness, Contracts to Avoid, Activation Plan &amp; QA</div>
-    <p style="color:var(--muted);font-size:14px;line-height:1.7">These sections contain your bid readiness score, a list of contracts the evidence says to avoid, a 30-day activation checklist, and QA notes on source quality and data caveats. All sourced, dated, and evidence-graded.</p>
-    <div style="margin-top:20px;padding:20px;background:var(--surface-2);border-left:3px solid var(--brand)">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px">Full report only</div>
-      <div style="font-size:14px;color:var(--muted)">All four sections are visible in the unredacted report. The sample above shows the shape of the output, not the intelligence.</div>
+  <div class="sr-section">
+    <div class="sr-label">Section 7 of 10</div>
+    <div class="sr-title">Bid Readiness Score</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-family:var(--serif);font-size:32px;font-weight:500;color:var(--green)">72%</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Ready to bid &mdash; minor gaps</span></div>
+    <div class="sr-bar"><div class="sr-bar-fill" style="width:72%;background:var(--green)"></div></div>
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="padding:12px;background:var(--surface-2);border:1px solid var(--border-2)">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">&#10004; Strengths</div>
+        <div style="font-size:12px;color:var(--text-mid);line-height:1.5">3+ years public sector track record. ISO 9001/14001 certified. DBS-cleared workforce. Geographic coverage matches buyer concentration.</div>
+      </div>
+      <div style="padding:12px;background:var(--surface-2);border:1px solid var(--border-2)">
+        <div style="font-family:var(--mono);font-size:9px;color:#b45309;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">&#9888; Gaps</div>
+        <div style="font-size:12px;color:var(--text-mid);line-height:1.5">No Constructionline Gold. No case study exceeding &pound;5m single contract. Missing PAS 2030 for retrofit lots. Social value policy not uploaded.</div>
+      </div>
     </div>
   </div>
 
-  <div style="text-align:center;padding:40px 0;border-top:1px solid var(--border-2)">
-    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px">Ready to run yours?</div>
-    <a href="/pricing" style="display:inline-block;background:var(--brand);color:#fff;font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:16px 40px">Get started from £29 &rarr;</a>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:16px">No account needed until payment. Intelligence, not certainty.</div>
+  <div class="sr-section">
+    <div class="sr-label">Section 8 of 10</div>
+    <div class="sr-title">Do Not Chase These Yet</div>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">National Housing Federation &mdash; Major Refurbishment Framework</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid.</strong> Requires &pound;20m+ annual turnover and 3 completed framework references. Brightwell&rsquo;s &pound;8m turnover is below threshold. Apply after scaling to &pound;15m+.</div></div>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">Ministry of Justice &mdash; Prison Maintenance Programme</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid.</strong> SC security clearance required for all operatives. Lead time for clearance is 4&#8211;6 months. No evidence of existing clearance in profile.</div></div>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">TfL &mdash; Station Deep Clean and Maintenance</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:#b45309">Not yet.</strong> Requires Transport for London contractor accreditation (CIRAS membership + Sentinel card). Achievable within 3 months but not in place today.</div></div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-label">Section 9 of 10</div>
+    <div class="sr-title">30-Day Activation Plan</div>
+    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Register on Pagabo supplier portal</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Submit Brightwell&rsquo;s accreditations, insurance documents, and last 3 years&rsquo; audited accounts. Confirm eligibility for Lot 2 (&pound;1m&#8211;&pound;5m).</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Set up Contracts Finder alerts</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Keywords: &ldquo;responsive repairs&rdquo;, &ldquo;planned maintenance&rdquo;, &ldquo;void property&rdquo;, &ldquo;M&amp;E servicing&rdquo;. Filter by London and South East.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 2</span><div><div style="font-weight:600;margin-bottom:3px">Submit PQQ for Lewisham Homes &mdash; Void Turnaround</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Deadline: 15 August 2026. Requires 2 relevant case studies (void turnaround, &pound;500k+ each) and employer&rsquo;s liability certificate.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 3</span><div><div style="font-weight:600;margin-bottom:3px">Apply for Constructionline Gold</div><div style="font-size:13px;color:var(--muted);line-height:1.5">This is a gateway accreditation for 60%+ of housing maintenance frameworks. Processing takes 2&#8211;4 weeks. Cost: &pound;499/year.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 4</span><div><div style="font-weight:600;margin-bottom:3px">Draft social value policy and upload to supplier portals</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Social value weighting is now 10&#8211;20% on most housing tenders. Template available from National TOMS framework. Include local employment, apprenticeships, and carbon reduction commitments.</div></div></div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-label">Section 10 of 10</div>
+    <div class="sr-title">QA Notes &amp; Integrity Checks</div>
+    <div class="sr-qa"><span style="color:var(--muted)">Contracts Finder records checked</span><span style="font-family:var(--mono);font-weight:600">847</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Find a Tender records checked</span><span style="font-family:var(--mono);font-weight:600">312</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Matching contracts identified</span><span style="font-family:var(--mono);font-weight:600">47</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">CPV codes verified</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; 3 codes confirmed</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Outlier notices excluded</span><span style="font-family:var(--mono);font-weight:600">2 (&gt;&pound;500m threshold)</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Aggregator buyers filtered</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; Active</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Data freshness</span><span style="font-family:var(--mono);font-weight:600">Contracts Finder: &lt;24h &middot; FTS: &lt;48h</span></div>
+    <div style="margin-top:16px;padding:14px;background:var(--surface-2);border:1px solid var(--border-2);font-size:12px;color:var(--muted);line-height:1.6">
+      <strong style="color:var(--text-mid)">Caveat:</strong> This report is based on publicly available procurement data. Award values are as published by the contracting authority and may differ from final contract values. GovRevenue provides intelligence, not certainty.
+    </div>
+  </div>
+
+  <div class="sr-cta">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">This was Brightwell FM&rsquo;s report. Now get yours.</div>
+    <div style="font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4">Enter your company details and get your own 10-section intelligence report in under 5 minutes.</div>
+    <a href="/scan">Run your scan &rarr;</a>
+  </div>
+
+  <div style="text-align:center;padding:20px 0">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--faint);line-height:1.7">
+      PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY<br>
+      Brightwell FM Ltd is entirely fictional. All buyers, values, and contracts shown above are fabricated for illustration.
+    </div>
   </div>
 
 </div>
+${pageShellFoot()}
 </body>
 </html>`);
 });
@@ -9759,6 +9926,23 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 .btn-continue{display:inline-flex;align-items:center;gap:8px;background:#102A1E;color:#F3EFE6;font-family:var(--sans);font-size:15px;font-weight:600;padding:15px 32px;border:0;cursor:pointer;transition:.18s;margin-top:28px}
 .btn-continue:hover{background:#0A1C12}
 .btn-skip{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:0;margin-top:12px;padding:0}
+@media(max-width:640px){
+  .topstrip{padding:0 14px;font-size:10px;height:30px}
+  header{padding:0 14px}
+  .page{padding:28px 14px 48px}
+  .page-head{margin-bottom:24px;padding-bottom:18px}
+  .form-grid{padding:0 16px}
+  .step-bar{gap:0}
+  .step-pill{font-size:9px;padding:9px 4px;letter-spacing:.08em}
+  .submit-row{flex-direction:column;align-items:stretch;gap:12px}
+  .btn-submit,.btn-continue{width:100%;text-align:center;padding:14px 16px;font-size:14px}
+  h1{font-size:24px}
+}
+@media(max-width:380px){
+  .step-pill{font-size:8px;letter-spacing:.04em}
+  .field label{font-size:10px;letter-spacing:.1em}
+  .field input,.field textarea,.field select{padding:11px 12px;font-size:14px}
+}
 .btn-skip:hover{color:var(--text-mid)}
 .step-intro{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:8px;padding:14px 0}
 .field.invalid input,.field.invalid textarea{border-color:#c53030}
@@ -9991,6 +10175,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
       <div class="submit-row">
         <button type="submit" class="btn-submit">${auth ? "Run GovRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
         <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
+        <div style="margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Public record only &middot; Intelligence, not certainty</div>
       </div>
     </div>
   </form>
@@ -10571,6 +10756,8 @@ ${pageShellHeader(null, getAuthUser(req))}
     </table>
   </div>
   ${pager}
+
+  ${sampleCtaBlock("compact")}
 
 </div>
 </main>
@@ -12593,6 +12780,7 @@ ${analyticsHtml}
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--muted)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
 </div>
+${sampleCtaBlock("compact")}
 <div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
@@ -12883,6 +13071,7 @@ ${pageShellHeader(profile, authCtx)}
     <span style="font-family:var(--mono);font-size:10.5px;color:var(--muted)">Caveat: Data is indicative, not exhaustive.</span>
   </div>
 </div>
+${sampleCtaBlock("compact")}
 <div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; GovRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 GovRevenue &middot; Intelligence, not certainty. Public data only.</div>
 
 </body>
@@ -13016,7 +13205,78 @@ footer.hp-foot a{color:#9AA093}
 footer.hp-foot a:hover{color:#ECE6D6}
 footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1);margin-top:28px;padding-top:20px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:#6B6F65;flex-wrap:wrap;gap:10px}
 @media(max-width:880px){footer.hp-foot .wrap{grid-template-columns:1fr 1fr}.wrap{padding:0 24px}}
-@media(max-width:480px){.wrap{padding:0 14px}footer.hp-foot .wrap{grid-template-columns:1fr}}`;
+@media(max-width:480px){.wrap{padding:0 14px}footer.hp-foot .wrap{grid-template-columns:1fr}}
+/* ── sample report CTA component ── */
+.scta{max-width:680px;margin:0 auto;border:1px solid var(--border-2);background:var(--surface);position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),var(--green),var(--brand))}
+.scta-inner{padding:32px 36px}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(34,197,94,.5)}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--text);margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 0}
+.scta-item::before{content:'\\2713';color:var(--green);font-weight:700;font-size:12px}
+.scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
+.scta-btn:hover{background:var(--brand-hot)}
+.scta-btn::after{content:'\\2192';font-size:14px}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:var(--surface-2);border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.scta--compact{max-width:none}
+.scta--compact .scta-inner{padding:24px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.scta--compact .scta-left{flex:1;min-width:200px}
+.scta--compact .scta-h{font-size:17px;margin-bottom:6px}
+.scta--compact .scta-p{margin-bottom:0;font-size:12px}
+.scta--compact .scta-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.scta--compact .scta-grid{display:none}
+.scta--compact .scta-foot{padding:8px 28px}
+@media(max-width:600px){
+  .scta-inner{padding:24px 20px}
+  .scta-grid{grid-template-columns:1fr}
+  .scta--compact .scta-inner{flex-direction:column;align-items:flex-start}
+  .scta--compact .scta-right{width:100%}
+  .scta--compact .scta-btn{width:100%;justify-content:center}
+  .scta-foot{padding:8px 20px;flex-wrap:wrap;gap:4px}
+}`;
+}
+
+function sampleCtaBlock(variant: "full" | "compact" = "full"): string {
+  if (variant === "compact") {
+    return `<div class="scta scta--compact" style="margin:32px auto">
+  <div class="scta-inner">
+    <div class="scta-left">
+      <div class="scta-eyebrow">Sample report available</div>
+      <div class="scta-h">See what a full scan delivers</div>
+      <p class="scta-p">10 sections of procurement intelligence built from live Contracts Finder data.</p>
+    </div>
+    <div class="scta-right">
+      <a href="/scan/sample" class="scta-btn">View sample</a>
+    </div>
+  </div>
+  <div class="scta-foot"><span>Public record only</span><span>Contracts Finder &middot; Find a Tender</span></div>
+</div>`;
+  }
+  return `<div class="scta" style="margin:40px auto">
+  <div class="scta-inner">
+    <div class="scta-eyebrow">Sample intelligence report</div>
+    <div class="scta-h">See exactly what GovRevenue delivers</div>
+    <p class="scta-p">A full 10-section procurement scan built from live public-sector data. No sign-up required.</p>
+    <div class="scta-grid">
+      <div class="scta-item">Executive Decision Panel</div>
+      <div class="scta-item">Buyer Watchlist</div>
+      <div class="scta-item">Evidence Grade (A&ndash;E)</div>
+      <div class="scta-item">Money Map &amp; Routes</div>
+      <div class="scta-item">Bid Readiness Score</div>
+      <div class="scta-item">30-Day Activation Plan</div>
+    </div>
+    <div class="scta-actions">
+      <a href="/scan/sample" class="scta-btn">View sample report</a>
+      <span class="scta-note">No account needed</span>
+    </div>
+  </div>
+  <div class="scta-foot"><span>Public record only</span><span>Contracts Finder &middot; Find a Tender</span></div>
+</div>`;
 }
 
 function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string; tier: UserTier } | null): string {
@@ -13323,6 +13583,7 @@ ${pageShellHeader(null, authCtx)}
     </div>
     <div class="dl-grid">${cards}</div>
     ${pagerNav}
+    ${sampleCtaBlock("compact")}
   </div>
 </section>
 ${pageShellFoot()}
@@ -13489,6 +13750,7 @@ ${pageShellHeader(profile, authCtx)}
   </div>
   <p class="nb-disclaimer">Public record only &middot; No insider information &middot; Matched against the ${escapeHtml(profile.label)} desk profile</p>
   ${boardContent}
+  ${sampleCtaBlock("compact")}
 </div>
 
 ${pageShellFoot()}
@@ -13775,6 +14037,7 @@ ${pageShellHeader(profile, authCtx)}
     }
   </div>
 </section>
+${sampleCtaBlock("compact")}
 
 ${pageShellFoot()}
 </body>
