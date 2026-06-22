@@ -9151,7 +9151,7 @@ app.get("/api-docs", (req, res) => {
 `, req));
 });
 
-app.get("/pricing", (_req, res) => {
+app.get("/pricing", (req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9159,35 +9159,17 @@ app.get("/pricing", (_req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — GovRevenue</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
-:root{
-  --base:#F8F5EF;--surface:#FFFFFF;--surface-2:#F2EEE6;--surface-3:#EAE5DC;
-  --brand:#A0522D;--brand-hot:#B8673A;
-  --text:#1A1C18;--text-mid:#3A3C36;--muted:#6B6F65;--faint:#9AA093;
-  --border:rgba(27,28,22,.10);--border-2:rgba(27,28,22,.15);--border-3:rgba(27,28,22,.22);
-  --sans:"Libre Franklin",system-ui,sans-serif;
-  --serif:"Newsreader",Georgia,serif;
-  --mono:"Spline Sans Mono",ui-monospace,monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-.wrap{padding:0 32px;max-width:960px;margin:0 auto}
-header{background:rgba(248,245,239,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border-2);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.logo{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text)}
-.logo-dot{width:9px;height:9px;background:var(--brand);border-radius:50%}
-.logo b{color:var(--brand)}
-.back{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
-.back:hover{color:var(--text-mid)}
-.hero{padding:64px 0 48px;text-align:center}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
-h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px;color:var(--text)}
-.sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
+${pageShellCss()}
+.pr-wrap{max-width:960px;margin:0 auto;padding:0 32px}
+.pr-hero{padding:64px 0 48px;text-align:center}
+.pr-eye{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
+.pr-h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px;color:var(--text)}
+.pr-sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 0 80px}
 .plan{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface);position:relative;transition:border-color .2s,box-shadow .2s;display:flex;flex-direction:column}
 .plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.08)}
-.plan.featured{border-color:rgba(160,82,45,.4);box-shadow:0 0 0 1px rgba(160,82,45,.2)}
-.plan.featured:hover{border-color:rgba(160,82,45,.6)}
+.plan.featured{border-color:rgba(180,146,78,.4);box-shadow:0 0 0 1px rgba(180,146,78,.2)}
+.plan.featured:hover{border-color:rgba(180,146,78,.6)}
 .plan-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;white-space:nowrap;font-weight:600}
 .plan-name{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
 .plan-price{font-family:var(--mono);font-size:42px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:6px;color:var(--text)}
@@ -9207,39 +9189,24 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
 .btn-outline:hover{background:var(--surface-2);border-color:var(--brand);color:var(--text)}
 .plan-talk{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:auto;padding-top:10px;margin-bottom:10px;letter-spacing:.04em}
 .plan-talk:hover{color:var(--muted)}
-.plan-sample{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px}
-.plan-sample:hover{color:var(--muted)}
 .faq{padding:0 0 80px}
 .faq h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:32px;color:var(--text)}
 .faq-item{border-top:1px solid var(--border);padding:20px 0}
 .faq-item:last-child{border-bottom:1px solid var(--border)}
 .faq-q{font-weight:600;font-size:15px;margin-bottom:8px;color:var(--text)}
 .faq-a{font-size:14px;color:var(--muted);line-height:1.7}
-.caveat{padding:32px 0;border-top:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--faint)}
-@media(max-width:760px){.plans{grid-template-columns:1fr}.hero{padding:48px 0 40px}h1{font-size:28px}}
-@media(max-width:480px){
-  .wrap{padding:0 14px}
-  h1{font-size:22px}
-  .hero{padding:28px 0 24px}
-  .plan{padding:20px}
-  .plan-price{font-size:32px}
-  .plan li{font-size:13px}
-  .faq h2{font-size:20px}
-  .faq-q{font-size:14px}
-}
+@media(max-width:760px){.plans{grid-template-columns:1fr}.pr-hero{padding:48px 0 40px}.pr-h1{font-size:28px}}
+@media(max-width:480px){.pr-wrap{padding:0 14px}.pr-h1{font-size:22px}.pr-hero{padding:28px 0 24px}.plan{padding:20px}.plan-price{font-size:32px}.plan li{font-size:13px}.faq h2{font-size:20px}.faq-q{font-size:14px}}
 </style>
 </head>
 <body>
-<header>
-  <a href="/" class="logo"><span class="logo-dot"></span><span>Gov<b>Revenue</b></span></a>
-  <a href="/" class="back">&larr; Back to home</a>
-</header>
+${pageShellHeader(null, getAuthUser(req))}
 <main>
-<div class="wrap">
-  <div class="hero">
-    <div class="eyebrow">Pricing</div>
-    <h1>One scan or a standing desk.</h1>
-    <p class="sub">Pay per scan or subscribe for continuous intelligence across every desk that matters to your firm.</p>
+<div class="pr-wrap">
+  <div class="pr-hero">
+    <div class="pr-eye">Pricing</div>
+    <h1 class="pr-h1">One scan or a standing desk.</h1>
+    <p class="pr-sub">Pay per scan or subscribe for continuous intelligence across every desk that matters to your firm.</p>
   </div>
   <div class="plans">
     <div class="plan">
@@ -9300,10 +9267,6 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
       <div class="faq-a">A 10-section commercial intelligence report covering: executive verdict, evidence grade, intelligence dashboard, source-backed evidence, money map (best revenue routes), buyer watchlist, bid readiness score, contracts to avoid, 30-day activation plan, and QA notes. Every claim is sourced to a public record.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-q">Where does the data come from?</div>
-      <div class="faq-a">Contracts Finder, Find a Tender, and Local Authority transparency data — all UK public record. We do not use insider information or paid databases. Every figure in the report links back to a public notice.</div>
-    </div>
-    <div class="faq-item">
       <div class="faq-q">How long does a scan take?</div>
       <div class="faq-a">Typically 2–4 minutes. The agent searches both procurement databases, scores route-to-revenue fit, and generates the full report. You get an HTML report immediately and a PDF download link.</div>
     </div>
@@ -9330,14 +9293,7 @@ h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;lette
   </div>
 </div>
 </main>
-<footer style="border-top:1px solid var(--border);padding:32px">
-  <div class="caveat">Public record only &middot; Intelligence, not certainty &middot; <a href="/" style="text-decoration:underline;color:var(--muted)">GovRevenue</a></div>
-  <div style="text-align:center;margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.06em">
-    <a href="/privacy" style="color:var(--muted);text-decoration:none">Privacy</a> &middot;
-    <a href="/terms" style="color:var(--muted);text-decoration:none">Terms</a> &middot;
-    <a href="/sources" style="color:var(--muted);text-decoration:none">Sources</a>
-  </div>
-</footer>
+${pageShellFoot()}
 </body>
 </html>`);
 });
