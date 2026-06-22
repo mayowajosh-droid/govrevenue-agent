@@ -16222,7 +16222,14 @@ app.post("/admin/articles/new", requireAdmin, asyncRoute(async (req, res) => {
     );
     await logAdminAudit("admin", "article:create", id, { title, status: finalStatus });
   }
-  res.redirect(`/admin/articles/${id}/edit?token=${encodeURIComponent(token)}&msg=Article+created.+Use+Render+Images+button+to+generate+visuals.`);
+  // Fire image rendering in background if there are image prompts
+  if (process.env.OPENAI_API_KEY && (hero_prompt || (body_md ?? "").includes(":::image"))) {
+    renderArticleImages(id).catch(err => {
+      console.error("[article-images] background render failed on create", err);
+      captureError(err, { articleImages: { articleId: id } });
+    });
+  }
+  res.redirect(`/admin/articles/${id}/edit?token=${encodeURIComponent(token)}&msg=Article+created.+Images+rendering+in+background.`);
 }));
 
 app.get("/admin/articles/:id/edit", requireAdmin, asyncRoute(async (req, res) => {
@@ -16274,7 +16281,14 @@ app.post("/admin/articles/:id/publish", requireAdmin, asyncRoute(async (req, res
     [article.id, now]
   );
   await logAdminAudit("admin", "article:publish", article.id, { slug: article.slug });
-  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Published.`);
+  // Fire image rendering in background on publish if images are missing
+  if (process.env.OPENAI_API_KEY && !article.hero_image_url && (article.hero_prompt || article.body_md.includes(":::image"))) {
+    renderArticleImages(article.id).catch(err => {
+      console.error("[article-images] background render failed on publish", err);
+      captureError(err, { articleImages: { articleId: article.id } });
+    });
+  }
+  res.redirect(`/admin/articles/${article.id}/edit?token=${encodeURIComponent(token)}&msg=Published.+Images+rendering+in+background.`);
 }));
 
 app.post("/admin/articles/:id/unpublish", requireAdmin, asyncRoute(async (req, res) => {
@@ -16315,7 +16329,14 @@ app.post("/admin/articles/:id/repost", requireAdmin, asyncRoute(async (req, res)
      old.status, old.author_id, old.status === "published" ? now : old.published_at, now, rt]
   );
   await logAdminAudit("admin", "article:repost", newId, { oldId: old.id, slug: old.slug });
-  res.redirect(`/admin/articles/${newId}/edit?token=${encodeURIComponent(token)}&msg=Reposted.`);
+  // Trigger fresh image render in background
+  if (process.env.OPENAI_API_KEY && (old.hero_prompt || old.body_md.includes(":::image"))) {
+    renderArticleImages(newId).catch(err => {
+      console.error("[article-images] repost render failed", err);
+      captureError(err, { articleImages: { articleId: newId } });
+    });
+  }
+  res.redirect(`/admin/articles/${newId}/edit?token=${encodeURIComponent(token)}&msg=Reposted.+Fresh+images+rendering+in+background.`);
 }));
 
 app.post("/admin/articles/:id/render-images", requireAdmin, asyncRoute(async (req, res) => {
