@@ -14377,6 +14377,10 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     webhookRes, auditRes, deskCacheRes,
     slugRedirectsRes, articleLikesRes, articleAssetsRes, articleRevisionsRes,
     eventStatsRes,
+    recentEventsRes,
+    recentVisitorLogsRes,
+    commentLikesRes,
+    recentSignalsRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -14476,6 +14480,14 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       COUNT(*) FILTER(WHERE created_at > NOW() - INTERVAL '24 hours')::int AS today,
       COUNT(*) FILTER(WHERE created_at > NOW() - INTERVAL '7 days')::int AS week
     FROM visitor_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY event ORDER BY cnt DESC LIMIT 20`),
+    safePool(`SELECT event, meta_json, created_at, ip, user_agent
+    FROM visitor_events ORDER BY created_at DESC LIMIT 100`),
+    safePool(`SELECT ip, path, user_agent, visited_at
+    FROM visitor_logs ORDER BY visited_at DESC LIMIT 100`),
+    safePool(`SELECT cl.comment_id, cl.ip, cl.created_at, c.author_name, c.body
+    FROM comment_likes cl LEFT JOIN comments c ON c.id=cl.comment_id ORDER BY cl.created_at DESC LIMIT 100`),
+    safePool(`SELECT id, category, title, buyer, source, status, value_amount, notice_date, deadline_date
+    FROM homepage_signals ORDER BY notice_date DESC NULLS LAST LIMIT 100`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -14507,6 +14519,10 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const articleAssets    = articleAssetsRes.rows     as any[];
   const articleRevisions = articleRevisionsRes.rows  as any[];
   const eventStats      = eventStatsRes.rows        as any[];
+  const recentEvents    = recentEventsRes.rows      as any[];
+  const recentVisitorLogs = recentVisitorLogsRes.rows as any[];
+  const commentLikes    = commentLikesRes.rows      as any[];
+  const recentSignals   = recentSignalsRes.rows     as any[];
 
   // Build article-likes lookup map by article_id
   const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
@@ -15137,6 +15153,23 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div class="card"><div class="card-head">Top Pages <span class="card-head-val">7 days</span></div>${topPathsHtml}</div>
     <div class="card"><div class="card-head">Top IPs <span class="card-head-val">7 days</span></div><div class="tbl-wrap scroll-tbl" style="max-height:260px;border:none;box-shadow:none">${topIpsHtml}</div></div>
   </div>
+  <details style="margin-top:12px">
+    <summary style="font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;padding:6px 0">Raw visitor log (last 100)</summary>
+    <div class="tbl-wrap scroll-tbl" style="margin-top:8px;max-height:320px">
+      <table class="a-tbl">
+        <thead><tr><th>Time</th><th>Path</th><th>IP</th><th>User Agent</th></tr></thead>
+        <tbody>${recentVisitorLogs.length === 0
+          ? `<tr><td colspan="4" style="text-align:center;padding:20px;font-family:var(--mono);font-size:11px;color:var(--muted)">No visitor logs yet</td></tr>`
+          : recentVisitorLogs.map((v: any) => `<tr>
+            <td style="white-space:nowrap">${adminTime(v.visited_at)}</td>
+            <td style="font-family:var(--mono);font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((v.path || "").slice(0, 60))}</td>
+            <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((v.ip || "").slice(0, 20))}</td>
+            <td style="font-family:var(--mono);font-size:9px;color:var(--muted-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(v.user_agent || "")}">${escapeHtml((v.user_agent || "").slice(0, 60))}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </section>
 <div class="gap"></div>
 
@@ -15151,16 +15184,64 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   </div>
   ${eventStats.length === 0
     ? `<div style="padding:20px 0;font-family:var(--mono);font-size:11px;color:var(--muted)">No event data yet — tracking starts after deploy.</div>`
-    : `<div class="tbl-wrap scroll-tbl" style="margin-bottom:0">
-    <table>
-      <thead><tr><th>Event</th><th>Today</th><th>7 days</th><th>30 days</th></tr></thead>
-      <tbody>${eventStats.map((e: any) => `<tr>
-        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(e.event)}</td>
-        <td>${e.today}</td>
-        <td>${e.week}</td>
-        <td>${e.cnt}</td>
-      </tr>`).join("")}</tbody>
-    </table></div>`}
+    : (() => {
+        const maxCnt = Math.max(...eventStats.map((e: any) => Number(e.cnt) || 1));
+        const evtTotal30d = eventStats.reduce((s: number, e: any) => s + Number(e.cnt || 0), 0);
+        const evtTotal7d = eventStats.reduce((s: number, e: any) => s + Number(e.week || 0), 0);
+        const evtTotalToday = eventStats.reduce((s: number, e: any) => s + Number(e.today || 0), 0);
+        const eventNameMap: Record<string, { label: string; color: string }> = {
+          page_view: { label: "Page Views", color: "var(--brand)" },
+          cta_scan: { label: "Scan CTA", color: "var(--green)" },
+          cta_pricing: { label: "Pricing CTA", color: "var(--blue)" },
+          cta_desk: { label: "Desk CTA", color: "var(--amber)" },
+          form_submit: { label: "Form Submit", color: "#7C3AED" },
+          form_step2: { label: "Step 2 Continue", color: "#0EA5E9" },
+          form_skip_step2: { label: "Step 2 Skip", color: "var(--muted)" },
+        };
+        return `<div class="stat-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+          <div class="stat-cell"><div class="stat-val">${evtTotalToday}</div><div class="stat-lbl">Events today</div></div>
+          <div class="stat-cell"><div class="stat-val">${evtTotal7d}</div><div class="stat-lbl">Events 7 days</div></div>
+          <div class="stat-cell"><div class="stat-val">${evtTotal30d}</div><div class="stat-lbl">Events 30 days</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px">
+          ${eventStats.map((e: any) => {
+            const meta = eventNameMap[e.event] || { label: e.event, color: "var(--muted)" };
+            const pct = Math.round((Number(e.cnt) / maxCnt) * 100);
+            const todayPct = Number(e.week) > 0 ? Math.round((Number(e.today) / Number(e.week)) * 100) : 0;
+            const trend = Number(e.today) > 0 ? (todayPct > 20 ? "↑" : "→") : "—";
+            const trendColor = trend === "↑" ? "var(--green)" : trend === "→" ? "var(--amber)" : "var(--muted)";
+            return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden">
+              <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--border)"><div style="height:100%;width:${pct}%;background:${meta.color};transition:width .3s"></div></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">${escapeHtml(meta.label)}</span>
+                <span style="font-family:var(--mono);font-size:10px;color:${trendColor};font-weight:600">${trend}</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text);line-height:1">${e.cnt}</div>
+              <div style="display:flex;gap:12px;margin-top:6px">
+                <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">7d <strong style="color:var(--text)">${e.week}</strong></span>
+                <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">24h <strong style="color:var(--text)">${e.today}</strong></span>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>`;
+      })()}
+  <details style="margin-top:8px">
+    <summary style="font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;padding:6px 0">Recent events (last 100)</summary>
+    <div class="tbl-wrap scroll-tbl" style="margin-top:8px;max-height:320px">
+      <table class="a-tbl">
+        <thead><tr><th>Time</th><th>Event</th><th>Meta</th><th>IP</th></tr></thead>
+        <tbody>${recentEvents.length === 0
+          ? `<tr><td colspan="4" style="text-align:center;padding:20px;font-family:var(--mono);font-size:11px;color:var(--muted)">No events yet</td></tr>`
+          : recentEvents.map((e: any) => `<tr>
+            <td style="white-space:nowrap">${adminTime(e.created_at)}</td>
+            <td style="font-family:var(--mono);font-size:11px;font-weight:600">${escapeHtml(e.event || "")}</td>
+            <td style="font-family:var(--mono);font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.meta_json ? escapeHtml(JSON.stringify(e.meta_json).slice(0, 80)) : "—"}</td>
+            <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((e.ip || "").slice(0, 20))}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </section>
 <div class="gap"></div>
 
@@ -15181,6 +15262,32 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div class="stat-cell"><div class="stat-val">${sigs.categories || 0}</div><div class="stat-lbl">Active desks</div></div>
     <div class="stat-cell"><div class="stat-val">${Number(sigs.total || 0).toLocaleString()}</div><div class="stat-lbl">Total indexed</div></div>
   </div>
+  <details style="margin-top:12px">
+    <summary style="font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;padding:6px 0">Browse signals (latest 100)</summary>
+    <div class="tbl-wrap scroll-tbl" style="margin-top:8px;max-height:400px">
+      <table class="a-tbl">
+        <thead><tr><th>Date</th><th>Desk</th><th>Title</th><th>Buyer</th><th>Source</th><th>Status</th><th>Value</th></tr></thead>
+        <tbody>${recentSignals.length === 0
+          ? `<tr><td colspan="7" style="text-align:center;padding:20px;font-family:var(--mono);font-size:11px;color:var(--muted)">No signals yet</td></tr>`
+          : recentSignals.map((s: any) => {
+              const deskLabel = CATEGORY_LABELS[s.category] || s.category || "—";
+              const val = Number(s.value_amount || 0);
+              const valStr = val > 0 ? (val >= 1e6 ? `£${(val/1e6).toFixed(1)}m` : `£${Math.round(val/1e3)}k`) : "—";
+              const isOpen = !s.status || s.status.toLowerCase().includes("open") || s.status.toLowerCase().includes("active");
+              return `<tr>
+                <td style="white-space:nowrap;font-size:11px">${s.notice_date ? new Date(s.notice_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "—"}</td>
+                <td style="font-family:var(--mono);font-size:10px;white-space:nowrap">${escapeHtml(deskLabel)}</td>
+                <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${escapeHtml(s.title || "")}">${escapeHtml((s.title || "").slice(0, 80))}</td>
+                <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((s.buyer || "—").slice(0, 50))}</td>
+                <td style="font-family:var(--mono);font-size:10px">${escapeHtml(s.source || "")}</td>
+                <td><span class="pill ${isOpen ? "pill-completed" : "pill-pending"}" style="font-size:9px">${isOpen ? "Open" : "Awarded"}</span></td>
+                <td style="font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap">${valStr}</td>
+              </tr>`;
+            }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </section>
 <div class="gap"></div>
 
@@ -15252,6 +15359,23 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <a href="/admin/articles/comments?token=${encodeURIComponent(token)}" class="a-btn ${Number(commentStats.pending||0)>0?"a-btn-ok":""}">→ Review queue</a>
     </div>
   </div>
+  <details style="margin-top:12px">
+    <summary style="font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;padding:6px 0">Comment likes (last 100)</summary>
+    <div class="tbl-wrap scroll-tbl" style="margin-top:8px;max-height:280px">
+      <table class="a-tbl">
+        <thead><tr><th>Time</th><th>Comment Author</th><th>Comment Preview</th><th>IP</th></tr></thead>
+        <tbody>${commentLikes.length === 0
+          ? `<tr><td colspan="4" style="text-align:center;padding:20px;font-family:var(--mono);font-size:11px;color:var(--muted)">No comment likes yet</td></tr>`
+          : commentLikes.map((cl: any) => `<tr>
+            <td style="white-space:nowrap">${adminTime(cl.created_at)}</td>
+            <td style="font-family:var(--mono);font-size:11px">${escapeHtml((cl.author_name || "—").slice(0, 30))}</td>
+            <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${escapeHtml(cl.body || "")}">${escapeHtml((cl.body || "—").slice(0, 60))}</td>
+            <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((cl.ip || "").slice(0, 20))}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </section>
 <div class="gap"></div>
 
