@@ -12523,8 +12523,8 @@ html{scroll-behavior:smooth}
 .dp-panels{background:var(--base);border-bottom:1px solid rgba(255,255,255,.04)}
 .dp-panels-inner{padding:0 56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--border)}
 .dp-panel{padding:52px 40px;border-right:1px solid var(--border)}
-.dp-panel:first-child{background:linear-gradient(150deg,rgba(160,82,45,.16) 0%,rgba(180,146,78,.09) 55%,transparent 100%)}
-.dp-panel:last-child{background:linear-gradient(210deg,rgba(160,82,45,.16) 0%,rgba(180,146,78,.09) 55%,transparent 100%)}
+.dp-panel:first-child{background:linear-gradient(150deg,rgba(123,26,58,.14) 0%,rgba(14,35,24,.12) 55%,transparent 100%)}
+.dp-panel:last-child{background:linear-gradient(210deg,rgba(123,26,58,.14) 0%,rgba(14,35,24,.12) 55%,transparent 100%)}
 .dp-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .dp-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .dp-info{font-size:13px;color:var(--faint);cursor:help;margin-left:4px}
