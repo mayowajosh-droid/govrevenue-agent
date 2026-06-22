@@ -107,7 +107,7 @@ type ArticleRow = {
   body_md: string; desk: string | null; status: ArticleStatus; author_id: string;
   published_at: string | null; updated_at: string; views: number; reading_time: number;
   og_image: string | null; seo_title: string | null; seo_description: string | null;
-  like_count: number;
+  like_count: number; tags: string | null;
 };
 type ArticleAssetRow = {
   id: string; article_id: string; kind: "still" | "gif";
@@ -1242,7 +1242,8 @@ async function initDb() {
       reading_time INTEGER NOT NULL DEFAULT 1,
       og_image TEXT,
       seo_title TEXT,
-      seo_description TEXT
+      seo_description TEXT,
+      tags TEXT
     );
     CREATE TABLE IF NOT EXISTS article_revisions (
       id TEXT PRIMARY KEY,
@@ -1291,6 +1292,7 @@ async function initDb() {
 
   // Idempotent column migrations
   await pool.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS like_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS tags TEXT`);
   await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS guest_name TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS article_likes (
@@ -2033,6 +2035,40 @@ async function getArticleById(id: string): Promise<ArticleRow | null> {
   if (!pool) return null;
   const r = await pool.query<ArticleRow>(`SELECT * FROM articles WHERE id=$1`, [id]);
   return r.rows[0] ?? null;
+}
+
+const ARTICLE_TAG_RULES: { pattern: RegExp; tag: string }[] = [
+  { pattern: /\b(tender|tenders|tendering|bid|bidding|bids)\b/i, tag: "Tendering" },
+  { pattern: /\b(framework|frameworks|DPS|dynamic purchasing)\b/i, tag: "Frameworks" },
+  { pattern: /\b(buyer|buyers|contracting authorit|procuring body)\b/i, tag: "Buyer Intelligence" },
+  { pattern: /\b(SME|small business|micro business|small firm)\b/i, tag: "SME Strategy" },
+  { pattern: /\b(pricing|price|cost|value for money|commercial)\b/i, tag: "Commercial" },
+  { pattern: /\b(NHS|health|clinical|hospital)\b/i, tag: "Health" },
+  { pattern: /\b(digital|IT|technology|software|cyber|cloud)\b/i, tag: "Digital & IT" },
+  { pattern: /\b(construction|building|infrastructure|highways)\b/i, tag: "Construction" },
+  { pattern: /\b(facilities|FM|cleaning|maintenance|catering)\b/i, tag: "Facilities" },
+  { pattern: /\b(social value|community benefit|social impact)\b/i, tag: "Social Value" },
+  { pattern: /\b(pre.?market|early engagement|PIN|prior information)\b/i, tag: "Pre-Market" },
+  { pattern: /\b(contract|contracts|procurement|public sector)\b/i, tag: "Procurement" },
+  { pattern: /\b(strategy|strategic|planning|approach)\b/i, tag: "Strategy" },
+  { pattern: /\b(data|analytics|intelligence|insight)\b/i, tag: "Intelligence" },
+  { pattern: /\b(compliance|regulation|GDPR|audit)\b/i, tag: "Compliance" },
+  { pattern: /\b(win rate|success|won|winning)\b/i, tag: "Bid Success" },
+];
+
+function generateArticleTags(article: ArticleRow): string {
+  const tags = new Set<string>();
+  if (article.desk) {
+    const deskProfile = DESK_PROFILES.find(d => d.slug === article.desk || d.label === article.desk);
+    if (deskProfile) tags.add(deskProfile.label);
+  }
+  const text = `${article.title} ${article.dek || ""} ${article.eyebrow || ""}`;
+  for (const rule of ARTICLE_TAG_RULES) {
+    if (rule.pattern.test(text)) tags.add(rule.tag);
+    if (tags.size >= 3) break;
+  }
+  if (tags.size === 0) tags.add("Procurement Intelligence");
+  return [...tags].slice(0, 3).join(",");
 }
 
 async function getArticleAssets(articleId: string): Promise<ArticleAssetRow[]> {
@@ -5158,9 +5194,7 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
 <section class="art-hero">
   <div class="art-hero-inner">
     <div class="art-eyebrow-row">
-      <span class="art-eyebrow">${article.eyebrow ? escapeHtml(article.eyebrow) : "Procurement Intelligence"}</span>
-      <span class="art-eyebrow-rule"></span>
-      ${article.desk ? `<span class="art-eyebrow-num">${escapeHtml(article.desk)}</span>` : ""}
+      ${(article.tags || generateArticleTags(article)).split(",").map(t => `<span class="art-eyebrow">${escapeHtml(t.trim())}</span>`).join('<span class="art-eyebrow-rule"></span>')}
     </div>
     <h1 class="art-h1">${escapeHtml(article.title)}</h1>
     ${article.dek ? `<p class="art-dek">${escapeHtml(article.dek)}</p>` : ""}
@@ -5416,7 +5450,7 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
       <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(6,18,10,.72) 0%,rgba(10,28,18,.58) 100%)"></div>
       <div style="position:relative;padding:32px;display:flex;flex-direction:column;justify-content:center;gap:12px;height:100%;min-height:240px">
         ${featured.dek ? `<p style="font-family:var(--serif);font-size:16px;font-style:italic;color:rgba(236,230,214,.92);line-height:1.6;margin:0;text-shadow:0 1px 6px rgba(0,0,0,.5)">"${escapeHtml(featured.dek)}"</p>` : ""}
-        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(180,146,78,.85);margin-top:4px">${escapeHtml(featured.eyebrow || featured.desk || "Article")}</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">${(featured.tags || generateArticleTags(featured)).split(",").map(t => `<span style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(180,146,78,.85)">${escapeHtml(t.trim())}</span>`).join('<span style="color:rgba(180,146,78,.4)">·</span>')}</span>
       </div>`;
     const rightPanel = featured.hero_image_url
       ? `<div class="ai-fr" style="position:relative;overflow:hidden;border-left:1px solid rgba(236,230,214,.14)">
@@ -5449,9 +5483,10 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
     const date = a.published_at
       ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).toUpperCase()
       : "";
-    const tag = escapeHtml(a.eyebrow || a.desk || "");
+    const tags = (a.tags || generateArticleTags(a)).split(",").map(t => t.trim()).filter(Boolean);
+    const tagHtml = tags.map(t => `<span class="ai-pill">${escapeHtml(t)}</span>`).join("");
     return `<a href="/articles/${escapeHtml(a.slug)}" class="ai-row">
-  <span class="ai-tag">${tag}</span>
+  <div class="ai-tags">${tagHtml}</div>
   <div>
     <div class="ai-title">${escapeHtml(a.title)}</div>
     ${a.dek ? `<div class="ai-dek">${escapeHtml(a.dek)}</div>` : ""}
@@ -5475,10 +5510,11 @@ ${pageShellCss()}
 .ai-fw{max-width:1160px;margin:0 auto;padding:40px 32px 0}
 .ai-featured{display:grid;grid-template-columns:1.15fr 0.85fr}
 .ai-fl{padding:32px 38px}
-.ai-row{display:grid;grid-template-columns:120px 1fr 110px;gap:28px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
+.ai-row{display:grid;grid-template-columns:minmax(100px,auto) 1fr 110px;gap:22px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--border);transition:background .12s;color:inherit;text-decoration:none}
 .ai-row:hover{background:var(--surface)}
 .ai-row:last-child{border-bottom:none}
-.ai-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+.ai-tags{display:flex;flex-wrap:wrap;gap:5px}
+.ai-pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.18);padding:2px 8px;border-radius:3px;white-space:nowrap}
 .ai-title{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.01em;line-height:1.2;color:var(--text)}
 .ai-dek{font-size:14px;line-height:1.5;color:var(--muted);margin-top:5px;max-width:640px}
 .ai-meta{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
