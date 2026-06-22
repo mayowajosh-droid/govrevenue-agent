@@ -7402,23 +7402,23 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 ${chaseNowCss()}
 ${oppCardCss()}
-/* ── sample report CTA (homepage copy) ── */
-.scta{max-width:680px;margin:0 auto;border:1px solid rgba(236,230,214,.12);background:rgba(255,255,255,.03);position:relative;overflow:hidden}
-.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
+/* ── sample report CTA (homepage copy — dark island) ── */
+.scta{max-width:680px;margin:0 auto;background:#0B1018;border:1px solid #1E2A3A;position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#A0522D,#22C55E,#A0522D)}
 .scta-inner{padding:32px 36px}
-.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#A0522D;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
-.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#ECE6D6;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
-.scta-p{font-size:13px;color:#aeb8c0;line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#E9EEF5;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:#B0BAC8;line-height:1.6;margin-bottom:20px;max-width:48em}
 .scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
-.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8e9a8a;padding:5px 0}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8893A4;padding:5px 0}
 .scta-item::before{content:'\\2713';color:#22C55E;font-weight:700;font-size:12px}
 .scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:#A0522D;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
 .scta-btn:hover{background:#B8673A}
 .scta-btn::after{content:'\\2192';font-size:14px}
-.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B6F65}
-.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:rgba(255,255,255,.02);border-top:1px solid rgba(236,230,214,.08);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#6B6F65}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#566273}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#111A26;border-top:1px solid #1E2A3A;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#566273}
 @media(max-width:600px){.scta-inner{padding:24px 20px}.scta-grid{grid-template-columns:1fr}.scta-foot{padding:8px 20px;flex-wrap:wrap;gap:4px}}
 </style>
 </head>
@@ -13206,23 +13206,23 @@ footer.hp-foot a:hover{color:#ECE6D6}
 footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1);margin-top:28px;padding-top:20px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:#6B6F65;flex-wrap:wrap;gap:10px}
 @media(max-width:880px){footer.hp-foot .wrap{grid-template-columns:1fr 1fr}.wrap{padding:0 24px}}
 @media(max-width:480px){.wrap{padding:0 14px}footer.hp-foot .wrap{grid-template-columns:1fr}}
-/* ── sample report CTA component ── */
-.scta{max-width:680px;margin:0 auto;border:1px solid var(--border-2);background:var(--surface);position:relative;overflow:hidden}
-.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),var(--green),var(--brand))}
+/* ── sample report CTA component (dark island on light page) ── */
+.scta{max-width:680px;margin:0 auto;background:#0B1018;border:1px solid #1E2A3A;position:relative;overflow:hidden}
+.scta::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#A0522D,#22C55E,#A0522D)}
 .scta-inner{padding:32px 36px}
-.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(34,197,94,.5)}
-.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--text);margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
-.scta-p{font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:20px;max-width:48em}
+.scta-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#A0522D;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.scta-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
+.scta-h{font-family:var(--serif);font-size:22px;font-weight:400;color:#E9EEF5;margin-bottom:10px;line-height:1.3;letter-spacing:-.01em}
+.scta-p{font-size:13px;color:#B0BAC8;line-height:1.6;margin-bottom:20px;max-width:48em}
 .scta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:24px}
-.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 0}
-.scta-item::before{content:'\\2713';color:var(--green);font-weight:700;font-size:12px}
+.scta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#8893A4;padding:5px 0}
+.scta-item::before{content:'\\2713';color:#22C55E;font-weight:700;font-size:12px}
 .scta-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.scta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
-.scta-btn:hover{background:var(--brand-hot)}
+.scta-btn{display:inline-flex;align-items:center;gap:8px;background:#A0522D;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:12px 24px;text-decoration:none;transition:background .15s}
+.scta-btn:hover{background:#B8673A}
 .scta-btn::after{content:'\\2192';font-size:14px}
-.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:var(--surface-2);border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.scta-note{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#566273}
+.scta-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 36px;background:#111A26;border-top:1px solid #1E2A3A;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#566273}
 .scta--compact{max-width:none}
 .scta--compact .scta-inner{padding:24px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
 .scta--compact .scta-left{flex:1;min-width:200px}
