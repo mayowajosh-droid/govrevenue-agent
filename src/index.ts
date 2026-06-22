@@ -3152,6 +3152,13 @@ function renderIncumbentSection(data: ProcurementData): string {
       <td style="padding:9px 14px;font-size:12px;font-family:var(--mono);color:var(--muted);border-bottom:1px solid var(--border-2)">${escapeHtml(latest)}</td>
     </tr>`;
   }).join("");
+  if (incumbents.length === 0) {
+    return `<section style="margin:40px 0;background:var(--surface-2);border:1px solid var(--border-2);padding:28px 32px" class="no-print">
+  <h2 style="font-family:var(--sans);font-size:22px;font-weight:800;margin-bottom:6px;color:var(--text)">Incumbent map</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:12px;font-family:var(--mono)">Derived from awarded contract records in this dataset. Not exhaustive — covers notices returned by keyword search only.</p>
+  <p style="font-size:13px;color:var(--faint);font-family:var(--mono);padding:20px;border:1px dashed var(--border-2);line-height:1.6">No named suppliers found in the awarded contracts pulled for this scan. Either the matched notices did not include supplier disclosure, or all matched notices are open/pending (no supplier named yet). The LLM report's Buyer Watchlist section identifies who to approach before contracts formally re-tender.</p>
+</section>`;
+  }
   return `<section style="margin:40px 0;background:var(--surface-2);border:1px solid var(--border-2);padding:28px 32px" class="no-print">
   <h2 style="font-family:var(--sans);font-size:22px;font-weight:800;margin-bottom:6px;color:var(--text)">Incumbent map</h2>
   <p style="font-size:13px;color:var(--muted);margin-bottom:18px;font-family:var(--mono)">Derived from awarded contract records in this dataset. Not exhaustive — covers notices returned by keyword search only.</p>
@@ -3167,6 +3174,94 @@ function renderIncumbentSection(data: ProcurementData): string {
     </thead>
     <tbody>${rows}</tbody>
   </table>
+</section>`;
+}
+
+function renderScanSpendTrend(data: ProcurementData): string {
+  const awarded = (data?.contractsFinder?.awarded || []) as any[];
+  const nowMs = Date.now();
+  const cutoff365 = nowMs - 365 * 24 * 3_600_000;
+  const monthlySpend = new Map<string, number>();
+  let totalAwarded = 0;
+  for (const n of awarded) {
+    const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
+    if (!d || d.getTime() < cutoff365 || d.getTime() > nowMs) continue;
+    const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const val = Number(n.awardedValue || n.valueHigh || 0);
+    monthlySpend.set(mk, (monthlySpend.get(mk) || 0) + val);
+    totalAwarded += val;
+  }
+  const trendData = [...monthlySpend.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  if (trendData.length < 2) return "";
+  const maxMonthVal = Math.max(...trendData.map(([, v]) => v), 1);
+  const slice3 = (arr: [string, number][], end: boolean) => {
+    const s = end ? arr.slice(-3) : arr.slice(0, 3);
+    return s.reduce((sum, [, v]) => sum + v, 0) / Math.max(s.length, 1);
+  };
+  const first3Avg = slice3(trendData, false);
+  const last3Avg = slice3(trendData, true);
+  const trendPct = first3Avg > 0 ? Math.round(((last3Avg - first3Avg) / first3Avg) * 100) : 0;
+  const fmtShort = (v: number) => v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : v >= 1_000 ? `£${Math.round(v / 1000)}k` : `£${Math.round(v)}`;
+  const fmtBig = (v: number) => v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : `£${Math.round(v / 1000)}k`;
+  const trendDir = trendPct >= 5 ? "rising" : trendPct <= -5 ? "contracting" : "stable";
+  const trendColor = trendPct >= 5 ? "var(--green)" : trendPct <= -5 ? "var(--red)" : "var(--brand)";
+  const bars = trendData.map(([key, val]) => {
+    const pct = Math.max(Math.round((val / maxMonthVal) * 100), 2);
+    const dt = new Date(key + "-01");
+    const mo = dt.toLocaleDateString("en-GB", { month: "short" });
+    const yr = String(dt.getFullYear()).slice(2);
+    return `<div class="rt-bar-col" title="${escapeHtml(`${mo} '${yr}: ${fmtShort(val)}`)}">
+      <div class="rt-bar" style="height:${pct}%"></div>
+      <div class="rt-bar-label">${escapeHtml(mo)}<br><span>${escapeHtml("'" + yr)}</span></div>
+    </div>`;
+  }).join("");
+  return `<section style="margin:40px 0;padding:28px 32px;background:var(--surface-2);border:1px solid var(--border-2)" class="no-print">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:6px;flex-wrap:wrap">
+    <h2 style="font-family:var(--sans);font-size:22px;font-weight:800;margin:0;color:var(--text)">Sector spend trend</h2>
+    <span style="font-family:var(--mono);font-size:13px;color:${trendColor};font-weight:700">${trendPct >= 0 ? "▲" : "▼"} ${Math.abs(trendPct)}% ${trendDir}</span>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:18px;font-family:var(--mono)">Monthly awarded contract value from this scan's pulled records — last 12 months. MoM trend compares 3-month opening vs trailing average.</p>
+  <div style="height:140px;display:flex;align-items:flex-end;gap:3px;padding-bottom:0;border-bottom:1px solid var(--border-2)">
+    ${bars}
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
+    <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">${escapeHtml(fmtBig(totalAwarded))}+ awarded in period · ${trendData.length} months of data · public record only</span>
+    <span style="font-size:11px;color:var(--faint);font-family:var(--mono)">Contracts Finder awarded notices</span>
+  </div>
+  <style>.rt-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;min-width:0;height:100%}.rt-bar{width:80%;background:var(--brand);border-radius:2px 2px 0 0;opacity:.85;transition:opacity .15s}.rt-bar-col:hover .rt-bar{opacity:1}.rt-bar-label{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center;margin-top:5px;line-height:1.3}.rt-bar-label span{color:var(--faint)}</style>
+</section>`;
+}
+
+function renderBuyerConcentration(data: ProcurementData): string {
+  const awarded = (data?.contractsFinder?.awarded || []) as any[];
+  const buyerMap = new Map<string, { count: number; value: number }>();
+  for (const n of awarded) {
+    const buyer = String(n.buyer || "").trim();
+    if (!buyer || buyer.length < 3) continue;
+    const e = buyerMap.get(buyer) || { count: 0, value: 0 };
+    e.count++;
+    e.value += Number(n.awardedValue || 0);
+    buyerMap.set(buyer, e);
+  }
+  const topBuyers = [...buyerMap.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 7);
+  if (topBuyers.length === 0) return "";
+  const maxCount = topBuyers[0][1].count;
+  const fmtMoney = (v: number) => v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : v > 0 ? `£${Math.round(v / 1000)}k` : "—";
+  const rows = topBuyers.map(([buyer, { count, value }], i) => {
+    const pct = Math.max(Math.round((count / maxCount) * 100), 4);
+    return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;color:var(--text);margin-bottom:5px;font-family:var(--sans)">${i === 0 ? `<span style="font-size:9px;font-family:var(--mono);background:var(--brand-dim);color:var(--brand);padding:2px 6px;border-radius:2px;margin-right:6px;font-weight:700">TOP BUYER</span>` : ""}${escapeHtml(buyer.slice(0, 65))}</div>
+        <div style="height:3px;background:var(--surface-3);border-radius:2px"><div style="height:3px;width:${pct}%;background:var(--brand);border-radius:2px;opacity:.7"></div></div>
+      </div>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap">${count} award${count !== 1 ? "s" : ""}</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--text-mid);white-space:nowrap;font-weight:600">${escapeHtml(fmtMoney(value))}</span>
+    </div>`;
+  }).join("");
+  return `<section style="margin:40px 0;background:var(--surface-2);border:1px solid var(--border-2);padding:28px 32px" class="no-print">
+  <h2 style="font-family:var(--sans);font-size:22px;font-weight:800;margin-bottom:6px;color:var(--text)">Buyer concentration</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:18px;font-family:var(--mono)">Top contracting authorities by awarded contract count — from this scan's pulled records. Ranked by frequency, not value.</p>
+  ${rows}
 </section>`;
 }
 
@@ -6939,6 +7034,10 @@ function reportPage(scan: ScanRecord) {
     </section>
 
     ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
+
+    ${data ? renderScanSpendTrend(data) : ""}
+
+    ${data ? renderBuyerConcentration(data) : ""}
 
     ${data ? renderIncumbentSection(data) : ""}
 
