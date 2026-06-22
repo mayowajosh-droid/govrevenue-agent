@@ -2462,6 +2462,7 @@ const SECTOR_CPV: Record<string, string[]> = {
   "emergency":        ["75250000", "75252000", "35110000"],   // fire/rescue, ambulance, firefighting equipment
   "research":         ["73100000", "73200000", "72316000"],   // R&D, business consultancy, data analysis
   "consulting":       ["73200000", "72224000", "72220000"],   // business consultancy, project management consulting, systems/tech consulting
+  "training-skills":  ["80000000", "80500000", "80530000", "80521000", "80522000"], // education, training, vocational training, training programme, technical training
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal): Promise<ProcurementData> {
@@ -2848,6 +2849,17 @@ function resolveSector(text: string): SectorResult {
       key: "energy",
       label: "Energy / retrofit / built-environment decarbonisation",
       terms: ["energy", "retrofit", "solar", "decarbonisation", "net zero", "energy efficiency", "low carbon", "sustainability"]
+    };
+  }
+
+  if (t.includes("education") || t.includes("school") || t.includes("academy trust") ||
+      t.includes("further education") || t.includes("apprenticeship") || t.includes("dfe") ||
+      t.includes("nvq") || t.includes("cpd") || t.includes("learning management") ||
+      (t.includes("training") && (t.includes("skills") || t.includes("workforce") || t.includes("courses")))) {
+    return {
+      key: "training-skills",
+      label: "Education, training & skills",
+      terms: ["education", "school", "academy", "training", "apprenticeship", "skills", "further education", "learning", "teaching", "curriculum", "NVQ", "CPD", "workforce development", "upskilling"]
     };
   }
 
@@ -4118,16 +4130,16 @@ const DESK_PROFILES: DeskProfile[] = [
     live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "GovRevenue Desk",
-      mainServices: "school refurbishment education technology learning management training skills courses further education academy",
-      idealBuyers: "local authorities academy trusts Department for Education further education colleges",
-      mainGoal: "find education and skills contracts"
+      mainServices: "education training apprenticeship skills workforce development school academy further education college adult learning NVQ CPD teaching employability coaching upskilling SEND special educational needs",
+      idealBuyers: "local authorities academy trusts Department for Education further education colleges universities multi-academy trusts combined authorities",
+      mainGoal: "find education training and skills contracts"
     }),
     categories: [
-      { label: "School Buildings & Estates", keywords: ["school", "academy", "classroom", "education premises", "school refurb"],            subcategories: ["School refurbishment","RAAC remediation","Classroom fit-out","School expansion","Academy conversion","Caretaking","DDA works","Site security","Playground equipment","School gates"] },
-      { label: "Education Technology",       keywords: ["edtech", "education technology", "learning platform", "mis system", "school software", "vle", "lms"], subcategories: ["MIS systems","Learning platforms","VLE","Interactive displays","Broadband in schools","IT hardware","Digital literacy","Tablets & devices","Filtering software","Staff training tech"] },
-      { label: "Training & Skills",          keywords: ["training", "apprenticeship", "upskilling", "skills", "workforce development", "nvq", "cpd"],          subcategories: ["Apprenticeships","NVQ delivery","Leadership training","Digital skills","Workforce development","CPD programmes","Bootcamps","Functional skills","Sector-based work academies"] },
-      { label: "SEND & Alternative Provision", keywords: ["send support", "send provision", "special educational needs support", "alternative provision", "pupil referral", "ehcp"],  subcategories: ["SEND support","Alternative provision","Pupil referral units","Educational psychology","Specialist tutoring","EHCP provision","Short breaks","Post-16 SEND"] },
-      { label: "Further & Higher Education", keywords: ["further education", "fe college", "higher education", "university", "adult education"],               subcategories: ["FE college services","HE procurement","Adult education budget","T-levels","Higher Technical Qualifications","Skills bootcamps","Multiply numeracy","ESOL provision"] },
+      { label: "School Buildings & Estates", keywords: ["school", "academy", "classroom", "education", "raac", "school building", "teaching"],   subcategories: ["School refurbishment","RAAC remediation","Classroom fit-out","School expansion","Academy conversion","Caretaking","DDA works","Site security","Playground equipment","School gates"] },
+      { label: "Education Technology",       keywords: ["learning platform", "education technology", "school software", "interactive display", "broadband school"], subcategories: ["MIS systems","Learning platforms","VLE","Interactive displays","Broadband in schools","IT hardware","Digital literacy","Tablets & devices","Filtering software","Staff training tech"] },
+      { label: "Training & Skills",          keywords: ["training", "apprenticeship", "skills", "workforce development", "nvq", "cpd", "coaching", "upskilling", "employability"], subcategories: ["Apprenticeships","NVQ delivery","Leadership training","Digital skills","Workforce development","CPD programmes","Bootcamps","Functional skills","Sector-based work academies"] },
+      { label: "SEND & Alternative Provision", keywords: ["special educational", "alternative provision", "pupil referral", "ehcp", "send transport", "send provision", "sen support"], subcategories: ["SEND support","Alternative provision","Pupil referral units","Educational psychology","Specialist tutoring","EHCP provision","Short breaks","Post-16 SEND"] },
+      { label: "Further & Higher Education", keywords: ["further education", "college", "higher education", "university", "adult education", "adult learning", "t-level", "esol"], subcategories: ["FE college services","HE procurement","Adult education budget","T-levels","Higher Technical Qualifications","Skills bootcamps","Multiply numeracy","ESOL provision"] },
     ]
   },
   {
