@@ -491,6 +491,70 @@ function premiumCss() {
   `;
 }
 
+export type ArticleChartSpec =
+  | { type: "bar"; title: string; labels: string[]; values: number[]; unit?: string; color?: string }
+  | { type: "line"; title: string; labels: string[]; values: number[]; unit?: string; color?: string }
+  | { type: "pie"; title: string; labels: string[]; values: number[] }
+  | { type: "horizontal-bar"; title: string; labels: string[]; values: number[]; unit?: string; color?: string };
+
+export function renderArticleChart(spec: ArticleChartSpec, width = 700, height = 300): string {
+  const fmtVal = (v: number, unit?: string) => {
+    if (unit === "£bn") return `£${(v / 1e9).toFixed(1)}bn`;
+    if (unit === "£m") return `£${(v / 1e6).toFixed(1)}m`;
+    if (unit === "£k") return `£${Math.round(v / 1000)}k`;
+    if (unit === "£") return `£${new Intl.NumberFormat("en-GB").format(v)}`;
+    return new Intl.NumberFormat("en-GB").format(v);
+  };
+  const color = (spec as any).color || "#0E2318";
+  const gridColor = "#E5DED4";
+  const textColor = "#1A1208";
+  const mutedColor = "#7D6B50";
+
+  let option: any;
+
+  if (spec.type === "bar") {
+    option = {
+      grid: { left: 50, right: 20, top: 50, bottom: 40 },
+      xAxis: { type: "category", data: spec.labels, axisLabel: { color: mutedColor, fontSize: 11, interval: 0, rotate: spec.labels.length > 6 ? 30 : 0 }, axisLine: { lineStyle: { color: gridColor } }, axisTick: { show: false } },
+      yAxis: { type: "value", axisLabel: { color: mutedColor, fontSize: 10, formatter: (v: number) => fmtVal(v, spec.unit) }, splitLine: { lineStyle: { color: gridColor } }, axisLine: { show: false }, axisTick: { show: false } },
+      series: [{ type: "bar", data: spec.values, itemStyle: { color, borderRadius: [3, 3, 0, 0] }, label: { show: spec.values.length <= 8, position: "top", formatter: (p: any) => fmtVal(p.value, spec.unit), color: textColor, fontSize: 10, fontWeight: 600 } }]
+    };
+  } else if (spec.type === "horizontal-bar") {
+    height = Math.max(height, spec.labels.length * 38 + 60);
+    option = {
+      grid: { left: 160, right: 80, top: 30, bottom: 20 },
+      xAxis: { type: "value", axisLabel: { color: mutedColor, fontSize: 10, formatter: (v: number) => fmtVal(v, spec.unit) }, splitLine: { lineStyle: { color: gridColor } }, axisLine: { show: false }, axisTick: { show: false } },
+      yAxis: { type: "category", data: [...spec.labels].reverse(), inverse: false, axisLabel: { color: textColor, fontSize: 11, fontWeight: 600 }, axisLine: { show: false }, axisTick: { show: false } },
+      series: [{ type: "bar", data: [...spec.values].reverse(), itemStyle: { color, borderRadius: [0, 3, 3, 0] }, barMaxWidth: 28, label: { show: true, position: "right", formatter: (p: any) => fmtVal(p.value, spec.unit), color: mutedColor, fontSize: 10 } }]
+    };
+  } else if (spec.type === "line") {
+    option = {
+      grid: { left: 55, right: 20, top: 50, bottom: 40 },
+      xAxis: { type: "category", data: spec.labels, axisLabel: { color: mutedColor, fontSize: 11 }, axisLine: { lineStyle: { color: gridColor } }, axisTick: { show: false } },
+      yAxis: { type: "value", axisLabel: { color: mutedColor, fontSize: 10, formatter: (v: number) => fmtVal(v, spec.unit) }, splitLine: { lineStyle: { color: gridColor } }, axisLine: { show: false }, axisTick: { show: false } },
+      series: [{ type: "line", data: spec.values, smooth: true, lineStyle: { color, width: 2.5 }, areaStyle: { color: color + "18" }, itemStyle: { color }, symbol: "circle", symbolSize: 5 }]
+    };
+  } else {
+    option = {
+      series: [{
+        type: "pie", radius: ["38%", "62%"], center: ["50%", "58%"],
+        data: spec.labels.map((l, i) => ({ name: l, value: spec.values[i] })),
+        label: { formatter: "{b}: {d}%", fontSize: 11, color: textColor },
+        itemStyle: { borderColor: "#FAF8F4", borderWidth: 2 }
+      }]
+    };
+    height = 280;
+  }
+
+  if (spec.type !== "pie") {
+    option.title = { text: spec.title, left: "left", top: 4, textStyle: { fontSize: 13, fontWeight: 700, color: textColor }, padding: [0, 0, 0, 6] };
+  } else {
+    option.title = { text: spec.title, left: "center", top: 8, textStyle: { fontSize: 13, fontWeight: 700, color: textColor } };
+  }
+
+  return chartSvg(option, width, height);
+}
+
 export function renderWorldClassDashboard(trust: TrustLayer) {
   return `
     ${premiumCss()}
