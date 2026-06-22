@@ -14381,6 +14381,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     recentVisitorLogsRes,
     commentLikesRes,
     recentSignalsRes,
+    scansByDayRes,
+    gradeDistRes,
+    activeSubCountRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -14488,6 +14491,18 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM comment_likes cl LEFT JOIN comments c ON c.id=cl.comment_id ORDER BY cl.created_at DESC LIMIT 100`),
     safePool(`SELECT id, category, title, buyer, source, status, value_amount, notice_date, deadline_date
     FROM homepage_signals ORDER BY notice_date DESC NULLS LAST LIMIT 100`),
+    safePool(`SELECT DATE(created_at) AS day, COUNT(*)::int AS cnt
+    FROM scans WHERE created_at > NOW() - INTERVAL '14 days' GROUP BY day ORDER BY day`),
+    safePool(`SELECT
+      CASE WHEN LEFT(report_markdown,5000) ~* 'Evidence Grade\\s*\\|\\s*A' THEN 'A'
+           WHEN LEFT(report_markdown,5000) ~* 'Evidence Grade\\s*\\|\\s*B' THEN 'B'
+           WHEN LEFT(report_markdown,5000) ~* 'Evidence Grade\\s*\\|\\s*C' THEN 'C'
+           WHEN LEFT(report_markdown,5000) ~* 'Evidence Grade\\s*\\|\\s*D' THEN 'D'
+           WHEN LEFT(report_markdown,5000) ~* 'Evidence Grade\\s*\\|\\s*E' THEN 'E'
+           ELSE NULL END AS grade, COUNT(*)::int AS cnt
+    FROM scans WHERE status='completed' AND report_markdown IS NOT NULL
+    GROUP BY grade`),
+    safePool(`SELECT COUNT(*)::int AS cnt FROM alert_subscriptions WHERE active = true`),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -14523,6 +14538,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const recentVisitorLogs = recentVisitorLogsRes.rows as any[];
   const commentLikes    = commentLikesRes.rows      as any[];
   const recentSignals   = recentSignalsRes.rows     as any[];
+  const scansByDayDb    = scansByDayRes.rows        as any[];
+  const gradeDistDb     = gradeDistRes.rows         as any[];
+  const dbActiveSubCount = Number((activeSubCountRes.rows[0] as any)?.cnt || 0);
 
   // Build article-likes lookup map by article_id
   const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
@@ -14530,10 +14548,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const revisionsMap = new Map<string, any>(articleRevisions.map((r: any) => [r.article_id, r]));
 
   const gradeCount: Record<string, number> = {};
-  scans.forEach((s: any) => {
-    const g = (s.edp?.evidenceGrade || "").charAt(0);
-    const key = ["A","B","C","D","E"].includes(g) ? g : "—";
-    gradeCount[key] = (gradeCount[key] || 0) + 1;
+  gradeDistDb.forEach((r: any) => {
+    const g = r.grade;
+    if (g && ["A","B","C","D","E"].includes(g)) gradeCount[g] = Number(r.cnt || 0);
   });
 
   const vColor = (v: string) => {
@@ -14552,9 +14569,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     days14.push(d.toISOString().slice(0, 10));
   }
   const scansByDay = new Map<string, number>();
-  scans.forEach((s: any) => {
-    const d = String(s.created_at || "").slice(0, 10);
-    if (d) scansByDay.set(d, (scansByDay.get(d) || 0) + 1);
+  scansByDayDb.forEach((r: any) => {
+    const d = String(r.day || "").slice(0, 10);
+    if (d) scansByDay.set(d, Number(r.cnt || 0));
   });
   const maxSPerDay = Math.max(1, ...days14.map(d => scansByDay.get(d) || 0));
   const scanActivityHtml = `<div style="display:flex;align-items:flex-end;gap:3px;height:64px;margin-bottom:6px">
@@ -14705,7 +14722,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const totalFreeCount = Number(us.free_count || 0);
   const totalProCount  = Number(us.pro_count || 0);
   const totalAgencyCount = Number(us.agency_count || 0);
-  const activeSubCount = subscriptions.filter((s: any) => s.active).length;
+  const activeSubCount = dbActiveSubCount;
 
   const envRows: [string, boolean][] = [
     ["DATABASE_URL",            !!process.env.DATABASE_URL],
@@ -15060,10 +15077,10 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       ${scanActivityHtml}
     </div>
     <div class="card">
-      <div class="card-head">Grade Distribution <span class="card-head-val">${scans.filter((s:any)=>s.edp?.evidenceGrade).length} graded</span></div>
+      <div class="card-head">Grade Distribution <span class="card-head-val">${Object.values(gradeCount).reduce((a, b) => a + b, 0)} graded</span></div>
       ${["A","B","C","D","E"].map(g => {
         const n = gradeCount[g] || 0;
-        const gradedTotal = Math.max(1, scans.filter((s:any) => s.edp?.evidenceGrade).length);
+        const gradedTotal = Math.max(1, Object.values(gradeCount).reduce((a: number, b: number) => a + b, 0));
         const pct = Math.round((n / gradedTotal) * 100);
         const col = g==="A"?"var(--green)":g==="B"?"var(--blue)":g==="C"?"var(--amber)":g==="D"?"var(--red)":"var(--muted)";
         const bg = g==="A"?"var(--green-bg)":g==="B"?"var(--blue-bg)":g==="C"?"var(--amber-bg)":g==="D"?"var(--red-bg)":"var(--base)";
@@ -15086,7 +15103,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="s-eyebrow">Database</div>
       <div class="s-title">Scan Intelligence</div>
     </div>
-    <div class="s-sub">${scans.length} records &middot; most recent first &middot; all form fields</div>
+    <div class="s-sub">${ss.total || 0} records &middot; showing latest ${scans.length} &middot; all form fields</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
     <div class="stat-cell"><div class="stat-val" style="color:var(--green)">${ss.completed || 0}</div><div class="stat-lbl">Completed</div></div>
