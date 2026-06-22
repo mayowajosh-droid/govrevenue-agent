@@ -1786,7 +1786,8 @@ function getAuthUser(req: express.Request): { userId: string; email: string; tie
   if (!token) return null;
   try {
     const p = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; tier: string };
-    return { userId: p.userId, email: p.email, tier: p.tier as UserTier };
+    const tier = (p.email === "mayowajosh@gmail.com" ? "pro" : p.tier) as UserTier;
+    return { userId: p.userId, email: p.email, tier };
   } catch {
     return null;
   }
@@ -8153,6 +8154,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const auth = getAuthUser(req)!;
   const user = await getUserById(auth.userId);
   if (!user) { res.clearCookie("gr_token"); res.redirect("/login"); return; }
+  if (user.email === "mayowajosh@gmail.com") user.tier = "pro";
 
   const welcome = req.query.welcome === "1";
   const upgraded = req.query.upgraded === "1";
