@@ -4924,6 +4924,7 @@ a{color:inherit;text-decoration:none}
 .art-hero-inner{max-width:880px}
 .art-eyebrow-row{display:flex;align-items:center;gap:14px;margin-bottom:26px}
 .art-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#102A1E;text-transform:uppercase;white-space:nowrap}
+.art-eyebrow-report{color:#fff;background:#0E2318;padding:3px 10px;border-radius:3px;font-weight:600}
 .art-eyebrow-rule{height:1px;width:46px;background:#C9BFA6;flex-shrink:0}
 .art-eyebrow-num{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted)}
 .art-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;font-weight:500;color:#0E2318;margin:0 0 28px}
@@ -5251,7 +5252,7 @@ ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
 <section class="art-hero">
   <div class="art-hero-inner">
     <div class="art-eyebrow-row">
-      ${(article.tags || generateArticleTags(article)).split(",").map(t => `<span class="art-eyebrow">${escapeHtml(t.trim())}</span>`).join('<span class="art-eyebrow-rule"></span>')}
+      ${(article.tags || generateArticleTags(article)).split(",").map(t => `<span class="art-eyebrow${t.trim().toLowerCase() === "monthly report" ? " art-eyebrow-report" : ""}">${escapeHtml(t.trim())}</span>`).join('<span class="art-eyebrow-rule"></span>')}
     </div>
     <h1 class="art-h1">${escapeHtml(article.title)}</h1>
     ${article.dek ? `<p class="art-dek">${escapeHtml(article.dek)}</p>` : ""}
@@ -5541,7 +5542,7 @@ function articlesIndexPage(articles: ArticleRow[], authCtx?: { userId: string; e
       ? new Date(a.published_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).toUpperCase()
       : "";
     const tags = (a.tags || generateArticleTags(a)).split(",").map(t => t.trim()).filter(Boolean);
-    const tagHtml = tags.map(t => `<span class="ai-pill">${escapeHtml(t)}</span>`).join("");
+    const tagHtml = tags.map(t => `<span class="ai-pill${t.toLowerCase() === "monthly report" ? " ai-pill-report" : ""}">${escapeHtml(t)}</span>`).join("");
     return `<a href="/articles/${escapeHtml(a.slug)}" class="ai-row">
   <div class="ai-tags">${tagHtml}</div>
   <div>
@@ -5572,6 +5573,7 @@ ${pageShellCss()}
 .ai-row:last-child{border-bottom:none}
 .ai-tags{display:flex;flex-wrap:wrap;gap:5px}
 .ai-pill{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.18);padding:2px 7px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.ai-pill-report{color:#0E2318;background:rgba(14,35,24,.10);border-color:rgba(14,35,24,.28);font-weight:600}
 .ai-title{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.01em;line-height:1.2;color:var(--text)}
 .ai-dek{font-size:14px;line-height:1.5;color:var(--muted);margin-top:5px;max-width:640px}
 .ai-meta{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
