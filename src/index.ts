@@ -7537,7 +7537,7 @@ ${chaseNowHtml}
   </div>
 </section>
 <section class="subscribe" id="subscribe">
-  <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start">
+  <div class="wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center">
     ${sampleCtaBlock("full")}
     <div>
       <div class="eyebrow">Join the briefing</div>
