@@ -1801,13 +1801,17 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 async function getUserById(id: string): Promise<UserRecord | null> {
   if (!pool) return null;
   const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE id=$1`, [id]);
-  return r.rows[0] || null;
+  const u = r.rows[0] || null;
+  if (u && u.email === "mayowajosh@gmail.com") u.tier = "pro";
+  return u;
 }
 
 async function getUserByEmail(email: string): Promise<UserRecord | null> {
   if (!pool) return null;
   const r = await pool.query<UserRecord>(`SELECT * FROM users WHERE email=$1`, [email]);
-  return r.rows[0] || null;
+  const u = r.rows[0] || null;
+  if (u && u.email === "mayowajosh@gmail.com") u.tier = "pro";
+  return u;
 }
 
 async function createUser(email: string, password: string): Promise<UserRecord> {
@@ -8154,7 +8158,6 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const auth = getAuthUser(req)!;
   const user = await getUserById(auth.userId);
   if (!user) { res.clearCookie("gr_token"); res.redirect("/login"); return; }
-  if (user.email === "mayowajosh@gmail.com") user.tier = "pro";
 
   const welcome = req.query.welcome === "1";
   const upgraded = req.query.upgraded === "1";
@@ -14578,14 +14581,17 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   // Users rows
   const userRowsHtml = users.length === 0
     ? `<tr><td colspan="6" style="text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted)">No users yet</td></tr>`
-    : users.map((u: any) => `<tr>
+    : users.map((u: any) => {
+        const displayTier = u.email === "mayowajosh@gmail.com" ? "pro" : u.tier;
+        return `<tr>
         <td style="font-family:var(--mono);font-size:11px">${escapeHtml(u.email)}</td>
-        <td><span class="pill pill-${escapeHtml(u.tier)}">${escapeHtml(u.tier)}</span></td>
+        <td><span class="pill pill-${escapeHtml(displayTier)}">${escapeHtml(displayTier)}</span></td>
         <td style="white-space:nowrap">${adminTime(u.created_at)}</td>
         <td style="font-family:var(--mono);font-size:12px;font-weight:600;text-align:center">${u.scan_count || 0}</td>
         <td>${u.stripe_subscription_status ? `<span class="pill ${u.stripe_subscription_status === "active" ? "pill-active" : "pill-inactive"}">${escapeHtml(u.stripe_subscription_status)}</span>` : `<span style="color:var(--muted)">—</span>`}</td>
         <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml((u.stripe_customer_id || "").slice(0, 30)) || `<span style="opacity:.4">—</span>`}</td>
-      </tr>`).join("");
+      </tr>`;
+      }).join("");
 
   // Subscription rows
   const subRowsHtml = subscriptions.length === 0
