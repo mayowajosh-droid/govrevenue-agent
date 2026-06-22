@@ -21,7 +21,7 @@ import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import puppeteer from "puppeteer";
 import { createHash } from "node:crypto";
-import { renderWorldClassDashboard } from "./designEngine.js";
+import { renderWorldClassDashboard, renderArticleChart, type ArticleChartSpec } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject, storeObject } from "./lib/pdfStorage.js";
 import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail } from "./lib/emailNotifications.js";
 import {
@@ -2002,13 +2002,34 @@ function renderPullQuote(content: string): string {
   return `<blockquote class="art-pullquote"><p>${inlineMd(content.trim())}</p></blockquote>\n`;
 }
 
+function renderWinnersTable(content: string): string {
+  const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+  const sourceIdx = lines.findIndex(l => l.toLowerCase().startsWith("source:"));
+  const source = sourceIdx >= 0 ? lines.splice(sourceIdx, 1)[0] : null;
+  const rows = lines.filter(l => l.startsWith("|") && !l.match(/^\|[-:\s|]+\|$/));
+  if (rows.length === 0) return `<div class="art-record"><div class="art-record-head">SUPPLIER / WINNER DATA</div><div class="art-record-body"><p>No data rows. Use pipe-delimited markdown table format.</p></div></div>\n`;
+  const parseRow = (r: string) => r.split("|").map(c => c.trim()).filter(Boolean);
+  const headers = parseRow(rows[0]);
+  const body = rows.slice(1);
+  return `<div class="art-winners">
+  <div class="art-winners-head">SUPPLIER INTELLIGENCE &middot; PUBLIC RECORD</div>
+  <div class="art-winners-scroll">
+  <table class="art-winners-table">
+    <thead><tr>${headers.map(h => `<th>${inlineMd(h)}</th>`).join("")}</tr></thead>
+    <tbody>${body.map((r, i) => `<tr class="${i === 0 ? "art-winners-top" : ""}">${parseRow(r).map(c => `<td>${inlineMd(c)}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table>
+  </div>
+  ${source ? `<div class="art-winners-source">${inlineMd(source)}</div>` : ""}
+</div>\n`;
+}
+
 function parseShortcodes(bodyMd: string, assets: ArticleAssetRow[] = []): string {
   // Normalise line endings so the regex works regardless of how body was saved
   const normMd = bodyMd.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const assetMap = new Map(assets.map(a => [a.position_key, a]));
   let result = "";
   let remaining = normMd;
-  const re = /^:::(image|gif|record|quote)(\{[^}]*\})?[ \t]*\n([\s\S]*?)^:::[ \t]*$/m;
+  const re = /^:::(image|gif|record|quote|chart|winners)(\{[^}]*\})?[ \t]*\n([\s\S]*?)^:::[ \t]*$/m;
   let imgIdx = 0;
 
   while (remaining.length > 0) {
@@ -2046,6 +2067,15 @@ function parseShortcodes(bodyMd: string, assets: ArticleAssetRow[] = []): string
       result += renderDataInterlude(inner);
     } else if (type === "quote") {
       result += renderPullQuote(captionLine);
+    } else if (type === "chart") {
+      try {
+        const spec = JSON.parse(inner.trim()) as ArticleChartSpec;
+        result += `<div class="art-chart-card">${renderArticleChart(spec)}</div>\n`;
+      } catch {
+        result += `<div class="art-record"><div class="art-record-head">CHART ERROR</div><div class="art-record-body"><p>Invalid chart JSON — check spec format.</p></div></div>\n`;
+      }
+    } else if (type === "winners") {
+      result += renderWinnersTable(inner);
     }
 
     remaining = remaining.slice(m.index + m[0].length);
@@ -5125,6 +5155,19 @@ a{color:inherit;text-decoration:none}
 /* pull quote */
 .art-pullquote{margin:3em 0;padding:30px 34px;background:#ECE5D5;border-left:3px solid var(--gold);border-radius:0 6px 6px 0}
 .art-pullquote p{font-family:var(--serif);font-size:25px;font-weight:400;color:var(--dark);line-height:1.4;font-style:italic}
+/* chart shortcode */
+.art-chart-card{margin:3em 0;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--gold);padding:24px 20px 16px;overflow-x:auto}
+.art-chart-card svg{width:100%;height:auto;display:block}
+/* winners/supplier-table shortcode */
+.art-winners{margin:3em 0;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--dark);padding:0}
+.art-winners-head{font-family:var(--mono);font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);padding:14px 22px 12px;border-bottom:1px solid var(--border);background:var(--dark)}
+.art-winners-scroll{overflow-x:auto}
+.art-winners-table{width:100%;border-collapse:collapse;font-size:13px}
+.art-winners-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 16px;text-align:left;border-bottom:2px solid var(--border-2);white-space:nowrap}
+.art-winners-table td{font-family:var(--mono);font-size:13px;color:var(--text);padding:10px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+.art-winners-table tr.art-winners-top td{color:var(--dark);font-weight:600;background:rgba(168,132,46,.06)}
+.art-winners-table tr:last-child td{border-bottom:none}
+.art-winners-source{font-family:var(--mono);font-size:9px;color:var(--muted);padding:10px 22px;border-top:1px solid var(--border);background:var(--bg)}
 /* inline CTA */
 .art-cta-strip{margin:3.6em 0;background:var(--dark);border-radius:6px;padding:30px 34px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
 .art-cta-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--gold-lt);text-transform:uppercase;margin-bottom:8px}
@@ -6202,7 +6245,27 @@ ${adminArticleCss()}
     </div>
     <div class="art-editor">
       <div class="art-editor-pane">
-        <div class="art-pane-head">SOURCE — markdown + shortcodes</div>
+        <div class="art-pane-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <span>SOURCE — markdown + shortcodes</span>
+          <button type="button" onclick="document.getElementById('sc-ref').style.display=document.getElementById('sc-ref').style.display==='none'?'block':'none'" style="font-size:10px;padding:4px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--muted);cursor:pointer;font-family:var(--mono);letter-spacing:.06em">SHORTCODES ▾</button>
+        </div>
+        <div id="sc-ref" style="display:none;background:#0D1118;border-bottom:1px solid rgba(255,255,255,.08);padding:16px 18px;font-family:var(--mono);font-size:11px;line-height:1.9;color:#9AA093;max-height:220px;overflow-y:auto">
+          <b style="color:#B4924E;display:block;margin-bottom:4px">:::image{key="img-0" ratio="16:9"}</b> DALL-E image placeholder<br>
+          <b style="color:#B4924E;display:block;margin-top:8px">:::record</b> "ON THE RECORD" data card (monospaced bullet block)<br>
+          <b style="color:#B4924E;display:block;margin-top:8px">:::quote</b> Large pull quote<br>
+          <b style="color:#B4924E;display:block;margin-top:8px">:::chart</b> ECharts bar/line/pie — inner content is JSON:<br>
+          <span style="color:#6B7280;white-space:pre">  {
+    "type": "bar",          // bar | line | pie | horizontal-bar
+    "title": "Top buyers",
+    "labels": ["Buyer A", "Buyer B"],
+    "values": [5000000, 3000000],
+    "unit": "£"            // optional: £ £m £bn £k
+  }</span><br>
+          <b style="color:#B4924E;display:block;margin-top:8px">:::winners</b> Supplier league table — inner content is a pipe-delimited markdown table<br>
+          <span style="color:#6B7280">  | Supplier | Awards | Value |<br>  |---|---|---|<br>  | Serco | 12 | £8.4m |</span><br>
+          <b style="color:#5A8A6A;display:block;margin-top:10px">Desk chart data API:</b>
+          <span style="color:#6B7280">GET /admin/articles/desk-stats/{desk-slug}?token=... → JSON with ready-to-paste chart specs</span>
+        </div>
         <textarea class="art-source" id="source" placeholder="Start writing...">${bodyEsc}</textarea>
       </div>
       <div class="art-editor-pane art-preview-pane">
@@ -16016,7 +16079,96 @@ app.post("/api/articles/preview", asyncRoute(async (req, res) => {
     .art-record-source{font-family:var(--mono);font-size:9px;color:var(--muted-2);margin-top:12px;padding-top:9px;border-top:1px solid var(--border)}
     .art-pullquote{margin:2.6em 0;padding:22px 28px 22px 24px;border-left:4px solid var(--brand);background:var(--surface)}
     .art-pullquote p{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--text);line-height:1.38;font-style:italic}
+    .art-chart-card{margin:2.6em 0;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--brand);padding:20px 16px 12px;overflow-x:auto}
+    .art-chart-card svg{width:100%;height:auto;display:block}
+    .art-winners{margin:2.6em 0;background:var(--surface);border:1px solid var(--border);border-top:3px solid #1A1208}
+    .art-winners-head{font-family:var(--mono);font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--brand);padding:12px 18px 10px;border-bottom:1px solid var(--border);background:#1A1208;color:#E8E0D0}
+    .art-winners-scroll{overflow-x:auto}
+    .art-winners-table{width:100%;border-collapse:collapse;font-size:13px}
+    .art-winners-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:9px 14px;text-align:left;border-bottom:2px solid var(--border-2);white-space:nowrap}
+    .art-winners-table td{font-family:var(--mono);font-size:12px;color:var(--text);padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+    .art-winners-table tr.art-winners-top td{font-weight:600;background:rgba(168,132,46,.06)}
+    .art-winners-table tr:last-child td{border-bottom:none}
+    .art-winners-source{font-family:var(--mono);font-size:9px;color:var(--muted-2);padding:8px 18px;border-top:1px solid var(--border)}
   </style></head><body>${bodyHtml}</body></html>`);
+}));
+
+// ── Admin: desk stats for article chart authoring ─────────────────────────────
+// Returns ready-to-paste :::chart JSON specs derived from the desk cache.
+// Usage: GET /admin/articles/desk-stats/facilities-management?token=...
+app.get("/admin/articles/desk-stats/:slug", requireAdmin, asyncRoute(async (req, res) => {
+  const slug = req.params.slug;
+  const cached = await getDeskCache(slug);
+  if (!cached) { res.status(404).json({ error: "Desk not found or not cached" }); return; }
+  const data = cached.data as ProcurementData;
+  const awarded = (data?.contractsFinder?.awarded || []) as any[];
+  const fmtMoney = (v: number) => v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(1)}m` : v > 0 ? `£${Math.round(v / 1000)}k` : "—";
+
+  // Top buyers by awarded contract count
+  const buyerMap = new Map<string, { count: number; value: number }>();
+  for (const n of awarded) {
+    const b = String(n.buyer || "").trim(); if (!b) continue;
+    const e = buyerMap.get(b) || { count: 0, value: 0 };
+    e.count++; e.value += Number(n.awardedValue || 0);
+    buyerMap.set(b, e);
+  }
+  const topBuyers = [...buyerMap.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 8);
+
+  // Top suppliers by award count
+  const supplierMap = new Map<string, { count: number; value: number }>();
+  for (const n of awarded) {
+    const s = String(n.awardedSupplier || "").trim();
+    if (!s || s.toLowerCase().includes("not stated") || s.length < 3) continue;
+    const key = normaliseCompanyName(s) || s;
+    const e = supplierMap.get(key) || { count: 0, value: 0, name: s };
+    e.count++; e.value += Number(n.awardedValue || 0);
+    supplierMap.set(key, e);
+  }
+  const topSuppliers = [...supplierMap.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 8);
+
+  // Monthly spend (last 12 months)
+  const nowMs = Date.now();
+  const cutoff365 = nowMs - 365 * 24 * 3_600_000;
+  const monthlyMap = new Map<string, number>();
+  for (const n of awarded) {
+    const d = n.awardedDate ? new Date(n.awardedDate) : (n.publishedDate ? new Date(n.publishedDate) : null);
+    if (!d || d.getTime() < cutoff365 || d.getTime() > nowMs) continue;
+    const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthlyMap.set(mk, (monthlyMap.get(mk) || 0) + Number(n.awardedValue || 0));
+  }
+  const monthly = [...monthlyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  const specs = {
+    topBuyersByValue: topBuyers.length === 0 ? null : {
+      type: "horizontal-bar",
+      title: `Top buyers by awarded value — ${slug}`,
+      labels: topBuyers.map(([b]) => b.slice(0, 40)),
+      values: topBuyers.map(([, e]) => e.value),
+      unit: "£"
+    } satisfies ArticleChartSpec,
+    topSuppliersByCount: topSuppliers.length === 0 ? null : {
+      type: "horizontal-bar",
+      title: `Top suppliers by award count — ${slug}`,
+      labels: topSuppliers.map(([, e]) => (e as any).name?.slice(0, 40) ?? "Unknown"),
+      values: topSuppliers.map(([, e]) => e.count)
+    } satisfies ArticleChartSpec,
+    monthlySpend: monthly.length < 2 ? null : {
+      type: "bar",
+      title: `Monthly awarded spend — ${slug} (last 12 months)`,
+      labels: monthly.map(([k]) => { const d = new Date(k + "-01"); return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }); }),
+      values: monthly.map(([, v]) => v),
+      unit: "£"
+    } satisfies ArticleChartSpec,
+    winnersTableMarkdown: topSuppliers.length === 0 ? null :
+      `| Supplier | Awards | Total value | Latest award |\n|---|---|---|---|\n` +
+      topSuppliers.slice(0, 10).map(([, e]) => {
+        const latest = awarded.filter(n => normaliseCompanyName(String(n.awardedSupplier || "")) === normaliseCompanyName((e as any).name || "")).map(n => n.awardedDate || n.publishedDate || "").filter(Boolean).sort().at(-1);
+        const latestStr = latest ? new Date(latest).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : "—";
+        return `| ${(e as any).name} | ${e.count} | ${fmtMoney(e.value)} | ${latestStr} |`;
+      }).join("\n")
+  };
+
+  res.json({ slug, cachedAt: cached.cached_at, awardedCount: awarded.length, specs });
 }));
 
 // ── Admin article routes ───────────────────────────────────────────────────────
