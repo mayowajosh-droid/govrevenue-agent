@@ -12,7 +12,8 @@ const GOV_DOMAIN_MAP: Record<string, (slug: string) => string> = {
 
 function slugify(name: string): string {
   return name.toLowerCase()
-    .replace(/\b(council|borough of|city of|county|district|london borough of|royal borough of|metropolitan|university of|the)\b/g, "")
+    .replace(/\b(london borough of|royal borough of|borough of|city of|county of|university of)\b/g, "")
+    .replace(/\b(council|borough|district|county|city|town|metropolitan|unitary|authority|foundation trust|nhs trust|trust|college|university|academy|police|fire|rescue|service|services|the|and|of)\b/g, "")
     .replace(/[^a-z0-9]+/g, "")
     .trim();
 }
