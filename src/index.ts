@@ -8054,6 +8054,25 @@ app.post("/api/buyers/:id/discover-contacts", requireAdmin, asyncRoute(async (re
   res.json({ discovered: count });
 }));
 
+app.post("/api/buyers/recompute-totals", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ ok: false, error: "no db" }); return; }
+  const r = await pool.query(`
+    UPDATE buyer_entities be SET
+      total_awards = sub.cnt,
+      total_award_value = sub.val,
+      updated_at = NOW()
+    FROM (
+      SELECT buyer_entity_id,
+        COUNT(*)::int AS cnt,
+        COALESCE(SUM(COALESCE(awarded_value, value_high, value_low, 0)), 0)::bigint AS val
+      FROM buyer_procurement_history
+      GROUP BY buyer_entity_id
+    ) sub
+    WHERE be.id = sub.buyer_entity_id
+  `);
+  res.json({ ok: true, updated: r.rowCount });
+}));
+
 app.post("/api/buyers/discover-all-contacts", requireAdmin, asyncRoute(async (_req, res) => {
   res.json({ ok: true, message: "Bulk contact discovery started in background." });
   const allBuyers = await getTopBuyers(2000);
