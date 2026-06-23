@@ -15004,13 +15004,13 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     GROUP BY grade`),
     safePool(`SELECT COUNT(*)::int AS cnt FROM alert_subscriptions WHERE active = true`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT buyer_type)::int AS types, MAX(last_seen) AS last_seen FROM buyer_entities`),
-    safePool(`SELECT id, name, buyer_type, address, total_awards, total_award_value, last_seen FROM buyer_entities ORDER BY total_award_value DESC NULLS LAST LIMIT 50`),
+    safePool(`SELECT id, name, buyer_type, address, total_awards, total_award_value, last_seen FROM buyer_entities ORDER BY total_award_value DESC NULLS LAST LIMIT 10`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE verified=true)::int AS verified, COUNT(DISTINCT buyer_entity_id)::int AS entities, COUNT(DISTINCT domain)::int AS domains FROM buyer_contacts`),
-    safePool(`SELECT bc.email, bc.name, bc.role, bc.confidence_score, bc.verified, bc.domain, bc.source, bc.discovered_at, be.name AS org_name FROM buyer_contacts bc LEFT JOIN buyer_entities be ON be.id=bc.buyer_entity_id ORDER BY bc.confidence_score DESC LIMIT 50`),
+    safePool(`SELECT bc.email, bc.name, bc.role, bc.confidence_score, bc.verified, bc.domain, bc.source, bc.discovered_at, be.name AS org_name FROM buyer_contacts bc LEFT JOIN buyer_entities be ON be.id=bc.buyer_entity_id ORDER BY bc.confidence_score DESC LIMIT 10`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE significance='high')::int AS high, COUNT(*) FILTER (WHERE source='ons')::int AS ons, COUNT(*) FILTER (WHERE source='land_registry')::int AS lr FROM early_signals`),
-    safePool(`SELECT source, indicator, region, period, change_pct, significance, narrative, fetched_at FROM early_signals ORDER BY fetched_at DESC LIMIT 50`),
+    safePool(`SELECT source, indicator, region, period, change_pct, significance, narrative, fetched_at FROM early_signals ORDER BY fetched_at DESC LIMIT 10`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT stage)::int AS stages, COUNT(*) FILTER (WHERE stage='open_tender')::int AS open, COUNT(*) FILTER (WHERE stage='awarded')::int AS awarded FROM opportunity_lifecycle`),
-    safePool(`SELECT buyer, title, stage, maturity_score, desk_category, stage_entered_at, source_url FROM opportunity_lifecycle ORDER BY stage_entered_at DESC LIMIT 50`),
+    safePool(`SELECT buyer, title, stage, maturity_score, desk_category, stage_entered_at, source_url FROM opportunity_lifecycle ORDER BY stage_entered_at DESC LIMIT 10`),
     safePool(`SELECT COUNT(*)::int AS total FROM lifecycle_transitions`),
   ]);
 
@@ -16113,7 +16113,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   </div>
   ${buyerList.length === 0
     ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No buyer entities yet — runs after first signal refresh</div>`
-    : `<div style="overflow-x:auto"><table class="a-tbl">
+    : `<div style="overflow:auto;max-height:360px"><table class="a-tbl">
         <thead><tr><th>Organisation</th><th>Type</th><th>Total Contracts</th><th>Total Value</th><th>Last Seen</th></tr></thead>
         <tbody>${buyerList.map((b: any) => `<tr>
           <td style="font-weight:500;max-width:220px">${escapeHtml((b.name||"").slice(0,50))}</td>
@@ -16147,7 +16147,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   </div>
   ${contactList.length === 0
     ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No contacts yet — triggered via POST /api/buyers/:id/discover-contacts</div>`
-    : `<div style="overflow-x:auto"><table class="a-tbl">
+    : `<div style="overflow:auto;max-height:360px"><table class="a-tbl">
         <thead><tr><th>Email</th><th>Name</th><th>Org</th><th>Role</th><th>Source</th><th>Score</th><th>Verified</th><th>Discovered</th></tr></thead>
         <tbody>${contactList.map((c: any) => `<tr>
           <td style="font-family:var(--mono);font-size:11px">${escapeHtml(c.email||"")}</td>
@@ -16182,7 +16182,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   </div>
   ${earlySignalList.length === 0
     ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No early signals yet — POST /api/early-signals/refresh to seed</div>`
-    : `<div style="overflow-x:auto"><table class="a-tbl">
+    : `<div style="overflow:auto;max-height:360px"><table class="a-tbl">
         <thead><tr><th>Source</th><th>Indicator</th><th>Region</th><th>Period</th><th>Change %</th><th>Significance</th><th>Narrative</th><th>Fetched</th></tr></thead>
         <tbody>${earlySignalList.map((s: any) => {
           const sig = String(s.significance||"low");
@@ -16223,7 +16223,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   </div>
   ${lifecycleList.length === 0
     ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No lifecycle data yet — populates after signal refresh</div>`
-    : `<div style="overflow-x:auto"><table class="a-tbl">
+    : `<div style="overflow:auto;max-height:360px"><table class="a-tbl">
         <thead><tr><th>Buyer</th><th>Title</th><th>Stage</th><th>Maturity</th><th>Desk</th><th>Entered</th><th>Source</th></tr></thead>
         <tbody>${lifecycleList.map((l: any) => {
           const stage = String(l.stage||"unknown");
