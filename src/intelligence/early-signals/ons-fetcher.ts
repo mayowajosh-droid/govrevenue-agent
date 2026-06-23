@@ -1,7 +1,12 @@
 import type { OnsDataPoint } from "./types.js";
 
-const ONS_BASE = "https://api.ons.gov.uk";
+const ONS_BETA = "https://api.beta.ons.gov.uk/v1";
 const TIMEOUT_MS = 15_000;
+
+const CONSTRUCTION_DATASET = "output-in-the-construction-industry";
+const CONSTRUCTION_EDITION = "time-series";
+
+const BUSINESS_DATASET = "uk-business-by-enterprises-and-local-units";
 
 function onsAbort(): AbortController {
   const ac = new AbortController();
@@ -9,33 +14,66 @@ function onsAbort(): AbortController {
   return ac;
 }
 
-/**
- * Fetch last 12 months of construction output index (series K2N3).
- * Returns monthly data points sorted oldest-first.
- */
-export async function fetchConstructionOutput(): Promise<OnsDataPoint[]> {
+function recentMonthCodes(count: number): string[] {
+  const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  const codes: string[] = [];
+  const now = new Date();
+  for (let i = count; i >= 1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    codes.push(`${d.getFullYear()}-${months[d.getMonth()]}`);
+  }
+  return codes;
+}
+
+async function fetchLatestVersion(): Promise<string> {
+  const ac = onsAbort();
+  const res = await fetch(
+    `${ONS_BETA}/datasets/${CONSTRUCTION_DATASET}/editions/${CONSTRUCTION_EDITION}/versions?limit=1`,
+    { signal: ac.signal }
+  );
+  if (!res.ok) return "54";
+  const json = await res.json() as { items?: Array<{ version?: number }> };
+  return String(json.items?.[0]?.version ?? 54);
+}
+
+async function fetchConstructionObservation(version: string, timeCode: string): Promise<OnsDataPoint | null> {
   try {
     const ac = onsAbort();
-    const res = await fetch(
-      `${ONS_BASE}/economy/constructionindustry/timeseries/K2N3/data`,
-      { signal: ac.signal }
-    );
-    if (!res.ok) return [];
+    const url = `${ONS_BETA}/datasets/${CONSTRUCTION_DATASET}/editions/${CONSTRUCTION_EDITION}/versions/${version}/observations?geography=K03000001&seasonaladjustment=seasonal-adjustment&seriestype=index-numbers&typeofwork=1&time=${timeCode}`;
+    const res = await fetch(url, { signal: ac.signal });
+    if (!res.ok) return null;
 
-    const json = (await res.json()) as {
-      months?: Array<{ date: string; value: string; label: string }>;
+    const json = await res.json() as {
+      observations?: Array<{ observation: string }> | null;
+      total_observations?: number;
     };
 
-    if (!json.months || !Array.isArray(json.months)) return [];
+    if (!json.observations || json.observations.length === 0) return null;
 
-    const points: OnsDataPoint[] = json.months
-      .slice(-12)
-      .map((m) => ({
-        date: m.date,
-        value: parseFloat(m.value),
-        label: m.label,
-      }))
-      .filter((p) => !isNaN(p.value));
+    const val = parseFloat(json.observations[0].observation);
+    if (isNaN(val)) return null;
+
+    return { date: timeCode, value: val, label: timeCode };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchConstructionOutput(): Promise<OnsDataPoint[]> {
+  try {
+    const version = await fetchLatestVersion();
+    const codes = recentMonthCodes(12);
+
+    const results = await Promise.allSettled(
+      codes.map(code => fetchConstructionObservation(version, code))
+    );
+
+    const points: OnsDataPoint[] = [];
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) {
+        points.push(r.value);
+      }
+    }
 
     return points;
   } catch {
@@ -43,34 +81,32 @@ export async function fetchConstructionOutput(): Promise<OnsDataPoint[]> {
   }
 }
 
-/**
- * Fetch latest business demography data (birth/death rates).
- * Uses the business demography timeseries endpoint.
- */
 export async function fetchBusinessDemography(): Promise<OnsDataPoint[]> {
   try {
-    const ac = onsAbort();
-    // Business births timeseries — annual data
-    const res = await fetch(
-      `${ONS_BASE}/businessindustryandtrade/business/activitysizeandlocation/timeseries/JA2I/data`,
-      { signal: ac.signal }
-    );
-    if (!res.ok) return [];
+    const points: OnsDataPoint[] = [];
+    const editions = ["2021", "2022"];
 
-    const json = (await res.json()) as {
-      years?: Array<{ date: string; value: string; label: string }>;
-    };
+    for (const edition of editions) {
+      try {
+        const ac = onsAbort();
+        const url = `${ONS_BETA}/datasets/${BUSINESS_DATASET}/editions/${edition}/versions/1/observations?geography=K02000001&enterprisesandlocalunits=enterprises&unofficialstandardindustrialclassification=total&time=${edition}`;
+        const res = await fetch(url, { signal: ac.signal });
+        if (!res.ok) continue;
 
-    if (!json.years || !Array.isArray(json.years)) return [];
+        const json = await res.json() as {
+          observations?: Array<{ observation: string }> | null;
+        };
 
-    const points: OnsDataPoint[] = json.years
-      .slice(-5)
-      .map((y) => ({
-        date: y.date,
-        value: parseFloat(y.value),
-        label: y.label,
-      }))
-      .filter((p) => !isNaN(p.value));
+        if (!json.observations || json.observations.length === 0) continue;
+
+        const val = parseFloat(json.observations[0].observation);
+        if (!isNaN(val)) {
+          points.push({ date: edition, value: val, label: `${edition} enterprises` });
+        }
+      } catch {
+        continue;
+      }
+    }
 
     return points;
   } catch {
