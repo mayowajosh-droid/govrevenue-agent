@@ -8054,6 +8054,19 @@ app.post("/api/buyers/:id/discover-contacts", requireAdmin, asyncRoute(async (re
   res.json({ discovered: count });
 }));
 
+app.post("/api/buyers/discover-all-contacts", requireAdmin, asyncRoute(async (_req, res) => {
+  res.json({ ok: true, message: "Bulk contact discovery started in background." });
+  const allBuyers = await getTopBuyers(2000);
+  let total = 0;
+  for (const entity of allBuyers) {
+    try {
+      const n = await discoverContactsForBuyer(entity);
+      total += n;
+    } catch {}
+  }
+  console.log(`[contacts] bulk discovery complete: ${total} contacts across ${allBuyers.length} buyers`);
+}));
+
 app.get("/api/early-signals", requireAuth, asyncRoute(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const signals = await getLatestEarlySignals(limit);
