@@ -7,6 +7,7 @@ const GOV_DOMAIN_MAP: Record<string, (slug: string) => string> = {
   police_fire: (s) => `${s}.police.uk`,
   education: (s) => `${s}.ac.uk`,
   central_gov: (s) => `${s}.gov.uk`,
+  housing: (s) => `${s}.org.uk`,
 };
 
 function slugify(name: string): string {

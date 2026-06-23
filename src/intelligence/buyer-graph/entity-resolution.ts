@@ -116,12 +116,13 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
       buyer_entity_id: entity.id,
     }));
     await insertBuyerOfficers(allPeople);
-
-    try {
-      const { discoverContactsForBuyer } = await import("../email-discovery/index.js");
-      await discoverContactsForBuyer(entity);
-    } catch {}
   }
+
+  // Discover contacts for all buyers (role-based emails + CH officers where available)
+  try {
+    const { discoverContactsForBuyer } = await import("../email-discovery/index.js");
+    await discoverContactsForBuyer(entity);
+  } catch {}
 
   return entity;
 }
