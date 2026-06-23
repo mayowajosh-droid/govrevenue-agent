@@ -140,6 +140,7 @@ export async function getBuyerOfficers(entityId: string): Promise<BuyerOfficer[]
 
 export async function upsertProcurementHistory(records: Omit<BuyerProcurementHistory, "id">[]): Promise<void> {
   if (!pool || records.length === 0) return;
+  const affectedEntityIds = new Set<string>();
   for (const rec of records) {
     await pool.query(
       `INSERT INTO buyer_procurement_history (id, buyer_entity_id, notice_id, title, category, status, value_low, value_high, awarded_value, awarded_supplier, published_date, deadline_date, awarded_date, source, source_url)
@@ -152,6 +153,18 @@ export async function upsertProcurementHistory(records: Omit<BuyerProcurementHis
       [makeId(), rec.buyer_entity_id, rec.notice_id, rec.title, rec.category, rec.status,
        rec.value_low, rec.value_high, rec.awarded_value, rec.awarded_supplier,
        rec.published_date, rec.deadline_date, rec.awarded_date, rec.source, rec.source_url]
+    );
+    affectedEntityIds.add(rec.buyer_entity_id);
+  }
+  // Recompute totals for each affected buyer from actual history rows
+  for (const entityId of affectedEntityIds) {
+    await pool.query(
+      `UPDATE buyer_entities SET
+         total_awards = (SELECT COUNT(*) FROM buyer_procurement_history WHERE buyer_entity_id = $1),
+         total_award_value = (SELECT COALESCE(SUM(COALESCE(awarded_value, value_high, value_low, 0)), 0) FROM buyer_procurement_history WHERE buyer_entity_id = $1),
+         updated_at = NOW()
+       WHERE id = $1`,
+      [entityId]
     );
   }
 }
