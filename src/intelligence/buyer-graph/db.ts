@@ -22,7 +22,7 @@ export async function initBuyerGraphTables() {
       last_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS idx_buyer_entities_normalised ON buyer_entities (normalised_name);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_buyer_entities_normalised ON buyer_entities (normalised_name);
     CREATE INDEX IF NOT EXISTS idx_buyer_entities_company_number ON buyer_entities (company_number) WHERE company_number IS NOT NULL;
   `);
 
@@ -77,7 +77,7 @@ export async function upsertBuyerEntity(entity: Omit<BuyerEntity, "id" | "first_
   const r = await pool.query<BuyerEntity>(
     `INSERT INTO buyer_entities (id, name, normalised_name, company_number, company_status, company_type, address, sic_codes, website, buyer_type, total_awards, total_award_value, first_seen, last_seen, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$13)
-     ON CONFLICT (normalised_name) WHERE normalised_name = $3
+     ON CONFLICT (normalised_name)
      DO UPDATE SET
        name = CASE WHEN LENGTH(EXCLUDED.name) > LENGTH(buyer_entities.name) THEN EXCLUDED.name ELSE buyer_entities.name END,
        company_number = COALESCE(EXCLUDED.company_number, buyer_entities.company_number),

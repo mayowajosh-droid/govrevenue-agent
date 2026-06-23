@@ -59,7 +59,7 @@ export function correlateSignals(input: RawSignalInput): EarlySignal[] {
     if (prev.value !== 0) {
       const changePct = ((curr.value - prev.value) / prev.value) * 100;
 
-      if (Math.abs(changePct) >= 5) {
+      if (Math.abs(changePct) >= 1) {
         const sig: EarlySignal = {
           id: `ons-construction-${curr.date}`,
           source: "ons",
@@ -90,7 +90,7 @@ export function correlateSignals(input: RawSignalInput): EarlySignal[] {
     if (prev.value !== 0) {
       const changePct = ((curr.value - prev.value) / prev.value) * 100;
 
-      if (Math.abs(changePct) >= 5) {
+      if (Math.abs(changePct) >= 1) {
         const sig: EarlySignal = {
           id: `ons-biz-demog-${curr.date}`,
           source: "ons",
