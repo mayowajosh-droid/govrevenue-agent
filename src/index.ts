@@ -7633,17 +7633,17 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="hero-grad"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Opportunity Radar &middot; UK Public Sector</div>
-      <h1>See government demand<br>before it <em>becomes a tender.</em></h1>
-      <p class="lede">Public bodies already spend on what you sell. We surface the buyers, frameworks, and spend patterns that signal the next opportunity &mdash; so your firm enters with intelligence, not hope.</p>
+      <div class="eyebrow">Market Intelligence Platform &middot; Public &amp; Private Sector</div>
+      <h1>The raw data is public.<br><em>The advantage is in the assembly.</em></h1>
+      <p class="lede">AtlasRevenue combines named decision-makers, verified contacts, pre-tender demand signals, and geographic opportunity mapping into a single intelligence layer &mdash; so your firm sees not just who is buying, but where demand is concentrating and where to expand next.</p>
       <div class="hero-actions">
-        <a class="btn-primary" href="/scan">Run a revenue scan</a>
+        <a class="btn-primary" href="/scan">Run an intelligence scan</a>
         ${sampleLink}
       </div>
       <div class="chips">
-        <div class="chip"><b>&pound;400bn</b> annual public spend</div>
-        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> signals tracked</div>
-        <div class="chip">Live: Contracts Finder + Find a Tender</div>
+        <div class="chip"><b>Verified</b> contacts &amp; decision-makers</div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> pre-tender signals</div>
+        <div class="chip">Geographic opportunity mapping</div>
       </div>
     </div>
     <div class="hero-card-wrap">
@@ -7666,8 +7666,8 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="wrap">
     <div class="reveal">
       <div class="eyebrow">All-desk spend signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
-      <h2>Track the spend curve before the tender lands.</h2>
-      <p>Recurring spend in a category is the leading indicator. When it climbs, re-lets and frameworks follow. We track the curve so you enter on the upswing, not after the award.</p>
+      <h2>Detect demand before it surfaces as a tender.</h2>
+      <p>Recurring spend in a category is the leading indicator. A competitor can replicate a feature. They cannot replicate a dataset verified by hand and refined by use over years. We map the curve so your firm enters on the upswing &mdash; not after the award.</p>
       <ul>
         ${chartBullets}
       </ul>
@@ -8734,8 +8734,8 @@ ${userScans.length === 0 ? `
   <div class="onb-hero-inner">
     <div class="onb-hero-content">
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Welcome to AtlasRevenue</div>
-      <h2 style="font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:14px;line-height:1.3">See government demand before it becomes a tender</h2>
-      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">AtlasRevenue scans Contracts Finder and Find a Tender against your company profile. In under 5 minutes you get a 10-section intelligence report: which buyers are spending, where the money is going, and whether your firm can win.</p>
+      <h2 style="font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:14px;line-height:1.3">The raw data is public. The advantage is in the assembly.</h2>
+      <p style="font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px">AtlasRevenue maps named buyers, verified contacts, and pre-tender demand signals against your company profile. In under 5 minutes you get a 10-section intelligence report: who is spending, where demand is concentrating, and where your firm should move next.</p>
       <div class="onb-steps">
         <div class="onb-step"><span class="onb-step-num">1</span><span class="onb-step-text">Tell us about your company</span></div>
         <div class="onb-step"><span class="onb-step-num">2</span><span class="onb-step-text">We scan live procurement data</span></div>
