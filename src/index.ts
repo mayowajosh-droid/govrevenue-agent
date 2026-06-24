@@ -9312,7 +9312,8 @@ document.querySelectorAll('.atl-pill').forEach(function(p){
   });
 });
 
-if(document.getElementById('atl-q').value.trim())doSearch();
+var initQ=document.getElementById('atl-q').value.trim();
+if(initQ)doSearch();else hideLdr();
 })();
 </script>
 </body>
