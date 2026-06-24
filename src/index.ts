@@ -8625,55 +8625,87 @@ app.get("/intelligence", asyncRoute(async (req, res) => {
 // ── Map API — aggregate demand by district ────────────────────────────────────
 
 app.get("/api/map/data", asyncRoute(async (req, res) => {
-  const q = String(req.query.q || "roofing").trim().toLowerCase();
-  if (!pool) { res.json({ districts: [] }); return; }
+  const q = String(req.query.q || "").trim();
+  if (!q) { res.json({ query: "", districts: [] }); return; }
+  const qLower = q.toLowerCase();
 
-  // Awarded contracts by district (from canonical_ingest buyer field + title match)
-  const contractsR = await pool.query<{ district: string; count: string; total_value: string }>(
-    `SELECT
-       COALESCE(NULLIF(TRIM(buyer_region), ''), TRIM(buyer), 'Unknown') AS district,
-       COUNT(*) AS count,
-       COALESCE(SUM(value), 0) AS total_value
-     FROM canonical_ingest
-     WHERE LOWER(title) LIKE $1
-       AND status IN ('awarded', 'processed', 'pending')
-       AND fetched_at > now() - interval '18 months'
-     GROUP BY district
-     ORDER BY count DESC
-     LIMIT 150`,
-    [`%${q}%`]
-  ).catch(() => ({ rows: [] as any[] }));
+  const districtNames = Object.keys(DISTRICT_CENTROIDS);
 
-  // Planning applications by local authority (keyword match on description)
-  const planningR = await pool.query<{ district: string; count: string }>(
-    `SELECT local_authority AS district, COUNT(*) AS count
-     FROM planning_applications
-     WHERE (LOWER(description) LIKE $1 OR LOWER(applicant_name) LIKE $1)
-       AND local_authority IS NOT NULL
-       AND received_date > now() - interval '18 months'
-     GROUP BY local_authority
-     ORDER BY count DESC
-     LIMIT 150`,
-    [`%${q}%`]
-  ).catch(() => ({ rows: [] as any[] }));
+  // Fuzzy-match a buyer/organisation name to a known UK district centroid
+  function matchDistrict(text: string): string | null {
+    const t = text.toLowerCase();
+    for (const d of districtNames) {
+      if (t.includes(d.toLowerCase())) return d;
+    }
+    return null;
+  }
 
-  // Merge both sets keyed by district name
   const merged = new Map<string, { contracts: number; planning: number; value: number }>();
 
-  for (const r of contractsR.rows as any[]) {
-    const d = String(r.district || "").trim();
-    if (!d || d === "Unknown" || d.length < 3) continue;
-    const e = merged.get(d) || { contracts: 0, planning: 0, value: 0 };
-    e.contracts += parseInt(r.count || "0");
-    e.value += parseFloat(r.total_value || "0");
-    merged.set(d, e);
-  }
-  for (const r of planningR.rows as any[]) {
-    const d = String(r.district || "").trim();
-    if (!d || d.length < 3) continue;
-    const e = merged.get(d) || { contracts: 0, planning: 0, value: 0 };
-    e.planning += parseInt(r.count || "0");
-    merged.set(d, e);
+  // ── 1. Live query to Contracts Finder ────────────────────────────────────────
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const cfResp = await fetch(
+      "https://www.contractsfinder.service.gov.uk/Published/Notices/PublishedNoticeList/Search",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": "AtlasRevenue/1.0" },
+        body: JSON.stringify({ searchCriteria: { keywords: q, size: 100, from: 0 } }),
+        signal: ctrl.signal,
+      }
+    ).finally(() => clearTimeout(timer));
+    if (cfResp.ok) {
+      const cfData = await cfResp.json() as any;
+      for (const notice of cfData?.notices ?? []) {
+        const item = notice?.item ?? notice;
+        const buyer = String(item?.organizationName || item?.buyerOrganisationName || item?.contactDetails?.name || "");
+        const district = matchDistrict(buyer);
+        if (!district) continue;
+        const val = parseFloat(item?.value?.amount ?? item?.awardedValue ?? 0) || 0;
+        const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
+        e.contracts++;
+        e.value += val;
+        merged.set(district, e);
+      }
+    }
+  } catch {}
+
+  // ── 2. Planning applications (DB) ────────────────────────────────────────────
+  if (pool) {
+    const planningR = await pool.query<{ district: string; count: string }>(
+      `SELECT local_authority AS district, COUNT(*) AS count
+       FROM planning_applications
+       WHERE (LOWER(description) LIKE $1 OR LOWER(applicant_name) LIKE $1)
+         AND local_authority IS NOT NULL
+       GROUP BY local_authority ORDER BY count DESC LIMIT 150`,
+      [`%${qLower}%`]
+    ).catch(() => ({ rows: [] as any[] }));
+    for (const r of planningR.rows as any[]) {
+      const raw = String(r.district || "").trim();
+      const district = matchDistrict(raw) ?? (DISTRICT_CENTROIDS[raw] ? raw : null);
+      if (!district) continue;
+      const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
+      e.planning += parseInt(r.count || "0");
+      merged.set(district, e);
+    }
+
+    // ── 3. homepage_signals buyer names → district matching ───────────────────
+    const sigsR = await pool.query<{ buyer: string; count: string; total_value: string }>(
+      `SELECT buyer, COUNT(*) AS count, COALESCE(SUM(value_amount),0) AS total_value
+       FROM homepage_signals
+       WHERE LOWER(title) LIKE $1 AND buyer IS NOT NULL AND buyer != ''
+       GROUP BY buyer`,
+      [`%${qLower}%`]
+    ).catch(() => ({ rows: [] as any[] }));
+    for (const r of sigsR.rows as any[]) {
+      const district = matchDistrict(String(r.buyer || ""));
+      if (!district) continue;
+      const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
+      e.contracts += parseInt(r.count || "0");
+      e.value += parseFloat(r.total_value || "0");
+      merged.set(district, e);
+    }
   }
 
   const districts = [...merged.entries()]
@@ -8885,7 +8917,7 @@ html,body{height:100%;overflow:hidden;background:#090a0c}
 
 /* Loading overlay */
 .atl-loader{position:absolute;inset:0;background:rgba(7,8,9,.75);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none;transition:opacity .4s;backdrop-filter:blur(3px)}
-.atl-loader.gone{opacity:0;pointer-events:none}
+.atl-loader.gone{opacity:0;pointer-events:none;visibility:hidden}
 .atl-spinner{width:18px;height:18px;border:2px solid rgba(255,165,0,.2);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:10px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .atl-loader-txt{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(236,230,214,.45)}
@@ -9107,12 +9139,16 @@ window.fd=function(name){
   if(ll){map.flyTo(ll,10,{animate:true,duration:1});setTimeout(function(){hilite(name);},400);}
 };
 
+function hideLdr(){var ldr=document.getElementById('atl-ldr');if(ldr){ldr.classList.add('gone');ldr.style.display='none';}}
+
 function doSearch(){
   var q=document.getElementById('atl-q').value.trim();
-  if(!q)return;
+  if(!q){hideLdr();return;}
   document.getElementById('atl-side-q').textContent=q;
   var ldr=document.getElementById('atl-ldr');
-  ldr.classList.remove('gone');
+  if(ldr){ldr.style.display='';ldr.classList.remove('gone');}
+  var done=false;
+  var guard=setTimeout(function(){if(!done){done=true;hideLdr();}},12000);
   fetch('/api/map/data?q='+encodeURIComponent(q))
     .then(function(r){return r.json();})
     .then(function(data){
@@ -9122,7 +9158,7 @@ function doSearch(){
       updateKpis(data);
     })
     .catch(function(){})
-    .finally(function(){ldr.classList.add('gone');});
+    .finally(function(){clearTimeout(guard);if(!done){done=true;hideLdr();}});
 }
 
 document.querySelectorAll('.atl-layer').forEach(function(btn){
