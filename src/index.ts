@@ -8860,9 +8860,6 @@ app.get("/atlas", asyncRoute(async (req, res) => {
 app.get("/map", (_req, res) => res.redirect(301, "/atlas"));
 
 function atlasPage(defaultQuery: string, authCtx?: { email: string; tier: UserTier } | null): string {
-  const authHtml = authCtx
-    ? `<a href="/account" class="atl-auth-lnk">Dashboard</a><a href="/logout" class="atl-auth-lnk">Sign out</a>`
-    : `<a href="/login" class="atl-auth-lnk">Sign in</a><a href="/scan" class="atl-auth-cta">Run a scan →</a>`;
   const q = escapeHtml(defaultQuery);
   const centroidsJson = JSON.stringify(DISTRICT_CENTROIDS);
   return `<!DOCTYPE html>
@@ -8875,162 +8872,269 @@ function atlasPage(defaultQuery: string, authCtx?: { email: string; tier: UserTi
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
 ${pageShellCss()}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:#090a0c}
+/* ── Atlas-specific styles ── */
+.atl-hero{background:var(--hero-2);border-bottom:1px solid rgba(236,230,214,.1);padding:52px 0 44px}
+.atl-hero-inner{padding:0 32px;max-width:1200px;margin:0 auto}
+.atl-hero-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.atl-live-dot{width:6px;height:6px;border-radius:50%;background:var(--brand);animation:atl-blink 2.5s ease infinite;flex-shrink:0}
+@keyframes atl-blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes atl-spin{to{transform:rotate(360deg)}}
+.atl-hero h1{font-family:var(--serif);font-size:36px;font-weight:500;letter-spacing:-.025em;line-height:1.1;color:#ECE6D6;margin-bottom:12px;max-width:640px}
+.atl-hero-sub{font-size:15px;color:rgba(236,230,214,.55);max-width:540px;line-height:1.6;margin-bottom:32px}
+.atl-search-row{display:flex;gap:0;max-width:600px}
+.atl-search-row input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(236,230,214,.15);border-right:none;color:#ECE6D6;font-family:var(--sans);font-size:14px;padding:13px 18px;outline:none;transition:border-color .15s;min-width:0}
+.atl-search-row input::placeholder{color:rgba(236,230,214,.3)}
+.atl-search-row input:focus{border-color:rgba(180,146,78,.6)}
+.atl-search-btn{background:var(--brand);color:#fff;border:none;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;padding:13px 24px;cursor:pointer;text-transform:uppercase;transition:opacity .15s;flex-shrink:0;white-space:nowrap}
+.atl-search-btn:hover{opacity:.88}
+.atl-pills-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.atl-pill{background:rgba(255,255,255,.05);border:1px solid rgba(236,230,214,.12);color:rgba(236,230,214,.5);font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:5px 12px;cursor:pointer;transition:all .15s;border-radius:2px}
+.atl-pill:hover{border-color:rgba(180,146,78,.5);color:rgba(236,230,214,.9);background:rgba(180,146,78,.08)}
+.atl-hero-stats{display:flex;gap:1px;background:rgba(236,230,214,.08);border:1px solid rgba(236,230,214,.08);width:fit-content;margin-top:36px}
+.atl-hstat{padding:12px 22px;background:rgba(255,255,255,.03)}
+.atl-hstat-val{display:block;font-family:var(--serif);font-size:22px;font-weight:500;color:#ECE6D6;letter-spacing:-.01em;line-height:1.1}
+.atl-hstat-lbl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,230,214,.3);margin-top:4px}
 
-.atl-hdr{background:#0b0c0e;border-bottom:1px solid rgba(255,255,255,.07);padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:1001;position:relative}
-.atl-logo{font-family:var(--serif);font-size:18px;color:#ECE6D6;text-decoration:none;flex-shrink:0}
-.atl-logo b{color:var(--brand)}
-.atl-vr{width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0}
-.atl-page-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.3);flex-shrink:0}
-.atl-search-wrap{display:flex;flex:1;max-width:400px;gap:0;flex-shrink:0}
-.atl-search-wrap input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-right:none;color:#ECE6D6;font-family:var(--mono);font-size:11px;padding:7px 14px;outline:none;min-width:0;transition:border-color .15s}
-.atl-search-wrap input::placeholder{color:rgba(236,230,214,.25)}
-.atl-search-wrap input:focus{border-color:rgba(255,165,0,.45)}
-.atl-search-btn{background:var(--brand);color:#000;border:none;font-family:var(--mono);font-size:9px;font-weight:900;letter-spacing:.12em;padding:7px 14px;cursor:pointer;text-transform:uppercase;transition:opacity .15s;flex-shrink:0}
-.atl-search-btn:hover{opacity:.85}
-.atl-layers{display:flex;gap:4px;flex-shrink:0}
-.atl-layer{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);color:rgba(236,230,214,.45);font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 10px;cursor:pointer;transition:all .15s;user-select:none}
-.atl-layer:hover{border-color:rgba(255,165,0,.4);color:rgba(236,230,214,.8)}
-.atl-layer.on{background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.45);color:var(--brand)}
-.atl-presets{display:flex;gap:3px;flex-shrink:0}
-.atl-pill{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:rgba(236,230,214,.4);font-family:var(--mono);font-size:8px;letter-spacing:.05em;padding:4px 9px;cursor:pointer;transition:all .15s;white-space:nowrap;border-radius:2px}
-.atl-pill:hover{border-color:rgba(255,165,0,.5);color:rgba(236,230,214,.85);background:rgba(255,165,0,.05)}
-.atl-auth{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
-.atl-auth-lnk{font-family:var(--mono);font-size:9px;color:rgba(236,230,214,.4);text-decoration:none;letter-spacing:.06em;transition:color .15s}
-.atl-auth-lnk:hover{color:var(--brand)}
-.atl-auth-cta{background:var(--brand);color:#000;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;padding:5px 12px;text-decoration:none;text-transform:uppercase}
-
-.atl-body{flex:1;display:grid;grid-template-columns:1fr 296px;overflow:hidden;position:relative}
-#atlas-map{width:100%;height:100%;position:relative}
-
-/* Leaflet dark theme */
-.leaflet-container{background:#070809!important}
-.leaflet-control-attribution{background:rgba(0,0,0,.55)!important;color:rgba(255,255,255,.25)!important;font-size:8px!important}
-.leaflet-control-attribution a{color:rgba(255,255,255,.3)!important}
-.leaflet-control-zoom a{background:#141516!important;color:#ECE6D6!important;border-color:rgba(255,255,255,.1)!important;transition:background .15s!important}
-.leaflet-control-zoom a:hover{background:#1e1f21!important}
-.leaflet-popup-content-wrapper{background:#13141a;border:1px solid rgba(255,255,255,.1);border-radius:2px;box-shadow:0 8px 40px rgba(0,0,0,.7);padding:0}
-.leaflet-popup-content{color:#ECE6D6;font-family:var(--mono);font-size:11px;margin:0;line-height:1.6}
-.leaflet-popup-tip-container{display:none}
-.leaflet-popup-close-button{color:rgba(236,230,214,.4)!important;font-size:16px!important;top:6px!important;right:8px!important}
-
-/* Loading overlay */
-.atl-loader{position:absolute;inset:0;background:rgba(7,8,9,.75);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none;transition:opacity .4s;backdrop-filter:blur(3px)}
+/* ── Map + sidebar block ── */
+.atl-map-section{padding:40px 0;background:var(--base)}
+.atl-map-inner{padding:0 32px;max-width:1200px;margin:0 auto}
+.atl-section-hd{margin-bottom:20px;display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.atl-section-label{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand)}
+.atl-section-title{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--text);letter-spacing:-.01em;margin-top:4px}
+.atl-layers-tog{display:flex;gap:6px}
+.atl-layer{background:var(--surface);border:1px solid var(--border-2);color:var(--muted);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:6px 12px;cursor:pointer;transition:all .15s;user-select:none}
+.atl-layer.on{background:var(--brand-dim);border-color:var(--brand);color:var(--brand)}
+.atl-layer:hover{border-color:var(--brand);color:var(--brand)}
+.atl-map-grid{display:grid;grid-template-columns:1fr 300px;gap:0;border:1px solid var(--border-2);background:var(--surface)}
+#atlas-map{height:520px;position:relative;z-index:0}
+.atl-loader{position:absolute;inset:0;background:rgba(251,249,243,.82);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none;transition:opacity .35s;backdrop-filter:blur(2px)}
 .atl-loader.gone{opacity:0;pointer-events:none;visibility:hidden}
-.atl-spinner{width:18px;height:18px;border:2px solid rgba(255,165,0,.2);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:10px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.atl-loader-txt{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(236,230,214,.45)}
-
-/* Sidebar */
-.atl-side{background:#0b0c0e;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;overflow:hidden}
-.atl-side-top{padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
-.atl-side-eyebrow{font-family:var(--mono);font-size:7px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.25);margin-bottom:4px}
-.atl-side-q{font-family:var(--serif);font-size:14px;font-weight:600;color:#ECE6D6;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.atl-kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
-.atl-kpi{background:#0b0c0e;padding:9px 14px}
-.atl-kpi-val{font-family:var(--mono);font-size:15px;font-weight:700;color:#ECE6D6;letter-spacing:-.02em;line-height:1}
-.atl-kpi-lbl{font-family:var(--mono);font-size:7px;letter-spacing:.15em;text-transform:uppercase;color:rgba(236,230,214,.28);margin-top:3px}
-.atl-legend{display:flex;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0;align-items:center}
+.atl-spinner{width:16px;height:16px;border:2px solid rgba(180,146,78,.2);border-top-color:var(--brand);border-radius:50%;animation:atl-spin .7s linear infinite;margin-right:10px;flex-shrink:0}
+.atl-loader-txt{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.atl-side{background:var(--surface);border-left:1px solid var(--border-2);display:flex;flex-direction:column;overflow:hidden}
+.atl-side-top{padding:16px 18px 14px;border-bottom:1px solid var(--border-2);flex-shrink:0}
+.atl-side-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.atl-side-q{font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.4em}
+.atl-kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border-2);border-bottom:1px solid var(--border-2);flex-shrink:0}
+.atl-kpi{background:var(--surface);padding:10px 14px}
+.atl-kpi-val{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text);letter-spacing:-.02em;line-height:1}
+.atl-kpi-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.atl-legend{display:flex;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;flex-wrap:wrap}
 .atl-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.atl-legend-lbl{font-family:var(--mono);font-size:8px;color:rgba(236,230,214,.4);letter-spacing:.04em}
-.atl-rank-hd{padding:9px 14px 7px;font-family:var(--mono);font-size:7px;letter-spacing:.2em;text-transform:uppercase;color:rgba(236,230,214,.25);border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
-.atl-rank-list{flex:1;overflow-y:auto}
-.atl-rank-list::-webkit-scrollbar{width:2px}
-.atl-rank-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
-.atl-rank-row{padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;transition:background .1s;display:grid;grid-template-columns:18px 1fr 48px 24px;align-items:center;gap:6px}
-.atl-rank-row:hover{background:rgba(255,255,255,.035)}
-.atl-rank-row.hi{background:rgba(255,165,0,.05);border-left:2px solid var(--brand)}
-.atl-rk-n{font-family:var(--mono);font-size:8px;color:rgba(236,230,214,.2);text-align:right}
-.atl-rk-name{font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.atl-rk-bar{height:2px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
+.atl-legend-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.04em}
+.atl-rank-hd{padding:10px 16px 8px;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
+.atl-rank-list{flex:1;overflow-y:auto;max-height:280px}
+.atl-rank-list::-webkit-scrollbar{width:3px}
+.atl-rank-list::-webkit-scrollbar-thumb{background:var(--border-2)}
+.atl-rank-row{padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;display:grid;grid-template-columns:20px 1fr 54px 28px;align-items:center;gap:6px}
+.atl-rank-row:hover{background:var(--surface-2)}
+.atl-rank-row.hi{background:var(--brand-dim);border-left:2px solid var(--brand)}
+.atl-rk-n{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:right}
+.atl-rk-name{font-family:var(--sans);font-size:11px;color:var(--text-mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.atl-rk-bar{height:2px;background:var(--border-2);border-radius:1px;overflow:hidden}
 .atl-rk-bar-f{height:100%;border-radius:1px;transition:width .5s}
-.atl-rk-ct{font-family:var(--mono);font-size:9px;color:rgba(236,230,214,.45);text-align:right}
-.atl-empty{padding:28px 16px;text-align:center;font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.25);line-height:1.9}
+.atl-rk-ct{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:right}
+.atl-empty{padding:32px 18px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:2}
 
-/* Status bar */
-.atl-bar{height:30px;background:#070809;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 18px;gap:20px;flex-shrink:0}
-.atl-live{width:5px;height:5px;border-radius:50%;background:var(--brand);animation:blink 2.5s ease infinite;flex-shrink:0}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-.atl-stat{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,230,214,.3);display:flex;gap:5px;align-items:center}
-.atl-stat b{color:rgba(236,230,214,.65);font-weight:700}
-.atl-bar-nav{margin-left:auto;display:flex;gap:14px}
-.atl-bar-nav a{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,230,214,.25);text-decoration:none;transition:color .15s}
-.atl-bar-nav a:hover{color:rgba(236,230,214,.7)}
+/* Leaflet overrides to match light theme */
+.leaflet-container{background:#d4cfc5!important}
+.leaflet-control-attribution{background:rgba(255,255,255,.7)!important;color:rgba(0,0,0,.35)!important;font-size:8px!important}
+.leaflet-control-zoom a{background:#fff!important;color:var(--text)!important;border-color:var(--border-2)!important}
+.leaflet-control-zoom a:hover{background:var(--surface-2)!important}
+.leaflet-popup-content-wrapper{background:var(--surface);border:1px solid var(--border-2);border-radius:2px;box-shadow:0 8px 32px rgba(0,0,0,.12);padding:0}
+.leaflet-popup-content{color:var(--text);font-family:var(--sans);font-size:12px;margin:0;line-height:1.5}
+.leaflet-popup-tip-container{display:none}
+.leaflet-popup-close-button{color:var(--muted)!important;top:8px!important;right:10px!important}
 
-@media(max-width:900px){.atl-presets,.atl-side{display:none}.atl-body{grid-template-columns:1fr}}
+/* ── Hotspots grid ── */
+.atl-hotspots{padding:0 0 48px}
+.atl-hs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border-2);border:1px solid var(--border-2)}
+.atl-hs-card{background:var(--surface);padding:18px 20px;transition:background .15s;cursor:pointer}
+.atl-hs-card:hover{background:var(--surface-2)}
+.atl-hs-rank{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-bottom:6px}
+.atl-hs-name{font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text);margin-bottom:6px;letter-spacing:-.01em}
+.atl-hs-bar-wrap{height:3px;background:var(--border-2);margin-bottom:10px;border-radius:1px;overflow:hidden}
+.atl-hs-bar{height:100%;border-radius:1px;transition:width .6s}
+.atl-hs-meta{display:flex;gap:16px;flex-wrap:wrap}
+.atl-hs-stat{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.atl-hs-stat b{color:var(--text-mid);font-weight:600}
+.atl-hs-empty{background:var(--surface);padding:40px;text-align:center;grid-column:1/-1;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2}
+
+/* ── Feature blocks ── */
+.atl-features{padding:56px 0;background:var(--surface-2);border-top:1px solid var(--border-2);border-bottom:1px solid var(--border-2)}
+.atl-feat-inner{padding:0 32px;max-width:1200px;margin:0 auto}
+.atl-feat-hd{text-align:center;margin-bottom:40px}
+.atl-feat-hd h2{font-family:var(--serif);font-size:28px;font-weight:500;letter-spacing:-.02em;color:var(--text);margin-bottom:8px}
+.atl-feat-hd p{color:var(--muted);font-size:14px;max-width:42em;margin:0 auto}
+.atl-feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border-2);border:1px solid var(--border-2)}
+.atl-feat-card{background:var(--surface);padding:28px 24px}
+.atl-feat-icon{font-size:22px;margin-bottom:14px}
+.atl-feat-title{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--text);margin-bottom:8px}
+.atl-feat-desc{font-size:13px;color:var(--muted);line-height:1.65}
+
+/* ── Scan CTA strip ── */
+.atl-cta-strip{padding:48px 0;background:var(--hero-2)}
+.atl-cta-inner{padding:0 32px;max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:32px;flex-wrap:wrap}
+.atl-cta-copy h2{font-family:var(--serif);font-size:24px;font-weight:500;color:#ECE6D6;margin-bottom:8px;letter-spacing:-.01em}
+.atl-cta-copy p{font-size:14px;color:rgba(236,230,214,.5);max-width:40em;line-height:1.6}
+.atl-cta-btn{display:inline-flex;align-items:center;gap:10px;background:var(--brand);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:14px 28px;text-decoration:none;flex-shrink:0;transition:opacity .15s}
+.atl-cta-btn:hover{opacity:.88}
+
+@media(max-width:960px){
+  .atl-map-grid{grid-template-columns:1fr}
+  .atl-side{border-left:none;border-top:1px solid var(--border-2)}
+  #atlas-map{height:400px}
+  .atl-hs-grid{grid-template-columns:repeat(2,1fr)}
+  .atl-feat-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:640px){
+  .atl-hero{padding:36px 0 32px}
+  .atl-hero h1{font-size:26px}
+  .atl-search-row{flex-direction:column}
+  .atl-search-row input{border-right:1px solid rgba(236,230,214,.15);border-bottom:none}
+  .atl-search-btn{padding:12px 20px}
+  .atl-hs-grid,.atl-feat-grid{grid-template-columns:1fr}
+  .atl-map-inner,.atl-feat-inner,.atl-hero-inner,.atl-cta-inner{padding-left:16px;padding-right:16px}
+  .atl-hero-stats{flex-wrap:wrap;width:100%}
+  .atl-hstat{flex:1 1 40%}
+  .atl-cta-inner{flex-direction:column;align-items:flex-start}
+}
 </style>
 </head>
-<body style="display:flex;flex-direction:column;height:100%">
+<body>
+${pageShellHeader(null, authCtx)}
 
-<div class="atl-hdr">
-  <a href="/" class="atl-logo">Atlas<b>Revenue</b></a>
-  <div class="atl-vr"></div>
-  <span class="atl-page-lbl">Atlas</span>
-  <div class="atl-search-wrap">
-    <input id="atl-q" type="text" value="${q}" placeholder="service keyword — roofing, IT, social care, energy…" autocomplete="off">
-    <button class="atl-search-btn" id="atl-go">Search</button>
+<!-- Hero -->
+<section class="atl-hero">
+  <div class="atl-hero-inner">
+    <div class="atl-hero-eyebrow"><span class="atl-live-dot"></span>Live Geo Intelligence</div>
+    <h1>Where is the UK buying<br>what you sell?</h1>
+    <p class="atl-hero-sub">Search any service keyword to map public-sector contract demand across every district in England, Scotland, Wales &amp; Northern Ireland.</p>
+    <div class="atl-search-row">
+      <input id="atl-q" type="text" value="${q}" placeholder="e.g. roofing, social care, IT services, waste management…" autocomplete="off">
+      <button class="atl-search-btn" id="atl-go">Map demand</button>
+    </div>
+    <div class="atl-pills-row">
+      <span class="atl-pill" data-q="roofing">Roofing</span>
+      <span class="atl-pill" data-q="construction">Construction</span>
+      <span class="atl-pill" data-q="social care">Social care</span>
+      <span class="atl-pill" data-q="IT services">IT services</span>
+      <span class="atl-pill" data-q="facilities management">Facilities</span>
+      <span class="atl-pill" data-q="energy">Energy</span>
+      <span class="atl-pill" data-q="cleaning">Cleaning</span>
+      <span class="atl-pill" data-q="security">Security</span>
+      <span class="atl-pill" data-q="waste management">Waste</span>
+      <span class="atl-pill" data-q="highways">Highways</span>
+    </div>
+    <div class="atl-hero-stats">
+      <div class="atl-hstat"><span class="atl-hstat-val">350+</span><span class="atl-hstat-lbl">Districts indexed</span></div>
+      <div class="atl-hstat"><span class="atl-hstat-val">43</span><span class="atl-hstat-lbl">Live data sources</span></div>
+      <div class="atl-hstat"><span class="atl-hstat-val">Live</span><span class="atl-hstat-lbl">Contracts Finder</span></div>
+      <div class="atl-hstat"><span class="atl-hstat-val">Free</span><span class="atl-hstat-lbl">No account needed</span></div>
+    </div>
   </div>
-  <div class="atl-layers">
-    <span class="atl-layer on" data-layer="contracts">Contracts</span>
-    <span class="atl-layer on" data-layer="planning">Planning</span>
-  </div>
-  <div class="atl-presets">
-    <span class="atl-pill" data-q="roofing">Roofing</span>
-    <span class="atl-pill" data-q="construction">Construction</span>
-    <span class="atl-pill" data-q="social care">Social Care</span>
-    <span class="atl-pill" data-q="IT services">IT</span>
-    <span class="atl-pill" data-q="energy">Energy</span>
-    <span class="atl-pill" data-q="cleaning">Cleaning</span>
-    <span class="atl-pill" data-q="security">Security</span>
-    <span class="atl-pill" data-q="waste management">Waste</span>
-  </div>
-  <div class="atl-auth">${authHtml}</div>
-</div>
+</section>
 
-<div class="atl-body">
-  <div id="atlas-map">
-    <div class="atl-loader" id="atl-ldr">
-      <div class="atl-spinner"></div>
-      <span class="atl-loader-txt">Scanning procurement records…</span>
+<!-- Map + sidebar -->
+<section class="atl-map-section">
+  <div class="atl-map-inner">
+    <div class="atl-section-hd">
+      <div>
+        <div class="atl-section-label">Demand map</div>
+        <div class="atl-section-title" id="atl-section-title">Search above to map UK contract demand</div>
+      </div>
+      <div class="atl-layers-tog">
+        <span class="atl-layer on" data-layer="contracts">Contracts</span>
+        <span class="atl-layer on" data-layer="planning">Planning</span>
+      </div>
+    </div>
+    <div class="atl-map-grid">
+      <div id="atlas-map" style="position:relative">
+        <div class="atl-loader" id="atl-ldr">
+          <div class="atl-spinner"></div>
+          <span class="atl-loader-txt">Scanning procurement records…</span>
+        </div>
+      </div>
+      <div class="atl-side">
+        <div class="atl-side-top">
+          <div class="atl-side-eyebrow">Demand profile</div>
+          <div class="atl-side-q" id="atl-side-q">Enter a keyword to begin</div>
+        </div>
+        <div class="atl-kpis">
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-z">—</div><div class="atl-kpi-lbl">Districts</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-c">—</div><div class="atl-kpi-lbl">Contracts</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-p">—</div><div class="atl-kpi-lbl">Planning</div></div>
+          <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-v">—</div><div class="atl-kpi-lbl">Est. value</div></div>
+        </div>
+        <div class="atl-legend">
+          <div class="atl-legend-dot" style="background:#dc2626"></div><span class="atl-legend-lbl">High</span>
+          <div class="atl-legend-dot" style="background:#ea580c"></div><span class="atl-legend-lbl">Medium</span>
+          <div class="atl-legend-dot" style="background:#2563eb"></div><span class="atl-legend-lbl">Low</span>
+        </div>
+        <div class="atl-rank-hd">Top demand zones</div>
+        <div class="atl-rank-list" id="atl-ranks">
+          <div class="atl-empty">Search a keyword above<br>to see ranked districts</div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="atl-side">
-    <div class="atl-side-top">
-      <div class="atl-side-eyebrow">Demand profile</div>
-      <div class="atl-side-q" id="atl-side-q">${q}</div>
-    </div>
-    <div class="atl-kpis">
-      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-z">—</div><div class="atl-kpi-lbl">Districts</div></div>
-      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-c">—</div><div class="atl-kpi-lbl">Contracts</div></div>
-      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-p">—</div><div class="atl-kpi-lbl">Planning</div></div>
-      <div class="atl-kpi"><div class="atl-kpi-val" id="kpi-v">—</div><div class="atl-kpi-lbl">Est. value</div></div>
-    </div>
-    <div class="atl-legend">
-      <div class="atl-legend-dot" style="background:#ef4444"></div><span class="atl-legend-lbl">High demand</span>
-      <div class="atl-legend-dot" style="background:#f97316"></div><span class="atl-legend-lbl">Medium</span>
-      <div class="atl-legend-dot" style="background:#3b82f6"></div><span class="atl-legend-lbl">Low</span>
-    </div>
-    <div class="atl-rank-hd">Top demand zones</div>
-    <div class="atl-rank-list" id="atl-ranks">
-      <div class="atl-empty">Enter a keyword above<br>to map UK contract demand</div>
-    </div>
-  </div>
-</div>
+</section>
 
-<div class="atl-bar">
-  <div class="atl-live"></div>
-  <div class="atl-stat">Zones: <b id="sb-z">—</b></div>
-  <div class="atl-stat">Contracts: <b id="sb-c">—</b></div>
-  <div class="atl-stat">Planning: <b id="sb-p">—</b></div>
-  <div class="atl-stat">Value: <b id="sb-v">—</b></div>
-  <div class="atl-bar-nav">
-    <a href="/desks">Desks</a>
-    <a href="/signals">Signals</a>
-    <a href="/articles">Articles</a>
-    <a href="/scan">Run a Scan</a>
+<!-- Hotspots grid (populated by JS) -->
+<section class="atl-map-section atl-hotspots">
+  <div class="atl-map-inner">
+    <div class="atl-section-hd">
+      <div>
+        <div class="atl-section-label">Top demand zones</div>
+        <div class="atl-section-title">Highest-activity districts</div>
+      </div>
+    </div>
+    <div class="atl-hs-grid" id="atl-hs-grid">
+      <div class="atl-hs-empty">Search a keyword above to reveal the top-demand districts for your service.</div>
+    </div>
   </div>
-</div>
+</section>
+
+<!-- Feature blocks -->
+<section class="atl-features">
+  <div class="atl-feat-inner">
+    <div class="atl-feat-hd">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px">How Atlas works</div>
+      <h2>Intelligence layered onto geography</h2>
+      <p>Atlas combines live Contracts Finder data with planning applications and procurement signals to show you exactly where public-sector buyers are spending.</p>
+    </div>
+    <div class="atl-feat-grid">
+      <div class="atl-feat-card">
+        <div class="atl-feat-icon">📡</div>
+        <div class="atl-feat-title">Live contract data</div>
+        <p class="atl-feat-desc">Every search hits Contracts Finder directly — no stale caches. You see what buyers published today, mapped to the district of the organisation that issued it.</p>
+      </div>
+      <div class="atl-feat-card">
+        <div class="atl-feat-icon">📍</div>
+        <div class="atl-feat-title">District-level demand</div>
+        <p class="atl-feat-desc">Buyer organisation names are matched to 350+ UK local authority districts. Each bubble on the map represents real procurement activity, sized by volume.</p>
+      </div>
+      <div class="atl-feat-card">
+        <div class="atl-feat-icon">🎯</div>
+        <div class="atl-feat-title">From map to scan</div>
+        <p class="atl-feat-desc">Spot a high-demand district? Click the dot, then run a full intelligence scan for your company — 10 sections of buyer analysis, bid readiness score, and a 30-day action plan.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Scan CTA -->
+<section class="atl-cta-strip">
+  <div class="atl-cta-inner">
+    <div class="atl-cta-copy">
+      <h2>Turn a demand signal into a win strategy</h2>
+      <p>Once you've spotted where demand is concentrated, run a full AtlasRevenue scan — we'll build a buyer watchlist, evidence grade, and 30-day activation plan around your company profile.</p>
+    </div>
+    <a href="/scan" class="atl-cta-btn">Run your scan &rarr;</a>
+  </div>
+</section>
+
+${pageShellFoot()}
 
 <script>
 (function(){
@@ -9039,8 +9143,8 @@ var lyr={contracts:true,planning:true};
 var mkrs=[];
 var cur=null;
 
-var map=L.map('atlas-map',{center:[54.2,-2.5],zoom:6,zoomControl:true,attributionControl:true});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+var map=L.map('atlas-map',{center:[54.2,-2.5],zoom:5,zoomControl:true,attributionControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
   attribution:'&copy;<a href="https://carto.com/">CARTO</a> &copy;<a href="https://openstreetmap.org/copyright">OSM</a>',
   subdomains:'abcd',maxZoom:14,minZoom:4
 }).addTo(map);
@@ -9048,14 +9152,14 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 function fv(v){if(!v||v===0)return'—';if(v>=1e9)return'£'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'£'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'£'+(v/1e3).toFixed(0)+'K';return'£'+Math.round(v)}
 
 function clr(ratio){
-  if(ratio>.75)return'#ef4444';
-  if(ratio>.45)return'#f97316';
-  if(ratio>.2)return'#f59e0b';
-  if(ratio>.07)return'#84cc16';
-  return'#3b82f6';
+  if(ratio>.75)return'#dc2626';
+  if(ratio>.45)return'#ea580c';
+  if(ratio>.2)return'#d97706';
+  if(ratio>.07)return'#65a30d';
+  return'#2563eb';
 }
 
-function rad(ratio){return Math.max(5,Math.min(42,6+ratio*40));}
+function rad(ratio){return Math.max(6,Math.min(44,7+ratio*42));}
 
 function clearMkrs(){mkrs.forEach(function(m){map.removeLayer(m)});mkrs=[];}
 
@@ -9071,23 +9175,18 @@ function render(data){
     var ratio=tot/max;
     var color=clr(ratio);
     var r=rad(ratio);
-
-    // Glow halo
-    var halo=L.circleMarker(ll,{radius:r+10,fillColor:color,color:color,weight:0,fillOpacity:0.07,interactive:false}).addTo(map);
+    var halo=L.circleMarker(ll,{radius:r+10,fillColor:color,color:color,weight:0,fillOpacity:0.08,interactive:false}).addTo(map);
     mkrs.push(halo);
-    // Outer ring
-    var ring=L.circleMarker(ll,{radius:r+4,fillColor:'transparent',color:color,weight:1,opacity:0.25,fillOpacity:0,interactive:false}).addTo(map);
+    var ring=L.circleMarker(ll,{radius:r+4,fillColor:'transparent',color:color,weight:1,opacity:0.2,fillOpacity:0,interactive:false}).addTo(map);
     mkrs.push(ring);
-    // Core
-    var mk=L.circleMarker(ll,{radius:r,fillColor:color,color:color,weight:1.5,opacity:0.9,fillOpacity:0.5}).addTo(map);
+    var mk=L.circleMarker(ll,{radius:r,fillColor:color,color:color,weight:1.5,opacity:0.85,fillOpacity:0.45}).addTo(map);
     mkrs.push(mk);
-
-    var lines='<div style="padding:14px 16px 12px"><div style="font-family:var(--serif);font-size:13px;color:#ECE6D6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)">'+d.name+'</div>';
-    if(lyr.contracts&&d.contracts>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Contracts</span><span style="color:#f59e0b;font-weight:700;font-size:11px">'+d.contracts+'</span></div>';
-    if(lyr.planning&&d.planning>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Planning apps</span><span style="color:#84cc16;font-weight:700;font-size:11px">'+d.planning+'</span></div>';
-    if(d.value>0)lines+='<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:rgba(236,230,214,.45);font-size:10px">Est. value</span><span style="color:rgba(236,230,214,.7);font-size:11px">'+fv(d.value)+'</span></div>';
-    lines+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)"><a href="/scan" style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);text-decoration:none">→ Scan this opportunity</a></div></div>';
-    mk.bindPopup(lines,{maxWidth:220,className:'atl-pop'});
+    var lines='<div style="padding:14px 16px 12px"><div style="font-family:var(--serif);font-size:14px;color:var(--text);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-2)">'+d.name+'</div>';
+    if(lyr.contracts&&d.contracts>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Contracts</span><span style="color:#b45309;font-weight:700;font-size:12px">'+d.contracts+'</span></div>';
+    if(lyr.planning&&d.planning>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Planning apps</span><span style="color:#15803d;font-weight:700;font-size:12px">'+d.planning+'</span></div>';
+    if(d.value>0)lines+='<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--muted);font-size:11px">Est. value</span><span style="color:var(--text);font-size:12px">'+fv(d.value)+'</span></div>';
+    lines+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><a href="/scan" style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">→ Scan this opportunity</a></div></div>';
+    mk.bindPopup(lines,{maxWidth:220});
     mk.on('click',function(){hilite(d.name);});
   });
 }
@@ -9100,20 +9199,49 @@ function renderRanks(data){
   data.districts.slice(0,40).forEach(function(d,i){
     var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
     var pct=max>0?Math.round(tot/max*100):0;
-    var bar_color=clr(tot/max);
+    var bc=clr(tot/max);
     html+='<div class="atl-rank-row" data-n="'+d.name.replace(/"/g,'')+'" onclick="fd(\''+d.name.replace(/'/g,"\\'")+'\')">'+
       '<span class="atl-rk-n">'+(i+1)+'</span>'+
       '<span class="atl-rk-name">'+d.name+'</span>'+
-      '<div class="atl-rk-bar"><div class="atl-rk-bar-f" style="width:'+pct+'%;background:'+bar_color+'"></div></div>'+
+      '<div class="atl-rk-bar"><div class="atl-rk-bar-f" style="width:'+pct+'%;background:'+bc+'"></div></div>'+
       '<span class="atl-rk-ct">'+tot+'</span>'+
     '</div>';
   });
   el.innerHTML=html;
 }
 
+function renderHotspots(data){
+  var grid=document.getElementById('atl-hs-grid');
+  if(!data||!data.districts||!data.districts.length){
+    grid.innerHTML='<div class="atl-hs-empty">No demand data found for this keyword.<br>Try: roofing · social care · IT · highways · cleaning</div>';
+    return;
+  }
+  var top=data.districts.slice(0,6);
+  var max=top[0].total||1;
+  var html='';
+  top.forEach(function(d,i){
+    var tot=(lyr.contracts?d.contracts:0)+(lyr.planning?d.planning:0);
+    var pct=Math.round(tot/max*100);
+    var bc=clr(tot/max);
+    html+='<div class="atl-hs-card" onclick="fd(\''+d.name.replace(/'/g,"\\'")+'\')">'+
+      '<div class="atl-hs-rank">#'+(i+1)+' demand zone</div>'+
+      '<div class="atl-hs-name">'+d.name+'</div>'+
+      '<div class="atl-hs-bar-wrap"><div class="atl-hs-bar" style="width:'+pct+'%;background:'+bc+'"></div></div>'+
+      '<div class="atl-hs-meta">'+
+        (d.contracts>0?'<div class="atl-hs-stat"><b>'+d.contracts+'</b> contracts</div>':'')+
+        (d.planning>0?'<div class="atl-hs-stat"><b>'+d.planning+'</b> planning</div>':'')+
+        (d.value>0?'<div class="atl-hs-stat"><b>'+fv(d.value)+'</b> value</div>':'')+
+      '</div>'+
+    '</div>';
+  });
+  grid.innerHTML=html;
+}
+
 function updateKpis(data){
-  var ids=['kpi-z','kpi-c','kpi-p','kpi-v','sb-z','sb-c','sb-p','sb-v'];
-  if(!data||!data.districts){ids.forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='—';});return;}
+  if(!data||!data.districts){
+    ['kpi-z','kpi-c','kpi-p','kpi-v'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='—';});
+    return;
+  }
   var tc=data.districts.reduce(function(s,d){return s+d.contracts;},0);
   var tp=data.districts.reduce(function(s,d){return s+d.planning;},0);
   var tv=data.districts.reduce(function(s,d){return s+(d.value||0);},0);
@@ -9122,10 +9250,6 @@ function updateKpis(data){
   document.getElementById('kpi-c').textContent=tc;
   document.getElementById('kpi-p').textContent=tp;
   document.getElementById('kpi-v').textContent=fv(tv);
-  document.getElementById('sb-z').textContent=tz;
-  document.getElementById('sb-c').textContent=tc;
-  document.getElementById('sb-p').textContent=tp;
-  document.getElementById('sb-v').textContent=fv(tv);
 }
 
 function hilite(name){
@@ -9136,7 +9260,11 @@ function hilite(name){
 
 window.fd=function(name){
   var ll=C[name];
-  if(ll){map.flyTo(ll,10,{animate:true,duration:1});setTimeout(function(){hilite(name);},400);}
+  if(ll){
+    map.flyTo(ll,10,{animate:true,duration:1});
+    document.getElementById('atlas-map').scrollIntoView({behavior:'smooth',block:'start'});
+    setTimeout(function(){hilite(name);},500);
+  }
 };
 
 function hideLdr(){var ldr=document.getElementById('atl-ldr');if(ldr){ldr.classList.add('gone');ldr.style.display='none';}}
@@ -9145,6 +9273,7 @@ function doSearch(){
   var q=document.getElementById('atl-q').value.trim();
   if(!q){hideLdr();return;}
   document.getElementById('atl-side-q').textContent=q;
+  document.getElementById('atl-section-title').textContent='Contract demand — '+q;
   var ldr=document.getElementById('atl-ldr');
   if(ldr){ldr.style.display='';ldr.classList.remove('gone');}
   var done=false;
@@ -9155,7 +9284,12 @@ function doSearch(){
       cur=data;
       render(data);
       renderRanks(data);
+      renderHotspots(data);
       updateKpis(data);
+      if(data.districts&&data.districts.length){
+        var bounds=data.districts.slice(0,10).map(function(d){return C[d.name];}).filter(Boolean);
+        if(bounds.length)map.flyToBounds(bounds,{padding:[40,40],maxZoom:8,animate:true,duration:1.2});
+      }
     })
     .catch(function(){})
     .finally(function(){clearTimeout(guard);if(!done){done=true;hideLdr();}});
@@ -9166,7 +9300,7 @@ document.querySelectorAll('.atl-layer').forEach(function(btn){
     var l=btn.dataset.layer;
     lyr[l]=!lyr[l];
     btn.classList.toggle('on',lyr[l]);
-    if(cur){render(cur);renderRanks(cur);updateKpis(cur);}
+    if(cur){render(cur);renderRanks(cur);renderHotspots(cur);updateKpis(cur);}
   });
 });
 document.getElementById('atl-go').addEventListener('click',doSearch);
