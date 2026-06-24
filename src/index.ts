@@ -17399,6 +17399,13 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   // Build revisions lookup map by article_id
   const revisionsMap = new Map<string, any>(articleRevisions.map((r: any) => [r.article_id, r]));
 
+  // Build metadata_catalog lookup by source_id for Source Registry enrichment
+  const catalogMap = new Map<string, any>(govCatalog.map((r: any) => [String(r.source_id || r.sourceId || ""), r]));
+  const liveSourcesCount = govCatalog.filter((r: any) => r.quality_status === "pass").length;
+  const warnSourcesCount = govCatalog.filter((r: any) => r.quality_status === "warn").length;
+  const failSourcesCount = govCatalog.filter((r: any) => r.quality_status === "fail").length;
+  const neverFetchedCount = DATA_SOURCES.length - govCatalog.length;
+
   const gradeCount: Record<string, number> = {};
   gradeDistDb.forEach((r: any) => {
     const g = r.grade;
@@ -17835,7 +17842,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="#ingest" class="sb-link">Ingest Pipeline <span class="sb-count">${Number(ingestTotals.total||0).toLocaleString()}</span></a>
     <a href="#geospatial" class="sb-link">Geospatial <span class="sb-count">${(geoLocationCount+geoPlanningCount).toLocaleString()}</span></a>
     <a href="#relationships" class="sb-link">Relationships <span class="sb-count">${(aliasCount+ownershipCount+directorCount).toLocaleString()}</span></a>
-    <a href="#source-registry" class="sb-link">43 Sources <span class="sb-count">${DATA_SOURCES.length}</span></a>
+    <a href="#source-registry" class="sb-link">43 Sources <span class="sb-count" style="color:${failSourcesCount>0?"var(--red)":warnSourcesCount>5?"var(--amber)":"var(--green)"}">${liveSourcesCount}✓ ${failSourcesCount>0?failSourcesCount+"✗":""}</span></a>
     <a href="#governance" class="sb-link">Governance <span class="sb-count" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${(govSummary.qualityPassRate||0)}%</span></a>
     <a href="#webhooks" class="sb-link">Webhooks <span class="sb-count">${webhookList.length}</span></a>
     <div class="sb-group">Admin</div>
@@ -17868,6 +17875,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
   <div class="topbar-right">
     <div class="clock-chip"><div class="live-dot"></div><span id="aclock" style="font-size:11px">${new Date().toISOString().slice(0,19).replace("T"," ")} UTC</span></div>
     <a href="/admin/scans?token=${encodeURIComponent(token)}" class="tb-btn">↻ Refresh</a>
+    <a href="/atlas" target="_blank" class="tb-btn hide-mob">↗ Atlas</a>
     <a href="/" target="_blank" class="tb-btn hide-mob">↗ Live site</a>
   </div>
 </header>
@@ -17923,6 +17931,16 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="kpi-lbl">Visitors Today</div>
       <div class="kpi-val kpi-blue">${Number(vToday.total || 0).toLocaleString()}</div>
       <div class="kpi-sub">${Number(vToday.unique_ips || 0)} unique IPs</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Sources Live</div>
+      <div class="kpi-val" style="color:${liveSourcesCount>30?"var(--green)":liveSourcesCount>15?"var(--amber)":"var(--red)"}">${liveSourcesCount}<span style="font-size:13px;color:var(--muted-2)">/${DATA_SOURCES.length}</span></div>
+      <div class="kpi-sub"><span style="color:var(--amber)">${warnSourcesCount} warn</span> &middot; <span style="color:var(--red)">${failSourcesCount} fail</span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Records Ingested</div>
+      <div class="kpi-val kpi-gold">${Number(ingestTotals.total||0).toLocaleString()}</div>
+      <div class="kpi-sub">${Number(ingestTotals.pending||0).toLocaleString()} pending · ${ingestBySource.length} sources</div>
     </div>
   </div>
 
@@ -18662,21 +18680,38 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     <div>
       <div class="s-eyebrow">Data Platform</div>
       <div class="s-title">43 Source Registry</div>
-      <div class="s-sub">${DATA_SOURCES.filter(s => s.live).length} live · ${DATA_SOURCES.filter(s => !s.requiresKey).length} free/no-key · ${DATA_SOURCES.filter(s => s.requiresKey).length} require API key</div>
+      <div class="s-sub">${DATA_SOURCES.filter(s => s.live).length} live · ${liveSourcesCount} last-fetch OK · ${warnSourcesCount} warn · ${failSourcesCount} fail · ${neverFetchedCount} never fetched</div>
     </div>
-    <a href="/sources" target="_blank" class="a-btn">Public Sources Page</a>
+    <div style="display:flex;gap:8px">
+      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full 43-source ingest?')"><button class="a-btn a-btn-ok" type="submit">▶ Run All</button></form>
+      <a href="/sources" target="_blank" class="a-btn">Public Sources</a>
+    </div>
   </div>
-  <div style="overflow:auto;max-height:500px"><table class="a-tbl">
-    <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Cadence</th><th>Key?</th><th>Status</th></tr></thead>
+  <div style="overflow:auto;max-height:560px"><table class="a-tbl">
+    <thead><tr><th>Source</th><th>Name</th><th>Category</th><th>Cadence</th><th>Key</th><th>Last Fetch</th><th>Records</th><th>Fetch Time</th><th>Quality</th><th>Action</th></tr></thead>
     <tbody>${DATA_SOURCES.map(s => {
       const cadenceColor = ({realtime:"var(--green)",daily:"var(--brand)",weekly:"#B4924E",monthly:"var(--muted)"})[s.cadence] || "var(--muted)";
+      const cat = catalogMap.get(s.id);
+      const qStatus = !s.live ? "stub" : !cat ? "never" : String(cat.quality_status || cat.qualityStatus || "never");
+      const qColor = qStatus === "pass" ? "var(--green)" : qStatus === "warn" ? "var(--amber)" : qStatus === "fail" ? "var(--red)" : "var(--muted)";
+      const qLabel = qStatus === "pass" ? "● pass" : qStatus === "warn" ? "◐ warn" : qStatus === "fail" ? "✕ fail" : qStatus === "stub" ? "○ stub" : "— never";
+      const lastFetch = cat?.last_fetched_at || cat?.lastFetchedAt;
+      const lastFetchStr = lastFetch ? new Date(lastFetch).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
+      const lastFetchAge = lastFetch ? Math.floor((Date.now()-new Date(lastFetch).getTime())/3600000) : null;
+      const ageColor = lastFetchAge === null ? "var(--muted)" : lastFetchAge < 6 ? "var(--green)" : lastFetchAge < 48 ? "var(--brand)" : "var(--red)";
+      const records = cat?.last_record_count ?? cat?.lastRecordCount;
+      const avgMs = cat?.avg_fetch_ms ?? cat?.avgFetchMs;
       return `<tr>
         <td style="font-family:var(--mono);font-size:9px;color:var(--muted)">${escapeHtml(s.id)}</td>
         <td style="font-size:11px;font-weight:500">${escapeHtml(s.name)}</td>
         <td style="font-family:var(--mono);font-size:9px">${escapeHtml(s.category.replace(/_/g," "))}</td>
         <td><span style="font-family:var(--mono);font-size:9px;color:${cadenceColor};text-transform:uppercase">${escapeHtml(s.cadence)}</span></td>
         <td>${s.requiresKey ? `<span style="font-family:var(--mono);font-size:9px;color:var(--amber)">${escapeHtml(s.keyEnvVar||"KEY")}</span>` : `<span style="font-family:var(--mono);font-size:9px;color:var(--green)">FREE</span>`}</td>
-        <td>${s.live ? `<span style="color:var(--green);font-size:10px">● Live</span>` : `<span style="color:var(--muted);font-size:10px">○ Stub</span>`}</td>
+        <td style="font-family:var(--mono);font-size:9px;color:${ageColor}" title="${lastFetchStr}">${lastFetch ? lastFetchStr : "—"}</td>
+        <td style="font-family:var(--mono);font-size:10px;color:${records>0?"var(--text)":"var(--muted)"}">${records != null ? Number(records).toLocaleString() : "—"}</td>
+        <td style="font-family:var(--mono);font-size:9px;color:var(--muted)">${avgMs != null ? Math.round(Number(avgMs)/1000)+"s" : "—"}</td>
+        <td><span style="font-family:var(--mono);font-size:9px;color:${qColor};font-weight:600">${qLabel}</span></td>
+        <td>${s.live ? `<form method="POST" action="/api/ingest/source/${escapeHtml(s.id)}" style="margin:0"><button class="a-btn" type="submit" style="font-size:8px;padding:2px 7px">↻</button></form>` : ""}</td>
       </tr>`;
     }).join("")}</tbody>
   </table></div>
