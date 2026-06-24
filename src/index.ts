@@ -8853,7 +8853,7 @@ const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
 
 app.get("/atlas", asyncRoute(async (req, res) => {
   const authCtx = getAuthUser(req);
-  const q = String(req.query.q || "roofing").trim();
+  const q = String(req.query.q || "").trim();
   res.type("html").send(atlasPage(q, authCtx));
 }));
 
@@ -9178,7 +9178,7 @@ document.querySelectorAll('.atl-pill').forEach(function(p){
   });
 });
 
-doSearch();
+if(document.getElementById('atl-q').value.trim())doSearch();
 })();
 </script>
 </body>
