@@ -3,6 +3,7 @@ import type { BuyerEntity } from "./types.js";
 import { upsertBuyerEntity, getBuyerEntity, upsertProcurementHistory, insertBuyerOfficers } from "./db.js";
 import { fetchOfficers, fetchPscs, fetchCompanyProfile } from "./companies-house-officers.js";
 import { companiesHouseSearch } from "../../fetchers/companies-house.js";
+import { searchCharity } from "../../fetchers/find-that-charity.js";
 
 const BUYER_PATTERNS: [RegExp, BuyerEntity["buyer_type"]][] = [
   // Public sector — checked first
@@ -67,7 +68,7 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
   if (existing && existing.buyer_type !== "unknown" && existing.buyer_type !== "company") return existing;
 
   const buyerType = classifyBuyerType(buyerName);
-  const website = inferDomain(buyerName, buyerType);
+  let website = inferDomain(buyerName, buyerType);
 
   let companyNumber: string | null = null;
   let companyStatus: string | null = null;
@@ -76,6 +77,8 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
   let sicCodes: string[] = [];
 
   const PUBLIC_SECTOR_TYPES = new Set(["local_authority", "nhs", "central_gov", "police_fire"]);
+  const CHARITY_TYPES = new Set(["social_care", "health", "education", "housing"]);
+
   if (!PUBLIC_SECTOR_TYPES.has(buyerType)) {
     const chResult = await companiesHouseSearch(buyerName);
     const match = chResult.matches.find(m =>
@@ -89,6 +92,19 @@ export async function resolveAndEnrichBuyer(buyerName: string): Promise<BuyerEnt
       companyType = match.companyType;
       address = match.address;
       sicCodes = match.sicCodes;
+    }
+
+    // For social-care / charity-adjacent buyers, also try Find That Charity
+    if (!companyNumber && CHARITY_TYPES.has(buyerType)) {
+      try {
+        const charities = await searchCharity(buyerName);
+        const charity = charities[0];
+        if (charity && normaliseBuyerName(charity.name).includes(normalised.slice(0, 12))) {
+          if (charity.companyNumber) companyNumber = charity.companyNumber;
+          if (charity.address && !address) address = charity.address;
+          if (!website && charity.url) website = charity.url;
+        }
+      } catch {}
     }
   }
 

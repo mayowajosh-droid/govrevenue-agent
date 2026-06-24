@@ -1,6 +1,6 @@
 export type EarlySignal = {
   id: string;
-  source: "ons" | "land_registry";
+  source: "ons" | "land_registry" | "planning";
   indicator: string;
   region: string;
   period: string;

@@ -56,6 +56,30 @@ import { initEmailDiscoveryTables, getContactsForBuyer, discoverContactsForBuyer
 import { initEarlySignalsTables, getLatestEarlySignals, getEarlySignalsByDesk, refreshEarlySignals } from "./intelligence/early-signals/index.js";
 import { initLifecycleTables, bulkTrackNotices, getLifecycleSummary, getRecentTransitions, getLifecycleByDesk } from "./intelligence/lifecycle/index.js";
 import { initCanonicalTables } from "./core/entities/db.js";
+import { runFullIngest, runSourceIngest } from "./core/ingest/orchestrator.js";
+import { DATA_SOURCES, getLiveSources } from "./core/ingest/source-registry.js";
+import { startIngestScheduler } from "./core/ingest/scheduler.js";
+import { initGeospatialTables, findLocationsNear, findPlanningApplicationsInDistrict, getGeospatialStats } from "./intelligence/geospatial/index.js";
+import { initRelationshipTables, findSharedDirectors, getOrganisationRelationships } from "./core/entities/relationships.js";
+import { scoreAndDeduplicate, aggregateSignalsForDesk, getAggregatedSignals, deriveSignalsFromIngest } from "./intelligence/early-signals/aggregation-engine.js";
+import {
+  initSupplierGraphTables, listSuppliers, getSupplierProfile, getSupplierEntityById,
+  syncSuppliersFromHistory,
+} from "./intelligence/supplier-graph/index.js";
+import {
+  initGovernanceTables, upsertMetadataCatalog, getMetadataCatalog,
+  runQualityChecks, getLatestQualityResults, writeAuditLog, getAuditLog,
+  getDataDictionary, getRetentionSchedule, runRetentionPurge,
+  seedLineageGraph, getLineageGraph, getGovernanceSummary,
+} from "./governance/index.js";
+import {
+  initWebhookTables, createWebhook, listWebhooks, deleteWebhook,
+  toggleWebhook, getWebhookDeliveries, fireWebhookEvent,
+} from "./integrations/webhooks.js";
+import {
+  exportOpportunitiesCsv, exportSuppliersCsv, exportBuyersCsv,
+  exportSignalsCsv, exportIngestCsv, exportCatalogCsv, exportPlanningCsv,
+} from "./integrations/csv-export.js";
 
 type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
@@ -5580,7 +5604,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
       </div>
       <div class="fp-col">
         <span class="fp-head">Intelligence</span>
-        <a href="/desks">All desks</a><a href="/signals">Live signals</a><a href="/scan/sample">Sample report</a>
+        <a href="/desks">All desks</a><a href="/signals">Live signals</a><a href="/intelligence">Executive view</a><a href="/scan/sample">Sample report</a>
       </div>
     </div>
   </div>
@@ -8086,13 +8110,13 @@ app.post("/api/buyers/discover-all-contacts", requireAdmin, asyncRoute(async (_r
   console.log(`[contacts] bulk discovery complete: ${total} contacts across ${allBuyers.length} buyers`);
 }));
 
-app.get("/api/early-signals", requireAuth, asyncRoute(async (req, res) => {
+app.get("/api/early-signals", asyncRoute(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const signals = await getLatestEarlySignals(limit);
   res.json({ signals });
 }));
 
-app.get("/api/early-signals/desk/:slug", requireAuth, asyncRoute(async (req, res) => {
+app.get("/api/early-signals/desk/:slug", asyncRoute(async (req, res) => {
   const signals = await getEarlySignalsByDesk(req.params.slug);
   res.json({ signals });
 }));
@@ -8102,21 +8126,526 @@ app.post("/api/early-signals/refresh", requireAdmin, asyncRoute(async (_req, res
   res.json({ refreshed: signals.length, signals });
 }));
 
-app.get("/api/lifecycle/summary", requireAuth, asyncRoute(async (_req, res) => {
+app.get("/api/lifecycle/summary", asyncRoute(async (_req, res) => {
   const summary = await getLifecycleSummary();
   res.json({ summary });
 }));
 
-app.get("/api/lifecycle/transitions", requireAuth, asyncRoute(async (req, res) => {
+app.get("/api/lifecycle/transitions", asyncRoute(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const transitions = await getRecentTransitions(limit);
   res.json({ transitions });
 }));
 
-app.get("/api/lifecycle/desk/:category", requireAuth, asyncRoute(async (req, res) => {
+app.get("/api/lifecycle/desk/:category", asyncRoute(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const entries = await getLifecycleByDesk(req.params.category, limit);
   res.json({ entries });
+}));
+
+// ── Supplier Graph API ────────────────────────────────────────────────────────
+
+app.get("/api/suppliers", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Number(req.query.offset) || 0;
+  const suppliers = await listSuppliers({ q: q || undefined, limit, offset });
+  res.json({ suppliers });
+}));
+
+app.get("/api/suppliers/:id", asyncRoute(async (req, res) => {
+  const profile = await getSupplierProfile(req.params.id);
+  if (!profile) { res.status(404).json({ error: "Supplier not found" }); return; }
+  res.json(profile);
+}));
+
+app.post("/api/suppliers/sync", requireAdmin, asyncRoute(async (_req, res) => {
+  res.json({ ok: true, message: "Supplier sync started in background." });
+  syncSuppliersFromHistory()
+    .then(n => console.log(`[supplier-graph] sync complete: ${n} relationships written`))
+    .catch(err => console.error(`[supplier-graph] sync error: ${err?.message}`));
+}));
+
+// ── Ingest Orchestrator API ───────────────────────────────────────────────────
+
+app.get("/api/sources", asyncRoute(async (_req, res) => {
+  res.json({ sources: DATA_SOURCES });
+}));
+
+app.post("/api/ingest/full", requireAdmin, asyncRoute(async (_req, res) => {
+  res.json({ ok: true, message: "Full 43-source ingest started in background." });
+  runFullIngest()
+    .then(results => {
+      const total = results.reduce((s, r) => s + r.recordsIngested, 0);
+      const errors = results.filter(r => r.error).length;
+      console.log(`[ingest] Full pass done: ${total} records, ${errors} errors`);
+    })
+    .catch(err => console.error(`[ingest] Full pass error: ${err?.message}`));
+}));
+
+app.post("/api/ingest/source/:sourceId", requireAdmin, asyncRoute(async (req, res) => {
+  const { sourceId } = req.params;
+  const result = await runSourceIngest(sourceId);
+  res.json(result);
+}));
+
+app.get("/api/ingest/status", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ error: "No database" }); return; }
+  const r = await pool.query<{ source: string; count: string; latest: string }>(
+    `SELECT source, COUNT(*) as count, MAX(fetched_at) as latest
+     FROM canonical_ingest
+     GROUP BY source
+     ORDER BY latest DESC`
+  );
+  res.json({ sources: r.rows });
+}));
+
+// ── Geospatial API ────────────────────────────────────────────────────────────
+
+app.get("/api/geo/nearby", asyncRoute(async (req, res) => {
+  const lat = parseFloat(String(req.query.lat || ""));
+  const lon = parseFloat(String(req.query.lon || ""));
+  const radius = Math.min(parseFloat(String(req.query.radius || "10")), 50);
+  if (!lat || !lon) { res.status(400).json({ error: "lat and lon required" }); return; }
+  const locations = await findLocationsNear(lat, lon, radius);
+  res.json({ locations });
+}));
+
+app.get("/api/geo/planning/:district", asyncRoute(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const apps = await findPlanningApplicationsInDistrict(req.params.district, limit);
+  res.json({ applications: apps });
+}));
+
+app.get("/api/geo/stats", asyncRoute(async (_req, res) => {
+  const stats = await getGeospatialStats();
+  res.json(stats);
+}));
+
+// ── Signal Aggregation Engine API ─────────────────────────────────────────────
+
+app.get("/api/signals/aggregated", asyncRoute(async (req, res) => {
+  const deskSlug = String(req.query.desk || "").trim() || undefined;
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const minScore = Number(req.query.minScore) || 0;
+  const signals = await getAggregatedSignals({ deskSlug, limit, minScore });
+  res.json({ signals });
+}));
+
+app.post("/api/signals/derive-from-ingest", requireAdmin, asyncRoute(async (_req, res) => {
+  const n = await deriveSignalsFromIngest();
+  res.json({ derived: n });
+}));
+
+// ── Relationship Graph API ────────────────────────────────────────────────────
+
+app.get("/api/entities/:id/relationships", asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ error: "No database" }); return; }
+  const rels = await getOrganisationRelationships(pool, req.params.id);
+  res.json(rels);
+}));
+
+app.get("/api/entities/shared-directors", asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ sharedDirectors: [] }); return; }
+  const minOrgs = Math.max(2, Number(req.query.minOrgs) || 2);
+  const directors = await findSharedDirectors(pool, minOrgs);
+  res.json({ sharedDirectors: directors });
+}));
+
+// ── Governance API ────────────────────────────────────────────────────────────
+
+app.get("/api/governance/summary", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({}); return; }
+  const summary = await getGovernanceSummary(pool);
+  res.json(summary);
+}));
+
+app.get("/api/governance/catalog", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ catalog: [] }); return; }
+  const catalog = await getMetadataCatalog(pool);
+  res.json({ catalog });
+}));
+
+app.get("/api/governance/quality", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ results: [] }); return; }
+  const results = await getLatestQualityResults(pool);
+  res.json({ results });
+}));
+
+app.post("/api/governance/quality/run", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ results: [] }); return; }
+  const results = await runQualityChecks(pool);
+  await writeAuditLog(pool, { action: "quality_check_run", detail: { ruleCount: results.length } });
+  res.json({ results });
+}));
+
+app.get("/api/governance/dictionary", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ entries: [] }); return; }
+  const tableName = typeof req.query.table === "string" ? req.query.table : undefined;
+  const entries = await getDataDictionary(pool, tableName);
+  res.json({ entries });
+}));
+
+app.get("/api/governance/retention", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ schedule: [] }); return; }
+  const schedule = await getRetentionSchedule(pool);
+  res.json({ schedule });
+}));
+
+app.post("/api/governance/retention/purge", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ results: [] }); return; }
+  const results = await runRetentionPurge(pool);
+  const total = results.reduce((a, r) => a + r.purged, 0);
+  await writeAuditLog(pool, { action: "retention_purge_run", detail: { tables: results.length, totalPurged: total } });
+  res.json({ results, totalPurged: total });
+}));
+
+app.get("/api/governance/lineage", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ nodes: [], edges: [] }); return; }
+  const graph = await getLineageGraph(pool);
+  res.json(graph);
+}));
+
+app.get("/api/governance/audit", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ log: [] }); return; }
+  const limit = Math.min(500, Number(req.query.limit) || 100);
+  const action = typeof req.query.action === "string" ? req.query.action : undefined;
+  const log = await getAuditLog(pool, limit, action);
+  res.json({ log });
+}));
+
+// ── Webhook API ───────────────────────────────────────────────────────────────
+
+app.get("/api/webhooks", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.json({ webhooks: [] }); return; }
+  const webhooks = await listWebhooks(pool);
+  res.json({ webhooks });
+}));
+
+app.post("/api/webhooks", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).json({ error: "No database" }); return; }
+  const { url, secret, events, label } = req.body as Record<string, unknown>;
+  if (typeof url !== "string" || !url.startsWith("http")) {
+    res.status(400).json({ error: "Invalid URL" }); return;
+  }
+  const wh = await createWebhook(pool, {
+    url,
+    secret: typeof secret === "string" ? secret : null,
+    events: Array.isArray(events) ? events as import("./integrations/webhooks.js").WebhookEvent[] : undefined,
+    label: typeof label === "string" ? label : null,
+  });
+  await writeAuditLog(pool, { action: "webhook_created", detail: { url, label } });
+  res.json({ webhook: wh });
+}));
+
+app.delete("/api/webhooks/:id", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).json({ error: "No database" }); return; }
+  await deleteWebhook(pool, req.params.id);
+  await writeAuditLog(pool, { action: "webhook_deleted", detail: { id: req.params.id } });
+  res.json({ ok: true });
+}));
+
+app.patch("/api/webhooks/:id/toggle", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).json({ error: "No database" }); return; }
+  const { enabled } = req.body as { enabled: boolean };
+  await toggleWebhook(pool, req.params.id, !!enabled);
+  res.json({ ok: true });
+}));
+
+app.get("/api/webhooks/:id/deliveries", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ deliveries: [] }); return; }
+  const limit = Math.min(200, Number(req.query.limit) || 50);
+  const deliveries = await getWebhookDeliveries(pool, req.params.id, limit);
+  res.json({ deliveries });
+}));
+
+app.post("/api/webhooks/test", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).json({ error: "No database" }); return; }
+  await fireWebhookEvent(pool, "ingest.complete", { test: true, timestamp: new Date().toISOString() });
+  res.json({ ok: true, message: "Test event fired to all enabled webhooks subscribed to ingest.complete" });
+}));
+
+// ── CSV Export API ────────────────────────────────────────────────────────────
+
+app.get("/api/export/signals.csv", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const desk = typeof req.query.desk === "string" ? req.query.desk : undefined;
+  const limit = Math.min(5000, Number(req.query.limit) || 1000);
+  const r = await pool.query<{
+    indicator: string; source: string; region: string | null; value_raw: number | null;
+    period: string | null; significance: string; relevance_score: number; fetched_at: string;
+  }>(
+    desk
+      ? `SELECT indicator, source, region, value_raw, period, significance, relevance_score, fetched_at
+         FROM early_signals WHERE desk_slug = $1 ORDER BY fetched_at DESC LIMIT $2`
+      : `SELECT indicator, source, region, value_raw, period, significance, relevance_score, fetched_at
+         FROM early_signals ORDER BY fetched_at DESC LIMIT $1`,
+    desk ? [desk, limit] : [limit]
+  );
+  const csv = exportSignalsCsv(r.rows.map(row => ({
+    indicator: row.indicator, source: row.source, region: row.region ?? undefined,
+    valueRaw: row.value_raw ?? undefined, period: row.period ?? undefined,
+    significance: row.significance, relevanceScore: row.relevance_score, fetchedAt: row.fetched_at,
+  })));
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="signals${desk ? "-" + desk : ""}.csv"`);
+  res.send(csv);
+}));
+
+app.get("/api/export/suppliers.csv", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const r = await pool.query<{
+    name: string; companies_house_id: string | null; postcode: string | null;
+    primary_sector: string | null; total_contracts: number | null;
+    total_contract_value: number | null;
+  }>(`SELECT name, companies_house_id, postcode, primary_sector, total_contracts, total_contract_value
+      FROM supplier_entities ORDER BY total_contract_value DESC NULLS LAST LIMIT 5000`);
+  const csv = exportSuppliersCsv(r.rows.map(row => ({
+    name: row.name, companiesHouseId: row.companies_house_id ?? undefined,
+    postcode: row.postcode ?? undefined, primarySector: row.primary_sector ?? undefined,
+    totalContracts: row.total_contracts ?? 0, totalContractValue: row.total_contract_value ?? 0,
+  })));
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="suppliers.csv"`);
+  res.send(csv);
+}));
+
+app.get("/api/export/buyers.csv", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const r = await pool.query<{
+    name: string; region: string | null; sector: string | null;
+    total_spend: number | null; contract_count: number | null;
+  }>(`SELECT name, region, sector, total_spend, contract_count
+      FROM buyer_entities ORDER BY total_spend DESC NULLS LAST LIMIT 5000`);
+  const csv = exportBuyersCsv(r.rows.map(row => ({
+    name: row.name, region: row.region ?? undefined, sector: row.sector ?? undefined,
+    totalSpend: row.total_spend ?? 0, contractCount: row.contract_count ?? 0,
+  })));
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="buyers.csv"`);
+  res.send(csv);
+}));
+
+app.get("/api/export/ingest.csv", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const source = typeof req.query.source === "string" ? req.query.source : undefined;
+  const limit = Math.min(10000, Number(req.query.limit) || 2000);
+  const r = await pool.query<{
+    source: string; title: string | null; buyer: string | null;
+    value: number | null; fetched_at: string; status: string;
+  }>(
+    source
+      ? `SELECT source, title, buyer, value, fetched_at, status FROM canonical_ingest WHERE source = $1 ORDER BY fetched_at DESC LIMIT $2`
+      : `SELECT source, title, buyer, value, fetched_at, status FROM canonical_ingest ORDER BY fetched_at DESC LIMIT $1`,
+    source ? [source, limit] : [limit]
+  );
+  const csv = exportIngestCsv(r.rows.map(row => ({
+    source: row.source, title: row.title ?? undefined, buyer: row.buyer ?? undefined,
+    value: row.value, fetchedAt: row.fetched_at, status: row.status,
+  })));
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="ingest${source ? "-" + source : ""}.csv"`);
+  res.send(csv);
+}));
+
+app.get("/api/export/catalog.csv", requireAdmin, asyncRoute(async (_req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const catalog = await getMetadataCatalog(pool);
+  const csv = exportCatalogCsv(catalog);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="data-catalog.csv"`);
+  res.send(csv);
+}));
+
+app.get("/api/export/planning.csv", requireAdmin, asyncRoute(async (req, res) => {
+  if (!pool) { res.status(503).send("No database"); return; }
+  const district = typeof req.query.district === "string" ? req.query.district : undefined;
+  const limit = Math.min(5000, Number(req.query.limit) || 1000);
+  const r = await pool.query<{
+    reference: string | null; description: string | null; status: string | null;
+    applicant_name: string | null; address: string | null; local_authority: string | null;
+    estimated_value: number | null; received_date: string | null;
+  }>(
+    district
+      ? `SELECT reference, description, status, applicant_name, address, local_authority, estimated_value, received_date
+         FROM planning_applications WHERE local_authority ILIKE $1 ORDER BY received_date DESC NULLS LAST LIMIT $2`
+      : `SELECT reference, description, status, applicant_name, address, local_authority, estimated_value, received_date
+         FROM planning_applications ORDER BY received_date DESC NULLS LAST LIMIT $1`,
+    district ? [`%${district}%`, limit] : [limit]
+  );
+  const csv = exportPlanningCsv(r.rows.map(row => ({
+    reference: row.reference, description: row.description, status: row.status,
+    applicantName: row.applicant_name, address: row.address, localAuthority: row.local_authority,
+    estimatedValue: row.estimated_value, receivedDate: row.received_date,
+  })));
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="planning${district ? "-" + district : ""}.csv"`);
+  res.send(csv);
+}));
+
+// Desk-level opportunity CSV export (public — requires auth for pro desks)
+app.get("/desk/:slug/export.csv", asyncRoute(async (req, res) => {
+  const slug = req.params.slug;
+  const deskProfile = DESK_PROFILES.find((d: DeskProfile) => d.slug === slug);
+  if (!deskProfile) { res.status(404).send("Desk not found"); return; }
+  if (deskProfile.live) {
+    const authCtx = getAuthUser(req);
+    if (!authCtx || (authCtx.tier === "free")) {
+      res.status(403).send("Pro subscription required for CSV export"); return;
+    }
+  }
+
+  const cached = await getDeskCache(slug);
+  if (!cached) { res.status(202).send("Data not yet compiled for this desk"); return; }
+  const { data } = cached;
+  const deskKeywords = deskProfile.categories.flatMap((c: { keywords: string[] }) => c.keywords);
+  const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
+  const rawOpen = (data.contractsFinder.open || []) as any[];
+  const rawAwarded = (data.contractsFinder.awarded || []) as any[];
+  const rawTender = (data.findTender?.notices || []) as any[];
+  const notices = [
+    ...rawOpen.map((n: any) => ({ ...n, status: "open" })),
+    ...rawAwarded.map((n: any) => ({ ...n, status: "awarded" })),
+    ...rawTender.map((n: any) => ({ ...n, status: "open" })),
+  ].filter((n: any) => {
+    const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
+    if (t > 0 && t < cutoff365) return false;
+    return deskKeywords.some((kw: string) => n.title.toLowerCase().includes(kw));
+  });
+
+  const csv = exportOpportunitiesCsv(notices);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="${slug}-opportunities.csv"`);
+  res.send(csv);
+}));
+
+// ── Public buyer HTML pages ───────────────────────────────────────────────────
+
+// ── Executive Intelligence page ───────────────────────────────────────────────
+
+app.get("/intelligence", asyncRoute(async (req, res) => {
+  const authCtx = getAuthUser(req);
+
+  // Pull cross-desk summaries from cached desk data
+  const deskSummaries: {
+    slug: string; label: string; openCount: number;
+    totalAwarded: number; awardedCount: number; topBuyer: string;
+  }[] = [];
+
+  const recentAwards: { title: string; buyer: string; value: number | null; supplier: string | null; desk: string }[] = [];
+  const cutoff90 = Date.now() - 90 * 24 * 3_600_000;
+  const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
+
+  for (const profile of DESK_PROFILES.filter((d: DeskProfile) => d.live)) {
+    const cached = await getDeskCache(profile.slug).catch(() => null);
+    if (!cached) {
+      deskSummaries.push({ slug: profile.slug, label: profile.label, openCount: 0, totalAwarded: 0, awardedCount: 0, topBuyer: "—" });
+      continue;
+    }
+    const { data } = cached;
+    const deskKeywords = profile.categories.flatMap((c: { keywords: string[] }) => c.keywords);
+    const nowMs = Date.now();
+
+    const openNotices = ((data.contractsFinder.open || []) as any[]).concat((data.findTender?.notices || []) as any[]).filter((n: any) => {
+      const t = new Date(n.publishedDate || 0).getTime();
+      if (t > 0 && t < cutoff365) return false;
+      return deskKeywords.some((kw: string) => n.title.toLowerCase().includes(kw));
+    });
+
+    const awardedNotices = ((data.contractsFinder.awarded || []) as any[]).filter((n: any) => {
+      const t = new Date(n.awardedDate || n.publishedDate || 0).getTime();
+      return t >= cutoff365 && t <= nowMs;
+    });
+
+    const threshold = computeOutlierThreshold(awardedNotices.map((n: any) => n.awardedValue ?? 0));
+    const validAwarded = awardedNotices.filter((n: any) => (n.awardedValue ?? 0) <= threshold);
+    const totalAwarded = validAwarded.reduce((s: number, n: any) => s + (n.awardedValue ?? 0), 0);
+
+    const buyerTotals = new Map<string, number>();
+    for (const n of validAwarded as any[]) {
+      if (!n.buyer || n.buyer === "Not stated") continue;
+      buyerTotals.set(n.buyer, (buyerTotals.get(n.buyer) || 0) + (n.awardedValue ?? 0));
+    }
+    const topBuyer = [...buyerTotals.entries()].filter(([b]) => !isAggregatorBuyer(b)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
+
+    deskSummaries.push({
+      slug: profile.slug, label: profile.label,
+      openCount: openNotices.length, totalAwarded, awardedCount: awardedNotices.length, topBuyer,
+    });
+
+    // Collect recent awards for cross-desk panel
+    for (const n of (awardedNotices as any[]).filter((n: any) => new Date(n.awardedDate || n.publishedDate || 0).getTime() >= cutoff90).slice(0, 3)) {
+      recentAwards.push({
+        title: (n.title ?? "").slice(0, 80),
+        buyer: n.buyer ?? "Unknown",
+        value: n.awardedValue ?? null,
+        supplier: n.awardedSupplier ?? null,
+        desk: profile.label,
+      });
+    }
+  }
+
+  // Sort recent awards by value desc
+  recentAwards.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+  // Pull top signals
+  let topSignals: { indicator: string; significance: string; relevanceScore: number; source: string; region: string | null }[] = [];
+  if (pool) {
+    try {
+      const sigR = await pool.query<{
+        indicator: string; significance: string; relevance_score: number; source: string; region: string | null;
+      }>(`SELECT indicator, significance, relevance_score, source, region FROM early_signals ORDER BY relevance_score DESC LIMIT 10`);
+      topSignals = sigR.rows.map(r => ({ indicator: r.indicator, significance: r.significance, relevanceScore: r.relevance_score, source: r.source, region: r.region }));
+    } catch {}
+  }
+
+  // Platform stats
+  let platformStats = { totalIngest: 0, liveSources: getLiveSources().length, suppliersIndexed: 0, buyersIndexed: 0, qualityPassRate: 0 };
+  if (pool) {
+    try {
+      const [ingestR, supR, buyR, govR] = await Promise.all([
+        pool.query<{ count: string }>(`SELECT COUNT(*) as count FROM canonical_ingest`),
+        pool.query<{ count: string }>(`SELECT COUNT(*) as count FROM supplier_entities`),
+        pool.query<{ count: string }>(`SELECT COUNT(*) as count FROM buyer_entities`),
+        getGovernanceSummary(pool).catch(() => ({ qualityPassRate: 0 })),
+      ]);
+      platformStats = {
+        totalIngest: parseInt(ingestR.rows[0]?.count ?? "0"),
+        liveSources: getLiveSources().length,
+        suppliersIndexed: parseInt(supR.rows[0]?.count ?? "0"),
+        buyersIndexed: parseInt(buyR.rows[0]?.count ?? "0"),
+        qualityPassRate: (govR as { qualityPassRate: number }).qualityPassRate,
+      };
+    } catch {}
+  }
+
+  res.type("html").send(executiveIntelligencePage({ deskSummaries, topSignals, platformStats, recentAwards: recentAwards.slice(0, 12), authCtx }));
+}));
+
+app.get("/buyers", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const buyers = q ? await findBuyersByName(q) : await getTopBuyers(60);
+  res.type("html").send(buyersDirectoryPage(buyers, q, getAuthUser(req)));
+}));
+
+app.get("/buyers/:id", asyncRoute(async (req, res) => {
+  const profile = await buildBuyerProfile(req.params.id);
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Buyer not found", getAuthUser(req))); return; }
+  res.type("html").send(buyerProfilePage(profile, getAuthUser(req)));
+}));
+
+// ── Public supplier HTML pages ────────────────────────────────────────────────
+
+app.get("/suppliers", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const suppliers = await listSuppliers({ q: q || undefined, limit: 60 });
+  res.type("html").send(suppliersDirectoryPage(suppliers, q, getAuthUser(req)));
+}));
+
+app.get("/suppliers/:id", asyncRoute(async (req, res) => {
+  const profile = await getSupplierProfile(req.params.id);
+  if (!profile) { res.status(404).type("html").send(notFoundHtml("Supplier not found", getAuthUser(req))); return; }
+  res.type("html").send(supplierProfilePage(profile, getAuthUser(req)));
 }));
 
 // ── End Intelligence API routes ──────────────────────────────────────────────
@@ -9529,36 +10058,58 @@ app.get("/terms", (req, res) => {
 });
 
 app.get("/sources", (req, res) => {
-  res.type("html").send(legalPage("Our Sources", `
-<h2>Where the data comes from</h2>
-<p>AtlasRevenue indexes two official UK government procurement platforms, updated hourly:</p>
+  const live = getLiveSources();
+  const categories: Record<string, { label: string; sources: typeof live }> = {
+    procurement_contracts:    { label: "Procurement & Contracts",       sources: [] },
+    government_public:        { label: "Government & Public Data",       sources: [] },
+    transport_infrastructure: { label: "Transport & Infrastructure",     sources: [] },
+    health_education_social:  { label: "Health, Education & Social",     sources: [] },
+    environment_energy:       { label: "Environment & Energy",           sources: [] },
+    news_media:               { label: "News & Media",                   sources: [] },
+    crime_justice:            { label: "Crime & Justice",                sources: [] },
+    other:                    { label: "Other",                          sources: [] },
+  };
+  for (const s of DATA_SOURCES) {
+    if (categories[s.category]) categories[s.category].sources.push(s);
+  }
 
-<h3>Contracts Finder</h3>
-<p>Operated by the Crown Commercial Service. All UK public-sector contracts above £12,000 (central government) or £30,000 (sub-central) must be published here. We search via the official REST API (v2), filtered by keyword relevance and CPV classification codes per intelligence desk.</p>
+  const cadenceLabel = (c: string) => ({ realtime: "Real-time", daily: "Daily", weekly: "Weekly", monthly: "Monthly" }[c] || c);
+  const cadenceColor = (c: string) => ({ realtime: "#1d6b4f", daily: "#4A7C91", weekly: "#7A6D3A", monthly: "#5A4A7A" }[c] || "#666");
 
-<h3>Find a Tender Service</h3>
-<p>Operated by the Cabinet Office. Publishes above-threshold procurement notices (typically £177,898+ for goods and services). We index via the OCDS (Open Contracting Data Standard) API, matching notices to sector desks by title keyword analysis.</p>
+  const categoryHtml = Object.values(categories).filter(g => g.sources.length > 0).map(g => `
+  <h2 style="font-family:var(--sans);font-size:18px;font-weight:700;letter-spacing:-.01em;color:var(--text);margin:40px 0 16px">${g.label}</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-bottom:24px">
+    ${g.sources.map(s => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${escapeHtml(s.name)}</div>
+        <div style="display:flex;gap:5px;flex-shrink:0;margin-left:8px">
+          <span style="background:${escapeHtml(cadenceColor(s.cadence))};color:#fff;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:3px">${escapeHtml(cadenceLabel(s.cadence))}</span>
+          ${s.requiresKey ? `<span style="background:rgba(169,121,50,.15);color:#A97932;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:3px">API KEY</span>` : `<span style="background:rgba(29,107,79,.12);color:#1d6b4f;font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:3px">FREE</span>`}
+          ${!s.live ? `<span style="background:rgba(155,45,32,.12);color:var(--red);font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:3px">STUB</span>` : ""}
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 8px">${escapeHtml(s.description)}</p>
+      <code style="font-size:10px;color:var(--faint);font-family:var(--mono)">${escapeHtml(s.baseUrl)}</code>
+    </div>`).join("")}
+  </div>`).join("");
 
-<h2>What we do with it</h2>
-<ul>
-<li><strong>Filter</strong> — Each of our ${DESK_PROFILES.filter(d => d.live).length} intelligence desks has sector-specific keyword sets. Notices are matched by title to ensure relevance; we do not match on description text (which caused false positives in testing).</li>
-<li><strong>Aggregate</strong> — We compute awarded values, buyer concentration, category breakdowns, and spend trends from the raw notice data.</li>
-<li><strong>Analyse</strong> — Scan reports use AI (Claude by Anthropic, with OpenAI as fallback) to synthesise the matched procurement data into a structured commercial intelligence report. The AI has access to web search for additional context.</li>
-<li><strong>Cap outliers</strong> — Notices with awarded values above &pound;2bn are excluded from aggregated statistics to prevent data-entry errors from distorting desk-level metrics.</li>
+  res.type("html").send(legalPage(`Our ${DATA_SOURCES.length} Data Sources`, `
+<p style="font-size:15px;line-height:1.7;color:var(--muted);margin-bottom:8px">AtlasRevenue indexes <strong style="color:var(--text)">${DATA_SOURCES.length} free public data sources</strong> — from procurement portals and company registries to environmental APIs and parliamentary records. All data originates from official UK government and public sector systems.</p>
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px;font-family:var(--mono);font-size:11px">
+  <span style="color:var(--muted)"><strong style="color:#1d6b4f">${DATA_SOURCES.filter(s => !s.requiresKey).length}</strong> free / no key</span>
+  <span style="color:var(--muted)"><strong style="color:#A97932">${DATA_SOURCES.filter(s => s.requiresKey).length}</strong> require API key</span>
+  <span style="color:var(--muted)"><strong style="color:var(--text)">${live.length}</strong> live</span>
+</div>
+${categoryHtml}
+<h2 style="font-family:var(--sans);font-size:18px;font-weight:700;margin:40px 0 12px">What we do with it</h2>
+<ul style="font-size:14px;line-height:1.8;color:var(--muted)">
+<li><strong style="color:var(--text)">Ingest</strong> — All records land in <code>canonical_ingest</code> with source tag, batch ID, and raw JSON payload</li>
+<li><strong style="color:var(--text)">Resolve</strong> — Entity resolution links organisations across sources via Companies House number, name matching, and domain</li>
+<li><strong style="color:var(--text)">Signal</strong> — Early signals are correlated across ONS, Planning Data, Land Registry, GOV.UK, Hansard, and BBC to surface desk-relevant intelligence</li>
+<li><strong style="color:var(--text)">Analyse</strong> — Scan reports use Claude (Anthropic) with OpenAI fallback to synthesise matched procurement data into a structured intelligence report</li>
 </ul>
-
-<h2>What we do not do</h2>
-<ul>
-<li>We do not scrape private databases, paywalled platforms, or restricted systems</li>
-<li>We do not access or store tender documents or bid submissions</li>
-<li>We do not predict outcomes — we report what the public record shows</li>
-</ul>
-
-<h2>Aggregator filtering</h2>
-<p>Procurement aggregators (Crown Commercial Service, YPO, ESPO, Pagabo, Scape, NHS Supply Chain, and others) are filtered from buyer-level statistics to prevent a single framework operator from distorting the buyer concentration picture for a given desk.</p>
-
-<h2>Limitations</h2>
-<p>Government data can be incomplete: some contracts are published late, some awarded values are missing or incorrect, and below-threshold contracts may not appear at all. AtlasRevenue reports what is published, not what exists. This is intelligence, not certainty.</p>
+<p style="font-size:13px;color:var(--faint);margin-top:24px">Government data can be incomplete. AtlasRevenue reports what is published — intelligence, not certainty.</p>
 `, req));
 });
 
@@ -9648,6 +10199,54 @@ app.get("/api-docs", (req, res) => {
 
 <h2>Rate limits</h2>
 <p>API access is rate-limited to 60 requests per minute per API key. Scan creation is limited to 10 per hour.</p>
+
+<h2>Buyer Graph API <span style="font-size:12px;background:#2F8A5220;color:#2F8A52;padding:2px 8px;border-radius:2px;margin-left:8px">Public</span></h2>
+
+<h3>List / search buyers</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/buyers?q=nhs+trust&amp;limit=20</code></p>
+<p>Returns top buyers by awarded spend (default) or filtered by name query. No authentication required.</p>
+
+<h3>Buyer profile</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/buyers/:id</code></p>
+<p>Returns a full buyer profile: entity details, Companies House data, officers, procurement history (up to 100 records), top categories, and top incumbent suppliers. No authentication required.</p>
+
+<h2>Signal API <span style="font-size:12px;background:#2F8A5220;color:#2F8A52;padding:2px 8px;border-radius:2px;margin-left:8px">Public</span></h2>
+
+<h3>Latest signals</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/signals/latest</code></p>
+<p>Returns the most recent procurement signal per sector desk, plus hero and ticker signals for the homepage feed.</p>
+
+<h3>Early signals</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/early-signals?limit=50</code></p>
+<p>Returns macro early signals from ONS construction data, DLUHC Planning Data, GOV.UK policy publications, and Land Registry. No authentication required. <code>limit</code> max 200.</p>
+
+<h3>Early signals by desk</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/early-signals/desk/:slug</code></p>
+<p>Returns early signals filtered to a specific intelligence desk category. No authentication required.</p>
+
+<h2>Lifecycle API <span style="font-size:12px;background:#2F8A5220;color:#2F8A52;padding:2px 8px;border-radius:2px;margin-left:8px">Public</span></h2>
+
+<h3>Lifecycle summary</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/lifecycle/summary</code></p>
+<p>Returns aggregate lifecycle stage distribution across all tracked contracts.</p>
+
+<h3>Recent transitions</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/lifecycle/transitions?limit=50</code></p>
+<p>Returns recently detected lifecycle stage transitions — contracts that moved from open to awarded, or from pipeline to active procurement.</p>
+
+<h3>Lifecycle by desk</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/lifecycle/desk/:category</code></p>
+<p>Returns lifecycle entries for a specific desk category.</p>
+
+<h2>Supplier Graph API <span style="font-size:12px;background:#2F8A5220;color:#2F8A52;padding:2px 8px;border-radius:2px;margin-left:8px">Public</span></h2>
+
+<h3>List suppliers</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/suppliers?q=siemens&amp;limit=50&amp;offset=0</code></p>
+<p>Returns supplier entities ordered by total contract wins. Supports text search by name. No authentication required.</p>
+
+<h3>Supplier profile</h3>
+<p><code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">GET /api/suppliers/:id</code></p>
+<p>Returns a full supplier profile: entity details, Companies House data, all contract wins with buyer names and values, top buyers, and top categories. No authentication required.</p>
 
 <h2>Webhooks (coming soon)</h2>
 <p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a>.</p>
@@ -12120,7 +12719,10 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
 
-  const cached = await getDeskCache(profile.slug).catch(() => null);
+  const [cached, earlySignals] = await Promise.all([
+    getDeskCache(profile.slug).catch(() => null),
+    getEarlySignalsByDesk(profile.slug).catch(() => []),
+  ]);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
 
   if (isStale) {
@@ -12128,7 +12730,7 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
     compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   }
 
-  res.type("html").send(deskPage(profile, cached, getAuthUser(req)));
+  res.type("html").send(deskPage(profile, cached, getAuthUser(req), earlySignals));
 }));
 
 app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
@@ -12434,7 +13036,7 @@ ${pageShellFoot()}
 </body></html>`;
 }
 
-function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null): string {
+function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null, earlySignals: import("./intelligence/early-signals/types.js").EarlySignal[] = []): string {
   const isCompiling = cached === null;
   const data = cached?.data;
 
@@ -13309,6 +13911,54 @@ ${recentAwardsHtml}
 
 ${analyticsHtml}
 
+${earlySignals.length > 0 ? `
+<section class="an-section" id="early-signals-desk" style="background:var(--surface-2)">
+  <div class="an-wrap">
+    <div class="an-hd">
+      <div>
+        <div class="an-eyebrow">Market Context</div>
+        <h2 class="an-title">Early Signals</h2>
+        <p class="an-subtitle">ONS, Planning Data &amp; GOV.UK policy indicators for this sector</p>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${earlySignals.slice(0, 5).map(s => {
+        const sigClass = s.significance === "high" ? "es-sig-high" : s.significance === "medium" ? "es-sig-med" : "es-sig-low";
+        const changeBadge = s.change_pct != null
+          ? `<span class="es-change ${Number(s.change_pct) >= 0 ? "es-change-up" : "es-change-dn"}">${Number(s.change_pct) >= 0 ? "▲" : "▼"} ${Math.abs(Number(s.change_pct)).toFixed(1)}%</span>`
+          : "";
+        return `<div class="es-card">
+          <div class="es-card-left">
+            <span class="es-src">${escapeHtml(s.source.replace(/_/g," ").toUpperCase())}</span>
+            <span class="es-sig ${sigClass}">${escapeHtml(s.significance.toUpperCase())}</span>
+          </div>
+          <div class="es-card-body">
+            <div class="es-narrative">${escapeHtml(s.narrative)}</div>
+            <div class="es-meta">${escapeHtml(s.region)} &middot; ${escapeHtml(s.period)} ${changeBadge}</div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>
+</section>` : ""}
+
+<style>
+.es-card{display:flex;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:0}
+.es-card-left{display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:flex-start;min-width:80px}
+.es-src{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);padding:2px 6px;border-radius:2px}
+.es-sig{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:2px}
+.es-sig-high{background:rgba(155,45,32,.12);color:#9b2d20}
+.es-sig-med{background:rgba(180,146,78,.12);color:#B4924E}
+.es-sig-low{background:var(--surface-3);color:var(--muted)}
+.es-card-body{flex:1;min-width:0}
+.es-narrative{font-size:13px;color:var(--text);line-height:1.55;margin-bottom:6px}
+.es-meta{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.es-change{padding:1px 6px;border-radius:2px;font-weight:600}
+.es-change-up{color:#2F8A52;background:rgba(47,138,82,.1)}
+.es-change-dn{color:#9b2d20;background:rgba(155,45,32,.1)}
+@media(max-width:600px){.es-card{flex-direction:column;gap:10px}.es-card-left{flex-direction:row}}
+</style>
+
 <section class="dm-section" id="demand-map">
   <div class="dm-section-inner">
     <div class="dm-head-row">
@@ -13852,6 +14502,9 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
       <nav class="gh-main-nav">
         <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
+        <a href="/intelligence">Intelligence</a>
+        <a href="/buyers">Buyers</a>
+        <a href="/suppliers">Suppliers</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
@@ -14501,7 +15154,10 @@ function buyersPage(
           <span class="bi-last">Last seen ${escapeHtml(lastSeen)}</span>
         </div>
       </div>
-      ${b.openCount > 0 ? `<div class="bi-card-right"><a href="/desk/${profile.slug}/notices?buyer=${encodeURIComponent(b.name)}" class="bi-cta">View notices &rarr;</a></div>` : ""}
+      <div class="bi-card-right" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        ${b.openCount > 0 ? `<a href="/desk/${profile.slug}/notices?buyer=${encodeURIComponent(b.name)}" class="bi-cta">View notices &rarr;</a>` : ""}
+        <a href="/buyers?q=${encodeURIComponent(b.name)}" class="bi-cta" style="opacity:.7">Buyer profile &rarr;</a>
+      </div>
     </div>`;
   }).join("");
 
@@ -14608,6 +15264,893 @@ ${pageShellHeader(profile, authCtx)}
 </section>
 ${sampleCtaBlock("compact")}
 
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+// ── Executive Intelligence View ───────────────────────────────────────────────
+
+function executiveIntelligencePage(opts: {
+  deskSummaries: { slug: string; label: string; openCount: number; totalAwarded: number; awardedCount: number; topBuyer: string }[];
+  topSignals: { indicator: string; significance: string; relevanceScore: number; source: string; region: string | null }[];
+  platformStats: { totalIngest: number; liveSources: number; suppliersIndexed: number; buyersIndexed: number; qualityPassRate: number };
+  recentAwards: { title: string; buyer: string; value: number | null; supplier: string | null; desk: string }[];
+  authCtx?: { email: string; tier: UserTier } | null;
+}): string {
+  const { deskSummaries, topSignals, platformStats, recentAwards, authCtx } = opts;
+
+  const fmtShort = (v: number) => v >= 1e9 ? `£${(v / 1e9).toFixed(1)}bn`
+    : v >= 1e6 ? `£${(v / 1e6).toFixed(0)}m`
+    : v >= 1e3 ? `£${Math.round(v / 1e3)}k`
+    : `£${Math.round(v)}`;
+
+  const totalOpen = deskSummaries.reduce((s, d) => s + d.openCount, 0);
+  const totalValue = deskSummaries.reduce((s, d) => s + d.totalAwarded, 0);
+  const totalContracts = deskSummaries.reduce((s, d) => s + d.awardedCount, 0);
+
+  const signalBadge = (sig: string) => sig === "high"
+    ? `<span style="font-family:var(--mono);font-size:9px;padding:2px 7px;background:rgba(29,107,79,.1);color:#1d6b4f;border:1px solid rgba(29,107,79,.22)">HIGH</span>`
+    : sig === "medium"
+    ? `<span style="font-family:var(--mono);font-size:9px;padding:2px 7px;background:rgba(180,146,78,.1);color:#8B6B2A;border:1px solid rgba(180,146,78,.25)">MED</span>`
+    : `<span style="font-family:var(--mono);font-size:9px;padding:2px 7px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border-2)">LOW</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Executive Intelligence — AtlasRevenue</title>
+<style>${pageShellCss()}
+.ei-hero{background:var(--hero-cta);padding:40px 0 36px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ei-hero-inner{max-width:1320px;margin:0 auto;padding:0 40px}
+.ei-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(236,230,214,.5);margin-bottom:8px}
+.ei-title{font-family:var(--serif);font-size:32px;font-weight:400;color:#ECE6D6;margin-bottom:6px}
+.ei-sub{font-family:var(--mono);font-size:11px;color:rgba(236,230,214,.45);letter-spacing:.04em}
+.ei-kpi-strip{max-width:1320px;margin:0 auto;padding:24px 40px;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border-2)}
+.ei-kpi{background:var(--surface-2);padding:20px 22px}
+.ei-kpi-val{font-family:var(--serif);font-size:26px;font-weight:400;color:var(--text);margin-bottom:4px}
+.ei-kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ei-body{max-width:1320px;margin:0 auto;padding:32px 40px;display:grid;grid-template-columns:1fr 340px;gap:32px}
+.ei-main{}
+.ei-side{}
+.ei-card{background:var(--surface);border:1px solid var(--border-2);margin-bottom:20px}
+.ei-card-head{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ei-card-title{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ei-card-body{padding:18px}
+.ei-desk-row{display:grid;grid-template-columns:200px 1fr 80px 90px 90px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.ei-desk-row:last-child{border-bottom:none}
+.ei-desk-name{font-weight:600;font-size:13px;color:var(--text)}
+.ei-desk-buyer{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ei-desk-stat{font-family:var(--mono);font-size:12px;color:var(--text-mid);text-align:right}
+.ei-desk-val{font-family:var(--serif);font-size:13px;font-weight:500;color:var(--brand);text-align:right}
+.ei-bar{height:4px;background:var(--border-2);border-radius:2px;margin-top:4px;overflow:hidden}
+.ei-bar-fill{height:100%;background:var(--brand);border-radius:2px;transition:width .4s}
+.ei-sig-row{padding:10px 0;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.ei-sig-row:last-child{border-bottom:none}
+.ei-sig-name{font-size:12px;color:var(--text);margin-bottom:2px}
+.ei-sig-meta{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ei-award-row{padding:10px 0;border-bottom:1px solid var(--border)}
+.ei-award-row:last-child{border-bottom:none}
+.ei-award-title{font-size:12px;color:var(--text);margin-bottom:2px;line-height:1.35}
+.ei-award-meta{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.ei-platform-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px}
+.ei-platform-row:last-child{border-bottom:none}
+.ei-platform-key{color:var(--muted)}
+.ei-platform-val{color:var(--text);font-weight:600}
+.ei-export-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.ei-export-btn{display:inline-block;padding:5px 12px;border:1px solid var(--border-2);font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:.15s}
+.ei-export-btn:hover{border-color:var(--brand);color:var(--brand)}
+@media(max-width:900px){
+  .ei-body{grid-template-columns:1fr}
+  .ei-kpi-strip{grid-template-columns:repeat(3,1fr)}
+  .ei-desk-row{grid-template-columns:1fr 80px 90px}
+}
+@media(max-width:600px){
+  .ei-kpi-strip{grid-template-columns:repeat(2,1fr)}
+  .ei-hero-inner,.ei-body{padding-left:16px;padding-right:16px}
+  .ei-kpi-strip{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<div class="ei-hero">
+  <div class="ei-hero-inner">
+    <div class="ei-eyebrow">AtlasRevenue Platform</div>
+    <h1 class="ei-title">Executive Intelligence View</h1>
+    <div class="ei-sub">Cross-desk procurement signals · ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</div>
+  </div>
+</div>
+
+<div class="ei-kpi-strip">
+  <div class="ei-kpi">
+    <div class="ei-kpi-val">${totalOpen.toLocaleString("en-GB")}</div>
+    <div class="ei-kpi-lbl">Open Opportunities</div>
+  </div>
+  <div class="ei-kpi">
+    <div class="ei-kpi-val">${fmtShort(totalValue)}</div>
+    <div class="ei-kpi-lbl">12-Month Awarded</div>
+  </div>
+  <div class="ei-kpi">
+    <div class="ei-kpi-val">${totalContracts.toLocaleString("en-GB")}</div>
+    <div class="ei-kpi-lbl">Contracts Indexed</div>
+  </div>
+  <div class="ei-kpi">
+    <div class="ei-kpi-val">${platformStats.suppliersIndexed.toLocaleString("en-GB")}</div>
+    <div class="ei-kpi-lbl">Suppliers in Graph</div>
+  </div>
+  <div class="ei-kpi">
+    <div class="ei-kpi-val" style="color:${platformStats.qualityPassRate >= 80 ? "var(--green)" : "var(--amber)"}">${platformStats.qualityPassRate}%</div>
+    <div class="ei-kpi-lbl">Data Quality</div>
+  </div>
+</div>
+
+<div class="ei-body">
+  <div class="ei-main">
+
+    <div class="ei-card">
+      <div class="ei-card-head">
+        <div class="ei-card-title">Desk Performance — Cross-sector Overview</div>
+        <a href="/desks" class="ei-export-btn">All desks &rarr;</a>
+      </div>
+      <div class="ei-card-body">
+        ${deskSummaries.length === 0
+          ? `<p style="color:var(--muted);font-family:var(--mono);font-size:12px">Desk data compiles on first cache build.</p>`
+          : (() => {
+              const maxVal = Math.max(...deskSummaries.map(d => d.totalAwarded), 1);
+              return deskSummaries.map(d => {
+                const pct = Math.round((d.totalAwarded / maxVal) * 100);
+                return `<div class="ei-desk-row">
+                  <div>
+                    <a href="/desk/${escapeHtml(d.slug)}" class="ei-desk-name" style="text-decoration:none">${escapeHtml(d.label)}</a>
+                    <div class="ei-desk-buyer">${escapeHtml(d.topBuyer || "—")}</div>
+                    <div class="ei-bar"><div class="ei-bar-fill" style="width:${pct}%"></div></div>
+                  </div>
+                  <div class="ei-desk-stat">${d.openCount} open</div>
+                  <div class="ei-desk-stat">${d.awardedCount} awarded</div>
+                  <div class="ei-desk-val">${fmtShort(d.totalAwarded)}</div>
+                </div>`;
+              }).join("");
+            })()
+        }
+      </div>
+    </div>
+
+    <div class="ei-card">
+      <div class="ei-card-head">
+        <div class="ei-card-title">Recent Contract Awards — Last 90 Days</div>
+        <a href="/api/export/ingest.csv" class="ei-export-btn">CSV &darr;</a>
+      </div>
+      <div class="ei-card-body">
+        ${recentAwards.length === 0
+          ? `<p style="color:var(--muted);font-family:var(--mono);font-size:12px">Awards populate from desk cache data.</p>`
+          : recentAwards.map(a => `<div class="ei-award-row">
+              <div class="ei-award-title">${escapeHtml(a.title)}</div>
+              <div class="ei-award-meta">
+                <span>${escapeHtml(a.buyer)}</span>
+                ${a.value ? `<span style="color:var(--brand)">${fmtShort(a.value)}</span>` : ""}
+                ${a.supplier ? `<span>&#127942; ${escapeHtml(a.supplier)}</span>` : ""}
+                <span style="color:var(--muted)">${escapeHtml(a.desk)}</span>
+              </div>
+            </div>`).join("")
+        }
+      </div>
+    </div>
+
+    <div class="ei-card">
+      <div class="ei-card-head">
+        <div class="ei-card-title">Data Exports</div>
+      </div>
+      <div class="ei-card-body">
+        <div class="ei-export-strip">
+          ${DESK_PROFILES.filter((d: DeskProfile) => d.live).map((d: DeskProfile) =>
+            `<a href="/desk/${escapeHtml(d.slug)}/export.csv" class="ei-export-btn">${escapeHtml(d.label)} CSV</a>`
+          ).join("")}
+          <a href="/api/export/suppliers.csv" class="ei-export-btn">Suppliers CSV</a>
+          <a href="/api/export/buyers.csv" class="ei-export-btn">Buyers CSV</a>
+          <a href="/api/export/signals.csv" class="ei-export-btn">Signals CSV</a>
+          <a href="/api/export/planning.csv" class="ei-export-btn">Planning CSV</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="ei-side">
+
+    <div class="ei-card">
+      <div class="ei-card-head">
+        <div class="ei-card-title">Top Early Signals</div>
+        <a href="/api/export/signals.csv" class="ei-export-btn">CSV &darr;</a>
+      </div>
+      <div class="ei-card-body">
+        ${topSignals.length === 0
+          ? `<p style="color:var(--muted);font-family:var(--mono);font-size:12px">Signals build after first ingest run.</p>`
+          : topSignals.map(s => `<div class="ei-sig-row">
+              <div>
+                <div class="ei-sig-name">${escapeHtml(s.indicator)}</div>
+                <div class="ei-sig-meta">${escapeHtml(s.source)}${s.region ? " · " + escapeHtml(s.region) : ""}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                ${signalBadge(s.significance)}
+                <span style="font-family:var(--mono);font-size:10px;color:var(--brand)">${s.relevanceScore.toFixed(0)}</span>
+              </div>
+            </div>`).join("")
+        }
+        <div style="margin-top:12px">
+          <a href="/api/governance/quality" target="_blank" class="ei-export-btn">Quality Check</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="ei-card">
+      <div class="ei-card-head">
+        <div class="ei-card-title">Platform Health</div>
+      </div>
+      <div class="ei-card-body">
+        <div class="ei-platform-row">
+          <span class="ei-platform-key">Live sources</span>
+          <span class="ei-platform-val">${platformStats.liveSources} / ${DATA_SOURCES.length}</span>
+        </div>
+        <div class="ei-platform-row">
+          <span class="ei-platform-key">Records ingested</span>
+          <span class="ei-platform-val">${platformStats.totalIngest.toLocaleString("en-GB")}</span>
+        </div>
+        <div class="ei-platform-row">
+          <span class="ei-platform-key">Suppliers indexed</span>
+          <span class="ei-platform-val">${platformStats.suppliersIndexed.toLocaleString("en-GB")}</span>
+        </div>
+        <div class="ei-platform-row">
+          <span class="ei-platform-key">Buyers indexed</span>
+          <span class="ei-platform-val">${platformStats.buyersIndexed.toLocaleString("en-GB")}</span>
+        </div>
+        <div class="ei-platform-row">
+          <span class="ei-platform-key">Quality pass rate</span>
+          <span class="ei-platform-val" style="color:${platformStats.qualityPassRate >= 80 ? "var(--green)" : "var(--amber)"}">${platformStats.qualityPassRate}%</span>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <a href="/admin" class="ei-export-btn">Admin &rarr;</a>
+          <a href="/api/governance/lineage" target="_blank" class="ei-export-btn">Data Lineage</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+function buyersDirectoryPage(
+  buyers: import("./intelligence/buyer-graph/types.js").BuyerEntity[],
+  query: string,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const BUYER_TYPE_LABEL: Record<string, string> = {
+    local_authority: "LOCAL AUTHORITY", nhs: "NHS", central_gov: "CENTRAL GOV",
+    housing: "HOUSING", education: "EDUCATION", police_fire: "POLICE/FIRE",
+    construction: "CONSTRUCTION", digital: "DIGITAL", facilities: "FACILITIES",
+    transport: "TRANSPORT", recruitment: "RECRUITMENT", legal: "LEGAL",
+    finance: "FINANCE", energy: "ENERGY", security: "SECURITY", catering: "CATERING",
+    waste: "WASTE", health: "HEALTH", social_care: "SOCIAL CARE", consulting: "CONSULTING",
+    company: "COMPANY",
+  };
+  const TAG_CLASS: Record<string, string> = {
+    local_authority: "bw-tag-la", nhs: "bw-tag-health", central_gov: "bw-tag-gov",
+    housing: "bw-tag-housing", education: "bw-tag-edu",
+  };
+
+  const cards = buyers.map(b => {
+    const typeLabel = BUYER_TYPE_LABEL[b.buyer_type] || b.buyer_type.toUpperCase();
+    const tagClass = TAG_CLASS[b.buyer_type] || "bw-tag-other";
+    const spend = b.total_award_value > 0 ? fmtMoney(Number(b.total_award_value)) : "—";
+    const initials = buyerInitials(b.name);
+    const chBadge = b.company_number
+      ? `<span class="bdir-ch" title="Companies House ${escapeHtml(b.company_number)}">CH ${escapeHtml(b.company_number)}</span>`
+      : "";
+    return `<a class="bdir-card" href="/buyers/${escapeHtml(b.id)}" data-search="${escapeHtml(b.name.toLowerCase())} ${escapeHtml(typeLabel.toLowerCase())}">
+      <div class="bdir-avatar">${escapeHtml(initials)}</div>
+      <div class="bdir-body">
+        <div class="bdir-name">${escapeHtml(b.name)}</div>
+        <div class="bdir-tags">
+          <span class="bw-tag ${tagClass}">${typeLabel}</span>
+          ${chBadge}
+        </div>
+        <div class="bdir-meta">
+          <span class="bdir-spend">${escapeHtml(spend)}</span> awarded &middot; ${b.total_awards} contracts
+        </div>
+      </div>
+      <div class="bdir-arrow">&rsaquo;</div>
+    </a>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Buyer Directory &mdash; UK Public-Sector Buyers &mdash; AtlasRevenue</title>
+<meta name="description" content="Browse and search UK public-sector buyers tracked by AtlasRevenue. Companies House data, procurement history, and contact intelligence for local authorities, NHS, central government, and more.">
+<style>
+${pageShellCss()}
+.bdir-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:28px;flex-wrap:wrap}
+.bdir-search{flex:1;min-width:200px;max-width:400px;font-family:var(--mono);font-size:13px;padding:10px 16px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);outline:none;border-radius:0}
+.bdir-search:focus{border-color:var(--brand)}
+.bdir-count{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+.bdir-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1px;background:var(--border)}
+.bdir-card{display:flex;align-items:center;gap:16px;padding:20px;background:var(--surface);text-decoration:none;transition:background .12s}
+.bdir-card:hover{background:var(--surface-2)}
+.bdir-avatar{width:48px;height:48px;border-radius:4px;background:var(--surface-3);color:var(--muted);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.04em}
+.bdir-body{flex:1;min-width:0}
+.bdir-name{font-size:14px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bdir-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center}
+.bdir-ch{font-family:var(--mono);font-size:9px;letter-spacing:.05em;padding:2px 6px;border:1px solid var(--border-2);color:var(--muted);border-radius:2px}
+.bdir-meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.bdir-spend{color:var(--text);font-weight:600}
+.bdir-arrow{font-size:22px;color:var(--brand);flex-shrink:0;align-self:center}
+@media(max-width:600px){.bdir-grid{grid-template-columns:1fr}.bdir-arrow{display:none}}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<section class="pg-mast">
+  <div class="pg-mast-inner">
+    <div class="pg-crumb">
+      <a href="/desks">Intelligence Desks</a>
+      <span class="pg-crumb-sep">&rsaquo;</span>
+      <span class="pg-crumb-active">Buyer Directory</span>
+    </div>
+    <h1>BUYER DIRECTORY</h1>
+    <p class="pg-desc">UK public-sector buyers tracked across Contracts Finder and Find a Tender. Enriched with Companies House company data, officer records, and procurement history.</p>
+    <div class="pg-stats">
+      <div class="pg-stat"><span class="pg-stat-val">${buyers.length}${query ? "" : "+"}</span><span class="pg-stat-label">Buyers indexed</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">24</span><span class="pg-stat-label">Sector desks</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">Live</span><span class="pg-stat-label">Updated hourly</span></div>
+    </div>
+  </div>
+</section>
+<section class="pg-body">
+  <div class="pg-body-inner">
+    <div class="bdir-toolbar">
+      <form method="get" action="/buyers" style="display:contents">
+        <input class="bdir-search" type="search" name="q" placeholder="Search buyer name or type&hellip;" value="${escapeHtml(query)}" id="bdir-search" autocomplete="off">
+        <button type="submit" class="btn-primary" style="font-family:var(--mono);font-size:12px;padding:10px 18px;letter-spacing:.06em">Search</button>
+      </form>
+      <span class="bdir-count" id="bdir-count">${buyers.length} buyers</span>
+    </div>
+    ${buyers.length === 0
+      ? `<p class="pg-empty">${query ? `No buyers found for &ldquo;${escapeHtml(query)}&rdquo;.` : "No buyer data yet — desk data compiles hourly."}</p>`
+      : `<div class="bdir-grid" id="bdir-grid">${cards}</div>
+         <script>
+         (function(){
+           var t;
+           document.getElementById('bdir-search').addEventListener('input',function(e){
+             clearTimeout(t);
+             t=setTimeout(function(){
+               var q=e.target.value.toLowerCase().trim();
+               var cards=document.querySelectorAll('#bdir-grid .bdir-card');
+               var vis=0;
+               cards.forEach(function(c){
+                 var show=!q||c.dataset.search.includes(q);
+                 c.style.display=show?'':'none';
+                 if(show)vis++;
+               });
+               document.getElementById('bdir-count').textContent=vis+' buyers';
+             },120);
+           });
+         })();
+         </script>`
+    }
+  </div>
+</section>
+${sampleCtaBlock("compact")}
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+function buyerProfilePage(
+  profile: import("./intelligence/buyer-graph/types.js").BuyerProfile,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const { entity, officers, history, stats } = profile;
+
+  const BUYER_TYPE_LABEL: Record<string, string> = {
+    local_authority: "LOCAL AUTHORITY", nhs: "NHS", central_gov: "CENTRAL GOV",
+    housing: "HOUSING", education: "EDUCATION", police_fire: "POLICE/FIRE",
+    construction: "CONSTRUCTION", digital: "DIGITAL", facilities: "FACILITIES",
+    transport: "TRANSPORT", recruitment: "RECRUITMENT", legal: "LEGAL",
+    finance: "FINANCE", energy: "ENERGY", security: "SECURITY", catering: "CATERING",
+    waste: "WASTE", health: "HEALTH", social_care: "SOCIAL CARE", consulting: "CONSULTING",
+    company: "COMPANY",
+  };
+  const typeLabel = BUYER_TYPE_LABEL[entity.buyer_type] || entity.buyer_type.toUpperCase();
+  const chUrl = entity.company_number
+    ? `https://find-and-update.company-information.service.gov.uk/company/${entity.company_number}`
+    : null;
+
+  const historyRows = history.slice(0, 50).map(h => {
+    const val = h.awarded_value || h.value_high || h.value_low;
+    const valStr = val ? fmtMoney(Number(val)) : "—";
+    const dateStr = h.awarded_date || h.published_date;
+    const date = dateStr ? new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+    const statusClass = /award/i.test(h.status) ? "bp-status-awarded" : /open/i.test(h.status) ? "bp-status-open" : "bp-status-other";
+    return `<tr>
+      <td class="bp-th-title"><a href="${escapeHtml(h.source_url)}" target="_blank" rel="noopener">${escapeHtml(h.title)}</a></td>
+      <td>${escapeHtml(h.category || "—")}</td>
+      <td><span class="bp-status ${statusClass}">${escapeHtml(h.status)}</span></td>
+      <td class="bp-num">${escapeHtml(valStr)}</td>
+      <td class="bp-num">${escapeHtml(date)}</td>
+    </tr>`;
+  }).join("");
+
+  const officerRows = officers.map(o => {
+    const role = o.role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const since = o.appointed_on ? new Date(o.appointed_on).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : "—";
+    return `<div class="bp-officer">
+      <div class="bp-officer-avatar">${escapeHtml((o.name.split(" ").map(w => w[0]).join("")).slice(0,2).toUpperCase())}</div>
+      <div class="bp-officer-body">
+        <div class="bp-officer-name">${escapeHtml(o.name)}</div>
+        <div class="bp-officer-role">${escapeHtml(role)}</div>
+        ${o.nationality ? `<div class="bp-officer-meta">${escapeHtml(o.nationality)}</div>` : ""}
+      </div>
+      <div class="bp-officer-since">${escapeHtml(since)}</div>
+    </div>`;
+  }).join("");
+
+  const catBars = stats.topCategories.slice(0, 5).map(c => {
+    const pct = stats.totalContracts > 0 ? Math.round((c.count / stats.totalContracts) * 100) : 0;
+    return `<div class="bp-cat-row">
+      <span class="bp-cat-label">${escapeHtml(c.category)}</span>
+      <div class="bp-cat-bar-wrap"><div class="bp-cat-bar" style="width:${pct}%"></div></div>
+      <span class="bp-cat-pct">${pct}%</span>
+    </div>`;
+  }).join("");
+
+  const supplierRows = stats.topSuppliers.slice(0, 6).map((s, i) => {
+    const val = s.value > 0 ? fmtMoney(s.value) : "—";
+    return `<div class="bp-supplier-row">
+      <span class="bp-supplier-rank">${i + 1}</span>
+      <span class="bp-supplier-name">${escapeHtml(s.name)}</span>
+      <span class="bp-supplier-val">${escapeHtml(val)}</span>
+      <span class="bp-supplier-cnt">${s.count} contracts</span>
+    </div>`;
+  }).join("");
+
+  const freqLabel = stats.procurementFrequency === "high" ? "High activity" : stats.procurementFrequency === "medium" ? "Moderate activity" : "Low activity";
+  const lastActivity = stats.lastActivity ? timeAgo(stats.lastActivity) : "—";
+  const websiteHtml = entity.website
+    ? `<a href="https://${escapeHtml(entity.website)}" target="_blank" rel="noopener" class="bp-ext-link">${escapeHtml(entity.website)} &rarr;</a>`
+    : "";
+  const sicHtml = entity.sic_codes?.length
+    ? entity.sic_codes.map(s => `<span class="bp-sic">${escapeHtml(s)}</span>`).join("")
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${escapeHtml(entity.name)} &mdash; Buyer Profile &mdash; AtlasRevenue</title>
+<meta name="description" content="Procurement profile for ${escapeHtml(entity.name)}: contract history, awarded spend, top suppliers, and Companies House officer records.">
+<style>
+${pageShellCss()}
+.bp-grid{display:grid;grid-template-columns:1fr 360px;gap:40px;align-items:start}
+.bp-main{}
+.bp-sidebar{display:flex;flex-direction:column;gap:24px}
+.bp-card{background:var(--surface);border:1px solid var(--border);padding:24px;border-radius:0}
+.bp-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+.bp-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bp-stat-val{font-family:var(--serif);font-size:26px;font-weight:500;color:var(--text);line-height:1}
+.bp-stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.bp-status{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:2px}
+.bp-status-awarded{background:rgba(47,138,82,.12);color:#2F8A52}
+.bp-status-open{background:rgba(29,78,216,.12);color:#1d4ed8}
+.bp-status-other{background:var(--surface-2);color:var(--muted)}
+.bp-table{width:100%;border-collapse:collapse;font-size:13px}
+.bp-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:2px solid var(--border-2)}
+.bp-table td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top}
+.bp-table td a{color:var(--brand);text-decoration:none}
+.bp-table td a:hover{text-decoration:underline}
+.bp-th-title{max-width:320px}
+.bp-num{text-align:right;font-family:var(--mono);font-size:12px}
+.bp-officer{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.bp-officer:last-child{border-bottom:none}
+.bp-officer-avatar{width:36px;height:36px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+.bp-officer-body{flex:1;min-width:0}
+.bp-officer-name{font-size:13px;font-weight:600;color:var(--text)}
+.bp-officer-role{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.bp-officer-meta{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.bp-officer-since{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+.bp-cat-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bp-cat-label{font-size:12px;color:var(--text);width:140px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bp-cat-bar-wrap{flex:1;height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden}
+.bp-cat-bar{height:100%;background:var(--brand);border-radius:3px;transition:width .3s}
+.bp-cat-pct{font-family:var(--mono);font-size:10px;color:var(--muted);width:32px;text-align:right;flex-shrink:0}
+.bp-supplier-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.bp-supplier-row:last-child{border-bottom:none}
+.bp-supplier-rank{font-family:var(--mono);font-size:10px;color:var(--muted);width:16px;flex-shrink:0}
+.bp-supplier-name{flex:1;font-size:13px;color:var(--text);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bp-supplier-val{font-family:var(--mono);font-size:12px;color:var(--text);font-weight:600;flex-shrink:0}
+.bp-supplier-cnt{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+.bp-ext-link{font-family:var(--mono);font-size:12px;color:var(--brand);text-decoration:none}
+.bp-ext-link:hover{text-decoration:underline}
+.bp-sic{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border:1px solid var(--border-2);color:var(--muted);border-radius:2px;margin-right:4px}
+.bp-ch-link{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--brand);text-decoration:none;padding:7px 14px;border:1px solid var(--brand);margin-top:12px}
+.bp-ch-link:hover{background:var(--brand-dim)}
+.bp-meta-row{display:flex;flex-direction:column;gap:8px}
+.bp-meta-item{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--text)}
+.bp-meta-key{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);min-width:100px;flex-shrink:0}
+@media(max-width:900px){.bp-grid{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .bp-stat-grid{grid-template-columns:1fr 1fr}
+  .bp-table th:nth-child(2),.bp-table td:nth-child(2){display:none}
+}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<section class="pg-mast">
+  <div class="pg-mast-inner">
+    <div class="pg-crumb">
+      <a href="/buyers">Buyer Directory</a>
+      <span class="pg-crumb-sep">&rsaquo;</span>
+      <span class="pg-crumb-active">${escapeHtml(entity.name)}</span>
+    </div>
+    <h1>${escapeHtml(entity.name.toUpperCase())}</h1>
+    <div class="pg-stats">
+      <div class="pg-stat">
+        <span class="pg-stat-val">${stats.totalValue > 0 ? fmtMoney(stats.totalValue) : "—"}</span>
+        <span class="pg-stat-label">Total awarded spend</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${stats.totalContracts}</span>
+        <span class="pg-stat-label">Contracts tracked</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</span>
+        <span class="pg-stat-label">Avg contract value</span>
+      </div>
+      <div class="pg-stat">
+        <span class="pg-stat-val">${freqLabel}</span>
+        <span class="pg-stat-label">Procurement frequency</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pg-body">
+  <div class="pg-body-inner">
+    <div class="bp-grid">
+      <div class="bp-main">
+
+        ${historyRows ? `<div class="bp-card" style="margin-bottom:32px">
+          <div class="bp-card-title">Contract History</div>
+          <div style="overflow-x:auto">
+            <table class="bp-table">
+              <thead><tr>
+                <th>Contract</th><th>Category</th><th>Status</th>
+                <th class="bp-num">Value</th><th class="bp-num">Date</th>
+              </tr></thead>
+              <tbody>${historyRows}</tbody>
+            </table>
+          </div>
+        </div>` : `<div class="bp-card" style="margin-bottom:32px"><p style="color:var(--muted);font-size:14px">No contract history yet.</p></div>`}
+
+        ${catBars ? `<div class="bp-card" style="margin-bottom:32px">
+          <div class="bp-card-title">Spend by Category</div>
+          ${catBars}
+        </div>` : ""}
+
+        ${supplierRows ? `<div class="bp-card" style="margin-bottom:32px">
+          <div class="bp-card-title">Top Incumbent Suppliers</div>
+          ${supplierRows}
+        </div>` : ""}
+
+      </div>
+      <div class="bp-sidebar">
+
+        <div class="bp-card">
+          <div class="bp-card-title">Overview</div>
+          <div class="bp-meta-row">
+            <div class="bp-meta-item"><span class="bp-meta-key">Type</span>${escapeHtml(typeLabel)}</div>
+            ${entity.address ? `<div class="bp-meta-item"><span class="bp-meta-key">Address</span><span style="font-size:12px">${escapeHtml(entity.address)}</span></div>` : ""}
+            ${entity.company_status ? `<div class="bp-meta-item"><span class="bp-meta-key">Status</span>${escapeHtml(entity.company_status)}</div>` : ""}
+            ${entity.company_type ? `<div class="bp-meta-item"><span class="bp-meta-key">Entity type</span>${escapeHtml(entity.company_type)}</div>` : ""}
+            <div class="bp-meta-item"><span class="bp-meta-key">Last seen</span>${escapeHtml(lastActivity)}</div>
+          </div>
+          ${websiteHtml ? `<div style="margin-top:12px">${websiteHtml}</div>` : ""}
+          ${sicHtml ? `<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:4px">${sicHtml}</div>` : ""}
+          ${chUrl ? `<a href="${escapeHtml(chUrl)}" target="_blank" rel="noopener" class="bp-ch-link">View on Companies House &rarr;</a>` : ""}
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-card-title">Key Metrics</div>
+          <div class="bp-stat-grid">
+            <div>
+              <div class="bp-stat-val">${stats.totalContracts}</div>
+              <div class="bp-stat-label">Contracts</div>
+            </div>
+            <div>
+              <div class="bp-stat-val">${stats.totalValue > 0 ? fmtMoney(stats.totalValue) : "—"}</div>
+              <div class="bp-stat-label">Total spend</div>
+            </div>
+            <div>
+              <div class="bp-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</div>
+              <div class="bp-stat-label">Avg contract</div>
+            </div>
+            <div>
+              <div class="bp-stat-val">${officers.length}</div>
+              <div class="bp-stat-label">Officers</div>
+            </div>
+          </div>
+        </div>
+
+        ${officerRows ? `<div class="bp-card">
+          <div class="bp-card-title">Officers &amp; Decision Makers</div>
+          ${officerRows}
+        </div>` : ""}
+
+        <div class="bp-card" style="background:var(--surface-2)">
+          <div class="bp-card-title">Run a scan for this buyer</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">Get a full intelligence report: routes to revenue, bid readiness score, and a 30-day activation pack targeting ${escapeHtml(entity.name)}.</p>
+          <a href="/scan" class="btn-primary" style="display:block;text-align:center">Run a scan &rarr;</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+function suppliersDirectoryPage(
+  suppliers: import("./intelligence/supplier-graph/types.js").SupplierEntity[],
+  q: string,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const cards = suppliers.map(s => {
+    const wins = s.total_wins;
+    const val = s.total_win_value;
+    const valStr = val > 0 ? fmtMoney(Number(val)) : "—";
+    const chBadge = s.company_number
+      ? `<span class="bd-badge bd-badge-ch">CH ${escapeHtml(s.company_number)}</span>`
+      : "";
+    const statusBadge = s.company_status
+      ? `<span class="bd-badge" style="background:${s.company_status.toLowerCase() === "active" ? "rgba(29,107,79,.14)" : "rgba(155,45,32,.12)"};color:${s.company_status.toLowerCase() === "active" ? "var(--green)" : "var(--red)"}">${escapeHtml(s.company_status.toUpperCase())}</span>`
+      : "";
+    return `<a href="/suppliers/${escapeHtml(s.id)}" class="bd-card">
+  <div class="bd-card-top">
+    <div class="bd-name">${escapeHtml(s.name)}</div>
+    <div class="bd-badges">${chBadge}${statusBadge}</div>
+  </div>
+  <div class="bd-meta">
+    <span>${wins} contract${wins !== 1 ? "s" : ""} won</span>
+    <span style="color:var(--brand)">${valStr} total</span>
+  </div>
+  ${s.address ? `<div class="bd-addr">${escapeHtml(s.address)}</div>` : ""}
+</a>`;
+  }).join("");
+
+  const empty = `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:40px 0">No suppliers found${q ? ` for "${escapeHtml(q)}"` : ""}. Data populates as contracts are awarded and ingested.</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supplier Directory &mdash; AtlasRevenue</title>
+<style>${pageShellCss()}
+.bd-hero{padding:60px 48px 0;max-width:1320px;margin:0 auto}
+.bd-hero h1{font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--text);margin-bottom:6px}
+.bd-hero p{font-size:14px;color:var(--muted);line-height:1.55;max-width:560px}
+.bd-search-bar{max-width:1320px;margin:28px auto 0;padding:0 48px;display:flex;gap:10px}
+.bd-search-bar input{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:10px 14px;outline:none}
+.bd-search-bar button{background:var(--brand);color:#000;border:none;border-radius:6px;padding:10px 20px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.bd-grid{max-width:1320px;margin:32px auto 60px;padding:0 48px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.bd-card{display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;text-decoration:none;transition:border-color .15s}
+.bd-card:hover{border-color:var(--brand)}
+.bd-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+.bd-name{font-size:15px;font-weight:600;color:var(--text);line-height:1.3}
+.bd-badges{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.bd-badge{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.bd-badge-ch{background:rgba(var(--brand-rgb),.1);color:var(--brand)}
+.bd-meta{display:flex;gap:14px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px}
+.bd-addr{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<div class="bd-hero">
+  <p style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px">Supplier Graph</p>
+  <h1>UK Procurement Suppliers</h1>
+  <p>Companies and organisations that have won public-sector contracts. Built from awarded contract disclosures on Contracts Finder and Find a Tender.</p>
+</div>
+<form method="GET" action="/suppliers" class="bd-search-bar">
+  <input name="q" value="${escapeHtml(q)}" placeholder="Search supplier name&hellip;" autocomplete="off">
+  <button type="submit">Search</button>
+</form>
+<div class="bd-grid">${suppliers.length > 0 ? cards : empty}</div>
+${pageShellFoot()}
+</body>
+</html>`;
+}
+
+function supplierProfilePage(
+  profile: import("./intelligence/supplier-graph/types.js").SupplierProfile,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const { entity, relationships, stats } = profile;
+
+  const chUrl = entity.company_number
+    ? `https://find-and-update.company-information.service.gov.uk/company/${entity.company_number}`
+    : null;
+
+  const lastActivity = stats.lastActivity
+    ? new Date(stats.lastActivity).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+
+  const relRows = relationships.slice(0, 80).map(r => {
+    const val = r.awarded_value;
+    const valStr = val ? fmtMoney(Number(val)) : "—";
+    const dateStr = r.awarded_date
+      ? new Date(r.awarded_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "—";
+    return `<tr>
+      <td class="bp-th-title"><a href="${escapeHtml(r.source_url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></td>
+      <td><a href="/buyers?q=${encodeURIComponent(r.buyer_name)}" style="color:var(--brand);text-decoration:none">${escapeHtml(r.buyer_name)}</a></td>
+      <td>${escapeHtml(r.category || "—")}</td>
+      <td style="color:var(--brand);font-family:var(--mono)">${escapeHtml(valStr)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${escapeHtml(dateStr)}</td>
+    </tr>`;
+  }).join("");
+
+  const buyerBars = stats.topBuyers.slice(0, 8).map(b => {
+    const pct = stats.totalContracts > 0 ? Math.round((b.count / stats.totalContracts) * 100) : 0;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <a href="/buyers?q=${encodeURIComponent(b.name)}" style="font-size:13px;color:var(--text);text-decoration:none">${escapeHtml(b.name)}</a>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${b.count} win${b.count !== 1 ? "s" : ""}</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:3px;height:4px">
+        <div style="width:${pct}%;background:var(--brand);border-radius:3px;height:4px"></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const catBars = stats.topCategories.map(c => {
+    const pct = stats.totalContracts > 0 ? Math.round((c.count / stats.totalContracts) * 100) : 0;
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+        <span style="font-size:12px;color:var(--text)">${escapeHtml(c.category)}</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${pct}%</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:3px;height:3px">
+        <div style="width:${pct}%;background:rgba(var(--brand-rgb),.55);border-radius:3px;height:3px"></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const sicHtml = entity.sic_codes.map(s => `<span class="bd-badge">${escapeHtml(s)}</span>`).join("");
+  const websiteHtml = entity.website
+    ? `<a href="${escapeHtml(entity.website)}" target="_blank" rel="noopener" class="bp-ch-link">${escapeHtml(entity.website)} &rarr;</a>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(entity.name)} &mdash; Supplier Profile &mdash; AtlasRevenue</title>
+<style>${pageShellCss()}
+.bp-hero{padding:48px 48px 0;max-width:1320px;margin:0 auto}
+.bp-page{max-width:1320px;margin:32px auto 60px;padding:0 48px;display:grid;grid-template-columns:1fr 320px;gap:28px;align-items:start}
+.bp-main{}
+.bp-sidebar{display:flex;flex-direction:column;gap:16px}
+.bp-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.bp-card-title{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
+.bp-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bp-stat-val{font-size:22px;font-weight:700;color:var(--text);font-family:var(--sans)}
+.bp-stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.bp-meta-row{display:flex;flex-direction:column;gap:8px}
+.bp-meta-item{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text)}
+.bp-meta-key{color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin-right:8px}
+.bp-ch-link{display:block;margin-top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);text-decoration:none}
+.bp-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table.bp-table{width:100%;border-collapse:collapse}
+table.bp-table th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface-2)}
+table.bp-table td{font-size:13px;color:var(--text);padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+table.bp-table tr:last-child td{border-bottom:none}
+.bp-th-title{max-width:340px;min-width:180px}
+.bp-th-title a{color:var(--text);text-decoration:none}
+.bp-th-title a:hover{color:var(--brand)}
+.bd-badge{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.bd-badge-ch{background:rgba(var(--brand-rgb),.1);color:var(--brand)}
+@media(max-width:900px){.bp-page{grid-template-columns:1fr}.bp-sidebar{order:-1}}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+<div class="bp-hero">
+  <p style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px"><a href="/suppliers" style="color:var(--brand);text-decoration:none">Suppliers</a> / Supplier Profile</p>
+  <h1 style="font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--text);margin-bottom:6px">${escapeHtml(entity.name)}</h1>
+  ${entity.address ? `<p style="font-size:14px;color:var(--muted)">${escapeHtml(entity.address)}</p>` : ""}
+</div>
+
+<div class="bp-page">
+  <div class="bp-main">
+    <div class="bp-card" style="margin-bottom:20px">
+      <div class="bp-card-title">Contract Wins (${relationships.length})</div>
+      ${relRows ? `<div class="bp-table-wrap"><table class="bp-table">
+        <thead><tr>
+          <th class="bp-th-title">Contract</th>
+          <th>Buyer</th>
+          <th>Category</th>
+          <th>Value</th>
+          <th>Date</th>
+        </tr></thead>
+        <tbody>${relRows}</tbody>
+      </table></div>` : `<p style="font-size:13px;color:var(--muted)">No contract records found yet.</p>`}
+    </div>
+
+    ${buyerBars ? `<div class="bp-card">
+      <div class="bp-card-title">Top Buyers</div>
+      ${buyerBars}
+    </div>` : ""}
+  </div>
+
+  <div class="bp-sidebar">
+    <div class="bp-card">
+      <div class="bp-card-title">Key Metrics</div>
+      <div class="bp-stat-grid">
+        <div>
+          <div class="bp-stat-val">${stats.totalContracts}</div>
+          <div class="bp-stat-label">Contracts won</div>
+        </div>
+        <div>
+          <div class="bp-stat-val">${stats.totalValue > 0 ? fmtMoney(stats.totalValue) : "—"}</div>
+          <div class="bp-stat-label">Total value</div>
+        </div>
+        <div>
+          <div class="bp-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</div>
+          <div class="bp-stat-label">Avg contract</div>
+        </div>
+        <div>
+          <div class="bp-stat-val">${stats.topBuyers.length}</div>
+          <div class="bp-stat-label">Buyers</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bp-card">
+      <div class="bp-card-title">Overview</div>
+      <div class="bp-meta-row">
+        ${entity.company_status ? `<div class="bp-meta-item"><span class="bp-meta-key">Status</span>${escapeHtml(entity.company_status)}</div>` : ""}
+        ${entity.company_type ? `<div class="bp-meta-item"><span class="bp-meta-key">Entity type</span>${escapeHtml(entity.company_type)}</div>` : ""}
+        ${entity.address ? `<div class="bp-meta-item"><span class="bp-meta-key">Address</span><span style="font-size:12px">${escapeHtml(entity.address)}</span></div>` : ""}
+        <div class="bp-meta-item"><span class="bp-meta-key">Last win</span>${escapeHtml(lastActivity)}</div>
+      </div>
+      ${websiteHtml ? `<div style="margin-top:12px">${websiteHtml}</div>` : ""}
+      ${sicHtml ? `<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:4px">${sicHtml}</div>` : ""}
+      ${chUrl ? `<a href="${escapeHtml(chUrl)}" target="_blank" rel="noopener" class="bp-ch-link">View on Companies House &rarr;</a>` : ""}
+    </div>
+
+    ${catBars ? `<div class="bp-card">
+      <div class="bp-card-title">Categories</div>
+      ${catBars}
+    </div>` : ""}
+
+    <div class="bp-card" style="background:var(--surface-2)">
+      <div class="bp-card-title">Compete for these contracts</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:14px">Run a scan to see open opportunities where ${escapeHtml(entity.name)} may be the incumbent — and build your bid strategy around them.</p>
+      <a href="/scan" class="btn-primary" style="display:block;text-align:center">Run a scan &rarr;</a>
+    </div>
+  </div>
+</div>
 ${pageShellFoot()}
 </body>
 </html>`;
@@ -14884,6 +16427,12 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     earlySignalStatsRes, earlySignalListRes,
     lifecycleStatsRes, lifecycleListRes,
     lifecycleTransitionCountRes,
+    ingestBySourceRes, ingestTotalsRes,
+    supplierStatsRes, supplierListRes,
+    geoLocationsRes, geoPlanningRes, geoPlanningByDistrictRes,
+    aliasCountRes, ownershipCountRes, directorCountRes, sharedDirectorsRes,
+    govSummaryRes, govCatalogRes, govQualityRes, govRetentionRes,
+    webhookListRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -15012,6 +16561,25 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT stage)::int AS stages, COUNT(*) FILTER (WHERE stage='open_tender')::int AS open, COUNT(*) FILTER (WHERE stage='awarded')::int AS awarded FROM opportunity_lifecycle`),
     safePool(`SELECT buyer, title, stage, maturity_score, desk_category, stage_entered_at, source_url FROM opportunity_lifecycle ORDER BY stage_entered_at DESC LIMIT 10`),
     safePool(`SELECT COUNT(*)::int AS total FROM lifecycle_transitions`),
+    // ── New sections ──────────────────────────────────────────────────────────
+    safePool(`SELECT source, COUNT(*)::int AS records, MAX(fetched_at) AS latest, COUNT(*) FILTER (WHERE status='pending')::int AS pending, COUNT(*) FILTER (WHERE status='processed')::int AS processed FROM canonical_ingest GROUP BY source ORDER BY latest DESC NULLS LAST`),
+    safePool(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='pending')::int AS pending, COUNT(*) FILTER (WHERE status='processed')::int AS processed FROM canonical_ingest`),
+    safePool(`SELECT COUNT(*)::int AS total, MAX(total_wins) AS max_wins, SUM(total_win_value)::bigint AS total_value FROM supplier_entities`),
+    safePool(`SELECT id, name, company_status, total_wins, total_win_value, last_seen FROM supplier_entities ORDER BY total_wins DESC NULLS LAST LIMIT 10`),
+    safePool(`SELECT COUNT(*)::int AS locations FROM spatial_locations`).catch(() => ({ rows: [{ locations: 0 }] })),
+    safePool(`SELECT COUNT(*)::int AS planning_apps FROM planning_applications`).catch(() => ({ rows: [{ planning_apps: 0 }] })),
+    safePool(`SELECT local_authority, COUNT(*)::int AS count FROM planning_applications WHERE local_authority IS NOT NULL GROUP BY local_authority ORDER BY count DESC LIMIT 8`).catch(() => ({ rows: [] })),
+    safePool(`SELECT COUNT(*)::int AS aliases FROM entity_aliases`).catch(() => ({ rows: [{ aliases: 0 }] })),
+    safePool(`SELECT COUNT(*)::int AS ownership_links FROM ownership_links`).catch(() => ({ rows: [{ ownership_links: 0 }] })),
+    safePool(`SELECT COUNT(*)::int AS director_roles FROM director_roles`).catch(() => ({ rows: [{ director_roles: 0 }] })),
+    safePool(`SELECT person_name, COUNT(DISTINCT organisation_id)::int AS org_count FROM director_roles WHERE resigned_on IS NULL GROUP BY person_name HAVING COUNT(DISTINCT organisation_id) >= 2 ORDER BY org_count DESC LIMIT 8`).catch(() => ({ rows: [] })),
+    // Governance
+    pool ? getGovernanceSummary(pool).then(s => ({ rows: [s] })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    pool ? getMetadataCatalog(pool).then(c => ({ rows: c })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    pool ? getLatestQualityResults(pool).then(r => ({ rows: r })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    pool ? getRetentionSchedule(pool).then(r => ({ rows: r })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    // Webhooks
+    pool ? listWebhooks(pool).then(w => ({ rows: w })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -15060,6 +16628,23 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const lifecycleStats   = (lifecycleStatsRes.rows[0] as any) || {};
   const lifecycleList    = lifecycleListRes.rows as any[];
   const lifecycleTransitionCount = Number((lifecycleTransitionCountRes.rows[0] as any)?.total || 0);
+
+  const ingestBySource    = ingestBySourceRes.rows  as any[];
+  const ingestTotals      = (ingestTotalsRes.rows[0] as any) || {};
+  const supplierStats     = (supplierStatsRes.rows[0] as any) || {};
+  const supplierList      = supplierListRes.rows     as any[];
+  const geoLocationCount  = Number((geoLocationsRes.rows[0] as any)?.locations || 0);
+  const geoPlanningCount  = Number((geoPlanningRes.rows[0] as any)?.planning_apps || 0);
+  const geoPlanningByDistrict = geoPlanningByDistrictRes.rows as any[];
+  const aliasCount        = Number((aliasCountRes.rows[0] as any)?.aliases || 0);
+  const ownershipCount    = Number((ownershipCountRes.rows[0] as any)?.ownership_links || 0);
+  const directorCount     = Number((directorCountRes.rows[0] as any)?.director_roles || 0);
+  const sharedDirectorsList = sharedDirectorsRes.rows as any[];
+  const govSummary          = (govSummaryRes.rows[0] as any) || {};
+  const govCatalog          = govCatalogRes.rows as any[];
+  const govQuality          = govQualityRes.rows as any[];
+  const govRetention        = govRetentionRes.rows as any[];
+  const webhookList         = webhookListRes.rows as any[];
 
   // Build article-likes lookup map by article_id
   const articleLikesMap = new Map<string, number>(articleLikeRows.map((r: any) => [r.article_id, Number(r.likes)]));
@@ -15495,8 +17080,16 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <div class="sb-group">Intelligence</div>
     <a href="#buyers" class="sb-link">Buyer Entities <span class="sb-count">${Number(buyerStats.total||0).toLocaleString()}</span></a>
     <a href="#contacts" class="sb-link">Contacts <span class="sb-count">${Number(contactStats.total||0).toLocaleString()}</span></a>
+    <a href="#suppliers" class="sb-link">Suppliers <span class="sb-count">${Number(supplierStats.total||0).toLocaleString()}</span></a>
     <a href="#early-signals" class="sb-link">Early Signals <span class="sb-count">${Number(earlySignalStats.total||0).toLocaleString()}</span></a>
     <a href="#lifecycle" class="sb-link">Lifecycle <span class="sb-count">${Number(lifecycleStats.total||0).toLocaleString()}</span></a>
+    <div class="sb-group">Data Platform</div>
+    <a href="#ingest" class="sb-link">Ingest Pipeline <span class="sb-count">${Number(ingestTotals.total||0).toLocaleString()}</span></a>
+    <a href="#geospatial" class="sb-link">Geospatial <span class="sb-count">${(geoLocationCount+geoPlanningCount).toLocaleString()}</span></a>
+    <a href="#relationships" class="sb-link">Relationships <span class="sb-count">${(aliasCount+ownershipCount+directorCount).toLocaleString()}</span></a>
+    <a href="#source-registry" class="sb-link">43 Sources <span class="sb-count">${DATA_SOURCES.length}</span></a>
+    <a href="#governance" class="sb-link">Governance <span class="sb-count" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${(govSummary.qualityPassRate||0)}%</span></a>
+    <a href="#webhooks" class="sb-link">Webhooks <span class="sb-count">${webhookList.length}</span></a>
     <div class="sb-group">Admin</div>
     <a href="#audit" class="sb-link">Audit Log <span class="sb-count">${auditLog.length}</span></a>
     <a href="#deskcache" class="sb-link">Desk Cache <span class="sb-count">${deskCache.length}</span></a>
@@ -16245,6 +17838,284 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
 </section>
 <div class="gap"></div>
 
+<!-- §SG SUPPLIERS -->
+<section class="section" id="suppliers">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Supplier Graph</div>
+      <div class="s-title">Supplier Entities</div>
+      <div class="s-sub">${Number(supplierStats.total||0).toLocaleString()} suppliers resolved · ${supplierStats.max_wins||0} max wins · ${supplierStats.total_value ? "£"+Number(supplierStats.total_value).toLocaleString() : "—"} total disclosed value</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="/suppliers" target="_blank" class="a-btn">Supplier Directory</a>
+      <form method="POST" action="/api/suppliers/sync?token=${encodeURIComponent(token)}"><button class="a-btn a-btn-ok" type="submit">↻ Sync from History</button></form>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(supplierStats.total||0).toLocaleString()}</div><div class="mc-lbl">Suppliers</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--brand)">${supplierStats.max_wins||0}</div><div class="mc-lbl">Max Wins</div></div>
+    <div class="metric-card"><div class="mc-val">${supplierStats.total_value ? "£"+Math.round(Number(supplierStats.total_value)/1e6)+"M" : "—"}</div><div class="mc-lbl">Total Value</div></div>
+    <div class="metric-card"><div class="mc-val">${supplierList.length}</div><div class="mc-lbl">Top 10 Ready</div></div>
+  </div>
+  ${supplierList.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No supplier data yet — run sync to populate from buyer procurement history</div>`
+    : `<div style="overflow:auto;max-height:340px"><table class="a-tbl">
+        <thead><tr><th>Supplier</th><th>Status</th><th>Wins</th><th>Total Value</th><th>Last Seen</th><th></th></tr></thead>
+        <tbody>${supplierList.map((s: any) => `<tr>
+          <td style="font-weight:500">${escapeHtml((s.name||"").slice(0,50))}</td>
+          <td><span style="font-family:var(--mono);font-size:9px;text-transform:uppercase;color:${s.company_status?.toLowerCase()==="active"?"var(--green)":"var(--muted)"}">${escapeHtml(s.company_status||"—")}</span></td>
+          <td style="font-family:var(--mono);color:var(--brand)">${s.total_wins||0}</td>
+          <td style="font-family:var(--mono)">${s.total_win_value ? "£"+Math.round(Number(s.total_win_value)/1000)+"k" : "—"}</td>
+          <td style="font-family:var(--mono);font-size:10px">${s.last_seen ? String(s.last_seen).slice(0,10) : "—"}</td>
+          <td><a href="/suppliers/${escapeHtml(s.id)}" target="_blank" class="a-btn" style="font-size:9px;padding:3px 7px">Profile</a></td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §INGEST PIPELINE -->
+<section class="section" id="ingest">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Data Platform</div>
+      <div class="s-title">Ingest Pipeline</div>
+      <div class="s-sub">${Number(ingestTotals.total||0).toLocaleString()} total records · ${Number(ingestTotals.pending||0).toLocaleString()} pending · ${Number(ingestTotals.processed||0).toLocaleString()} processed</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full 43-source ingest pass? This runs in background.')"><button class="a-btn a-btn-ok" type="submit">▶ Full Ingest</button></form>
+      <form method="POST" action="/api/signals/derive-from-ingest"><button class="a-btn" type="submit">⚡ Derive Signals</button></form>
+      <a href="/api/ingest/status" target="_blank" class="a-btn">Status JSON</a>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${Number(ingestTotals.total||0).toLocaleString()}</div><div class="mc-lbl">Total Records</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--amber)">${Number(ingestTotals.pending||0).toLocaleString()}</div><div class="mc-lbl">Pending</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--green)">${Number(ingestTotals.processed||0).toLocaleString()}</div><div class="mc-lbl">Processed</div></div>
+  </div>
+  ${ingestBySource.length === 0
+    ? `<div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No ingest records yet — trigger a full ingest pass</div>`
+    : `<div style="overflow:auto;max-height:400px"><table class="a-tbl">
+        <thead><tr><th>Source</th><th>Records</th><th>Pending</th><th>Processed</th><th>Latest</th><th>Action</th></tr></thead>
+        <tbody>${ingestBySource.map((r: any) => `<tr>
+          <td style="font-family:var(--mono);font-size:11px;font-weight:600">${escapeHtml(r.source)}</td>
+          <td style="font-family:var(--mono)">${Number(r.records||0).toLocaleString()}</td>
+          <td style="font-family:var(--mono);color:${Number(r.pending)>0?"var(--amber)":"var(--muted)"}">${r.pending||0}</td>
+          <td style="font-family:var(--mono);color:var(--green)">${r.processed||0}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${r.latest ? String(r.latest).slice(0,16).replace("T"," ") : "—"}</td>
+          <td><form method="POST" action="/api/ingest/source/${escapeHtml(r.source)}"><button class="a-btn" type="submit" style="font-size:9px;padding:3px 7px">↻ Run</button></form></td>
+        </tr>`).join("")}</tbody>
+      </table></div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §SOURCE REGISTRY -->
+<section class="section" id="source-registry">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Data Platform</div>
+      <div class="s-title">43 Source Registry</div>
+      <div class="s-sub">${DATA_SOURCES.filter(s => s.live).length} live · ${DATA_SOURCES.filter(s => !s.requiresKey).length} free/no-key · ${DATA_SOURCES.filter(s => s.requiresKey).length} require API key</div>
+    </div>
+    <a href="/sources" target="_blank" class="a-btn">Public Sources Page</a>
+  </div>
+  <div style="overflow:auto;max-height:500px"><table class="a-tbl">
+    <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Cadence</th><th>Key?</th><th>Status</th></tr></thead>
+    <tbody>${DATA_SOURCES.map(s => {
+      const cadenceColor = ({realtime:"var(--green)",daily:"var(--brand)",weekly:"#B4924E",monthly:"var(--muted)"})[s.cadence] || "var(--muted)";
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:9px;color:var(--muted)">${escapeHtml(s.id)}</td>
+        <td style="font-size:11px;font-weight:500">${escapeHtml(s.name)}</td>
+        <td style="font-family:var(--mono);font-size:9px">${escapeHtml(s.category.replace(/_/g," "))}</td>
+        <td><span style="font-family:var(--mono);font-size:9px;color:${cadenceColor};text-transform:uppercase">${escapeHtml(s.cadence)}</span></td>
+        <td>${s.requiresKey ? `<span style="font-family:var(--mono);font-size:9px;color:var(--amber)">${escapeHtml(s.keyEnvVar||"KEY")}</span>` : `<span style="font-family:var(--mono);font-size:9px;color:var(--green)">FREE</span>`}</td>
+        <td>${s.live ? `<span style="color:var(--green);font-size:10px">● Live</span>` : `<span style="color:var(--muted);font-size:10px">○ Stub</span>`}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table></div>
+</section>
+<div class="gap"></div>
+
+<!-- §GEO GEOSPATIAL -->
+<section class="section" id="geospatial">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Data Platform</div>
+      <div class="s-title">Geospatial Layer</div>
+      <div class="s-sub">${geoLocationCount.toLocaleString()} entity locations · ${geoPlanningCount.toLocaleString()} planning applications indexed</div>
+    </div>
+    <a href="/api/geo/stats" target="_blank" class="a-btn">Stats JSON</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${geoLocationCount.toLocaleString()}</div><div class="mc-lbl">Spatial Locations</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--brand)">${geoPlanningCount.toLocaleString()}</div><div class="mc-lbl">Planning Applications</div></div>
+    <div class="metric-card"><div class="mc-val">${geoPlanningByDistrict.length}</div><div class="mc-lbl">Districts with Data</div></div>
+  </div>
+  ${geoPlanningByDistrict.length > 0 ? `
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Top districts by planning applications</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    ${geoPlanningByDistrict.map((d: any) => `<span style="background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-family:var(--mono);font-size:10px">${escapeHtml(d.local_authority)} <strong style="color:var(--brand)">${d.count}</strong></span>`).join("")}
+  </div>` : `<div style="padding:24px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No geospatial data yet — populates from Planning Data and location enrichment</div>`}
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px">
+    <a href="/api/geo/nearby?lat=51.5&lon=-0.1&radius=5" target="_blank" class="a-btn">Test Nearby (London)</a>
+    <a href="/api/geo/planning/London" target="_blank" class="a-btn">Test Planning (London)</a>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §REL RELATIONSHIPS -->
+<section class="section" id="relationships">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Data Platform</div>
+      <div class="s-title">Relationship Graph</div>
+      <div class="s-sub">${aliasCount.toLocaleString()} aliases · ${ownershipCount.toLocaleString()} ownership links · ${directorCount.toLocaleString()} director roles</div>
+    </div>
+    <a href="/api/entities/shared-directors" target="_blank" class="a-btn">Shared Directors JSON</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${aliasCount.toLocaleString()}</div><div class="mc-lbl">Entity Aliases</div></div>
+    <div class="metric-card"><div class="mc-val">${ownershipCount.toLocaleString()}</div><div class="mc-lbl">Ownership Links</div></div>
+    <div class="metric-card"><div class="mc-val">${directorCount.toLocaleString()}</div><div class="mc-lbl">Director Roles</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:var(--amber)">${sharedDirectorsList.length}</div><div class="mc-lbl">Shared Directors</div></div>
+  </div>
+  ${sharedDirectorsList.length > 0 ? `
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Directors spanning multiple organisations</div>
+  <div style="overflow:auto;max-height:280px"><table class="a-tbl">
+    <thead><tr><th>Person</th><th>Organisations</th></tr></thead>
+    <tbody>${sharedDirectorsList.map((d: any) => `<tr>
+      <td style="font-weight:600">${escapeHtml(d.person_name)}</td>
+      <td><span style="font-family:var(--mono);font-size:11px;color:var(--brand)">${d.org_count} orgs</span></td>
+    </tr>`).join("")}</tbody>
+  </table></div>` : `<div style="padding:24px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">Relationship graph populates as buyer entities and CH officer data is ingested</div>`}
+</section>
+<div class="gap"></div>
+
+<!-- §GOV DATA GOVERNANCE -->
+<section class="section" id="governance">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Data Governance</div>
+      <div class="s-title">Metadata, Quality &amp; Compliance</div>
+      <div class="s-sub">${govSummary.totalSources||0} sources catalogued · ${govSummary.qualityPassRate||0}% rules passing · ${govSummary.piiFieldCount||0} PII fields tracked</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <form method="POST" action="/api/governance/quality/run" onsubmit="return confirm('Run quality checks?')"><button class="a-btn" type="submit">▶ Run Checks</button></form>
+      <form method="POST" action="/api/governance/retention/purge" onsubmit="return confirm('Purge expired records?')"><button class="a-btn" type="submit" style="border-color:var(--red);color:var(--red)">🗑 Purge Expired</button></form>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div class="metric-card"><div class="mc-val">${(govSummary.totalRecordsIngested||0).toLocaleString()}</div><div class="mc-lbl">Total Records Ingested</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:${(govSummary.qualityPassRate||0)>=80?'var(--green)':'var(--amber)'}">${govSummary.qualityPassRate||0}%</div><div class="mc-lbl">Quality Pass Rate</div></div>
+    <div class="metric-card"><div class="mc-val" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${govSummary.criticalRulesFailing||0}</div><div class="mc-lbl">Critical Rules Failing</div></div>
+    <div class="metric-card"><div class="mc-val">${govSummary.retentionTableCount||0}</div><div class="mc-lbl">Retention Policies</div></div>
+  </div>
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Quality Rules — Latest Results</div>
+  <div style="overflow:auto;max-height:220px;margin-bottom:20px"><table class="a-tbl">
+    <thead><tr><th>Rule</th><th>Severity</th><th>Status</th><th>Failure Rate</th></tr></thead>
+    <tbody>${govQuality.length > 0 ? govQuality.map((r: any) => `<tr>
+      <td style="font-family:var(--mono);font-size:11px">${escapeHtml(r.ruleName||"")}</td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:${r.severity==="critical"?"var(--red)":r.severity==="warn"?"var(--amber)":"var(--muted)"}">${escapeHtml(r.severity||"")}</span></td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:${r.status==="pass"?"var(--green)":r.status==="fail"?"var(--red)":"var(--amber)"}">${escapeHtml(r.status||"unknown")}</span></td>
+      <td style="font-family:var(--mono);font-size:11px">${r.failureRate!=null?(r.failureRate*100).toFixed(1)+"%":"—"}</td>
+    </tr>`).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No quality runs yet — click ▶ Run Checks above</td></tr>`}</tbody>
+  </table></div>
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Metadata Catalog — Source Health</div>
+  <div style="overflow:auto;max-height:240px;margin-bottom:20px"><table class="a-tbl">
+    <thead><tr><th>Source</th><th>Category</th><th>Cadence</th><th>Last Fetched</th><th>Records</th><th>Quality</th></tr></thead>
+    <tbody>${govCatalog.length > 0 ? govCatalog.map((s: any) => `<tr>
+      <td style="font-weight:600;font-size:12px">${escapeHtml(s.sourceName||s.source_name||"")}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml(s.category||"")}</td>
+      <td style="font-family:var(--mono);font-size:10px">${escapeHtml(s.cadence||"")}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${s.lastFetchedAt||s.last_fetched_at?new Date(s.lastFetchedAt||s.last_fetched_at).toLocaleDateString("en-GB"):"Never"}</td>
+      <td style="font-family:var(--mono);font-size:11px">${Number(s.lastRecordCount||s.last_record_count||0).toLocaleString()}</td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:${(s.qualityStatus||s.quality_status)==="pass"?"var(--green)":(s.qualityStatus||s.quality_status)==="fail"?"var(--red)":"var(--muted)"}">${escapeHtml(s.qualityStatus||s.quality_status||"unknown")}</span></td>
+    </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Metadata catalog populates on first ingest run</td></tr>`}</tbody>
+  </table></div>
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Retention Schedule</div>
+  <div style="overflow:auto;max-height:200px"><table class="a-tbl">
+    <thead><tr><th>Table</th><th>Tier</th><th>Retain</th><th>Archive</th><th>Delete</th><th>Last Purge</th><th>Purged</th></tr></thead>
+    <tbody>${govRetention.length > 0 ? govRetention.map((r: any) => `<tr>
+      <td style="font-family:var(--mono);font-size:11px">${escapeHtml(r.tableName||r.table_name||"")}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${escapeHtml(r.tier||"")}</td>
+      <td style="font-family:var(--mono);font-size:10px">${r.retainDays||r.retain_days}d</td>
+      <td style="font-family:var(--mono);font-size:10px">${r.archiveDays||r.archive_days}d</td>
+      <td style="font-family:var(--mono);font-size:10px">${r.deleteDays||r.delete_days}d</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${(r.lastRunAt||r.last_run_at)?new Date(r.lastRunAt||r.last_run_at).toLocaleDateString("en-GB"):"Never"}</td>
+      <td style="font-family:var(--mono);font-size:11px">${Number(r.recordsPurged||r.records_purged||0).toLocaleString()}</td>
+    </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Loading retention schedule…</td></tr>`}</tbody>
+  </table></div>
+
+  <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">
+    <a href="/api/governance/catalog" target="_blank" class="a-btn">Catalog JSON</a>
+    <a href="/api/governance/quality" target="_blank" class="a-btn">Quality JSON</a>
+    <a href="/api/governance/lineage" target="_blank" class="a-btn">Lineage Graph</a>
+    <a href="/api/governance/dictionary" target="_blank" class="a-btn">Data Dictionary</a>
+    <a href="/api/governance/audit" target="_blank" class="a-btn">Audit Log JSON</a>
+  </div>
+</section>
+<div class="gap"></div>
+
+<!-- §WH WEBHOOKS & EXPORTS -->
+<section class="section" id="webhooks">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Integrations</div>
+      <div class="s-title">Webhooks &amp; Data Exports</div>
+      <div class="s-sub">${webhookList.length} webhook${webhookList.length === 1 ? "" : "s"} configured · 7 CSV export endpoints active</div>
+    </div>
+  </div>
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Registered Webhooks</div>
+  ${webhookList.length > 0 ? `<div style="overflow:auto;max-height:260px;margin-bottom:20px"><table class="a-tbl">
+    <thead><tr><th>Label / URL</th><th>Events</th><th>Status</th><th>Last Fired</th><th>Failures</th><th>Actions</th></tr></thead>
+    <tbody>${webhookList.map((w: any) => `<tr>
+      <td style="max-width:200px">
+        <div style="font-weight:600;font-size:12px">${escapeHtml(w.label||"—")}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis">${escapeHtml(w.url||"")}</div>
+      </td>
+      <td style="font-family:var(--mono);font-size:9px;max-width:180px">${(Array.isArray(w.events)?w.events:w.events||[]).join(", ")}</td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:${w.enabled?"var(--green)":"var(--muted)"}">${w.enabled?"ACTIVE":"PAUSED"}</span></td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--muted)">${w.lastFiredAt||w.last_fired_at?new Date(w.lastFiredAt||w.last_fired_at).toLocaleDateString("en-GB"):"Never"}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:${(w.failCount||w.fail_count||0)>0?"var(--red)":"var(--muted)"}">${w.failCount||w.fail_count||0}</td>
+      <td>
+        <form method="DELETE" action="/api/webhooks/${escapeHtml(w.id)}" style="display:inline" onsubmit="if(!confirm('Delete webhook?'))event.preventDefault()"><button class="a-btn" type="submit" style="border-color:var(--red);color:var(--red);font-size:10px">Delete</button></form>
+      </td>
+    </tr>`).join("")}</tbody>
+  </table></div>` : `<div style="padding:20px;font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:16px">No webhooks configured yet. Add one below.</div>`}
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Register Webhook</div>
+  <form method="POST" action="/api/webhooks" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:20px;align-items:end">
+    <div>
+      <label style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Endpoint URL</label>
+      <input name="url" type="url" placeholder="https://hooks.example.com/atlasrevenue" required style="width:100%;font-family:var(--mono);font-size:11px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text)">
+    </div>
+    <div>
+      <label style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Label (optional)</label>
+      <input name="label" type="text" placeholder="Slack #procurement" style="width:100%;font-family:var(--mono);font-size:11px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text)">
+    </div>
+    <button class="a-btn" type="submit" style="white-space:nowrap">+ Add Webhook</button>
+  </form>
+
+  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">CSV Exports</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <a href="/api/export/signals.csv" class="a-btn">Signals CSV</a>
+    <a href="/api/export/suppliers.csv" class="a-btn">Suppliers CSV</a>
+    <a href="/api/export/buyers.csv" class="a-btn">Buyers CSV</a>
+    <a href="/api/export/ingest.csv" class="a-btn">Ingest CSV</a>
+    <a href="/api/export/catalog.csv" class="a-btn">Catalog CSV</a>
+    <a href="/api/export/planning.csv" class="a-btn">Planning CSV</a>
+    <form method="POST" action="/api/webhooks/test" style="display:inline"><button class="a-btn" type="submit">⚡ Fire Test Webhook</button></form>
+    <a href="/intelligence" class="a-btn">Executive View &rarr;</a>
+  </div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">
+    Desk-level exports also available at <code>/desk/:slug/export.csv</code> (pro subscribers)
+  </div>
+</section>
+<div class="gap"></div>
+
 <!-- §15 SYSTEM -->
 <section class="section" id="system">
   <div class="s-head">
@@ -16960,6 +18831,27 @@ initDb()
   .then(() => initEarlySignalsTables())
   .then(() => initLifecycleTables())
   .then(() => pool ? initCanonicalTables(pool) : Promise.resolve())
+  .then(() => pool ? initRelationshipTables(pool) : Promise.resolve())
+  .then(() => initGeospatialTables())
+  .then(() => initSupplierGraphTables())
+  .then(async () => {
+    if (pool) {
+      await initWebhookTables(pool);
+      await initGovernanceTables(pool);
+      await seedLineageGraph(pool).catch(() => null);
+      // Sync source registry into metadata catalog
+      for (const s of DATA_SOURCES) {
+        await upsertMetadataCatalog(pool, {
+          sourceId: s.id, sourceName: s.name, category: s.category,
+          description: s.description, baseUrl: s.baseUrl ?? null,
+          requiresKey: s.requiresKey, keyEnvVar: s.keyEnvVar ?? null,
+          isLive: s.live, cadence: s.cadence,
+          retentionTier: "raw", retentionDays: 730,
+          tags: [s.category, s.cadence],
+        }).catch(() => null);
+      }
+    }
+  })
   .then(() => {
     // Railway split-runtime setup later:
     // web service: RUN_WEB=true, RUN_WORKER=false
@@ -16970,6 +18862,9 @@ initDb()
       startAlertWorker();
       startBriefingWorker();
       startSignalsWorker();
+      if (redisConnection) {
+        startIngestScheduler(redisConnection);
+      }
     } else {
       console.log("[queue] worker disabled by RUN_WORKER=false");
     }
