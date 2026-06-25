@@ -3712,7 +3712,7 @@ function evidenceDashboard(scan: ScanRecord) {
 
 
 
-function buildPrompt(input: z.infer<typeof intakeSchema>, data: ProcurementData) {
+function buildPrompt(input: z.infer<typeof intakeSchema>, data: ProcurementData, preloadedSignals: import("./signals/external-signals.js").PreloadedSignal[] = []) {
   return `
 You are AtlasRevenue Agent, a sharp UK public-sector revenue intelligence analyst.
 
@@ -3842,50 +3842,26 @@ Write as if briefing the client on their market position, not summarising a tool
 Use compact value notation (£k / £m / £bn). No sentence may start with "The data shows..." or "This section..." — start every sentence with a commercial insight.
 
 ## 3a. Market Intelligence & Demand Signals
-This section is required and must contain a minimum of 16 specific data signals.
+${preloadedSignals.length > 0 ? `
+IMPORTANT: The following signals have been PRE-FETCHED from authoritative UK sources by the AtlasRevenue signal engine. These are real data points. Use ALL of them in this section — they are your foundation. You may add more via web search to reach 16+ total, but do not drop or modify these pre-fetched signals.
 
-You have access to web search. Search aggressively — run multiple searches to find granular, category-specific UK statistics. Do not rely on totals when breakdowns exist. Search for:
-- Model/brand-level breakdowns (not just total registrations — find specific marques if automotive)
-- Consumer demographic spending splits (e.g. age 35–54 luxury spend)
-- Category-specific CAGR from Mintel, Euromonitor, or IBISWorld
-- Amazon UK search volume trends for this product category
-- Google Trends UK for specific product/service terms
-- Gifting and seasonal behaviour data where relevant
-- ONS demographic and spending cohort data
+PRE-FETCHED SIGNALS (use exactly as formatted):
+${preloadedSignals.map(s => s.formatted).join("\n")}
 
-Use this EXACT format for every signal — no deviations:
-SOURCE  ·  [specific statistic with number]  ·  [geography]  ·  [date/period]  ·  [direct commercial implication — one sharp sentence ending with →]
-
-Example of correct format:
-DVLA  ·  Porsche: 16,800 new registrations  ·  UK-wide  ·  2024  ·  +8% YoY — core luxury buyer, new keys in new hands →
-EUROMONITOR  ·  car fragrance & ambient category  ·  +19% CAGR  ·  Europe  ·  2022–2026  ·  fastest-growing in-car accessory segment — category tailwind →
-AMAZON UK  ·  "luxury car air freshener" search volume  ·  +43% YoY  ·  UK  ·  Apr–Jun 2026  ·  demand is real and growing →
-
-Sources to search (pick what is sector-relevant, ignore what is not):
-- DVLA / SMMT — vehicle registrations by brand/model, fleet data, EV transition data, motorparc
-- ONS — consumer spending by category and age cohort, household expenditure, sector output
-- Land Registry — completions by region, average prices, new build volumes
-- Companies House — incorporation rates, sector formation trends
-- HMRC — VAT registrations, payroll, sector tax receipts
-- Mintel / Euromonitor / IBISWorld / GlobalData — market size, CAGR, consumer behaviour reports
-- AMAZON UK — category search trends, bestseller movement, review velocity
-- GOOGLE TRENDS UK — search interest over time, seasonal peaks, related queries
-- SMMT — new car registrations by segment and fuel type
-- Trade associations relevant to this company's sector
-- CCS / Contracts Finder — total framework spend in this category, if relevant
-- LinkedIn — job posting volumes as proxy for sector hiring/expansion
-
-Structure:
-1. Open with 3-4 sentences framing the macro market backdrop specific to this company's category and buyer type.
-2. List 16–20 demand signals in the exact SOURCE format above. Go deep — specific models, specific demographics, specific search terms, specific CAGR figures. Mix of: macro demand indicators, category-specific stats, buyer behaviour, seasonal signals, and geographic concentration.
-3. Close with "What this means for [Company Name]" — 2-3 sentences, name the 2-3 most actionable signals and say exactly what the company should do this quarter.
+` : "You have access to web search. Search aggressively for real, current UK market statistics specific to this company's sector.\n\n"}Use this EXACT format for every signal — no deviations:
+SOURCE  ·  [specific statistic with number]  ·  [geography]  ·  [date/period]  ·  [direct commercial implication — one sharp sentence]  →
 
 Rules:
 - Every signal must contain a real number. Never write "the market is growing" — write "+19% CAGR 2022–2026".
-- Go model/brand/category level — not just industry totals.
-- Use web search to find 2025 or 2026 data. State the year clearly.
-- No signal should be generic enough to apply to a different company in a different sector.
-- Minimum 4 signals must come from consumer/demand-side sources (Mintel, Euromonitor, Amazon UK, Google Trends, ONS spending cohorts).
+- Go model/brand/category level — not just industry totals. Find specific marque registrations, demographic splits, named CAGRs, specific search terms with percentages.
+- ${preloadedSignals.length > 0 ? "Include ALL pre-fetched signals above, then add more via web search to reach 16–20 total." : "Use web search to find 2025 or 2026 data. Minimum 16 signals."}
+- Minimum 4 signals from consumer/demand-side sources (Mintel, Euromonitor, Amazon UK, Google Trends, ONS spending cohorts).
+- No generic signals. Every signal must be specific to this company's sector and buyer type.
+
+Structure:
+1. Open with 3-4 sentences framing the macro market backdrop for this company's specific category.
+2. List 16–20 signals in SOURCE format above.
+3. Close with "What this means for [Company Name]" — 2-3 sentences naming the 2-3 most actionable signals and exactly what the company should do this quarter.
 
 ## 4. Source-Backed Evidence
 Only use pulled source records or clearly labelled client-provided evidence.
@@ -4197,7 +4173,22 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
     clearTimeout(fetchTimeout);
     await emitScanStage(id, "scoring");
 
-    const prompt = buildPrompt(input, data);
+    // Pre-fetch market signals before report generation so the main LLM call
+    // doesn't burn its web search budget on data we can fetch deterministically.
+    const { fetchExternalSignals } = await import("./signals/external-signals.js");
+    const preloadedSignals = await fetchExternalSignals({
+      companyName: input.companyName,
+      mainServices: input.mainServices,
+      idealBuyers: input.idealBuyers ?? "",
+      secondaryServices: input.secondaryServices ?? "",
+      pool: pool ?? null,
+      anthropic: anthropic ?? null,
+    }).catch(err => {
+      console.warn("[runScan] signal pre-fetch failed, continuing without:", String(err).slice(0, 100));
+      return [];
+    });
+
+    const prompt = buildPrompt(input, data, preloadedSignals);
     await emitScanStage(id, "report");
 
     const report = await callLlmReport(prompt);
