@@ -8175,7 +8175,7 @@ app.get("/api/sources", asyncRoute(async (_req, res) => {
 }));
 
 app.post("/api/ingest/full", requireAdmin, asyncRoute(async (_req, res) => {
-  res.json({ ok: true, message: "Full 43-source ingest started in background." });
+  res.json({ ok: true, message: `Full ${DATA_SOURCES.length}-source ingest started in background.` });
   runFullIngest()
     .then(results => {
       const total = results.reduce((s, r) => s + r.recordsIngested, 0);
@@ -16534,7 +16534,7 @@ ${pageShellHeader(null, authCtx)}
     <p class="pg-desc">UK public-sector buyers tracked across Contracts Finder and Find a Tender. Enriched with Companies House company data, officer records, and procurement history.</p>
     <div class="pg-stats">
       <div class="pg-stat"><span class="pg-stat-val">${buyers.length}${query ? "" : "+"}</span><span class="pg-stat-label">Buyers indexed</span></div>
-      <div class="pg-stat"><span class="pg-stat-val">24</span><span class="pg-stat-label">Sector desks</span></div>
+      <div class="pg-stat"><span class="pg-stat-val">${DESK_PROFILES.filter(d => d.live).length}</span><span class="pg-stat-label">Sector desks</span></div>
       <div class="pg-stat"><span class="pg-stat-val">Live</span><span class="pg-stat-label">Updated hourly</span></div>
     </div>
   </div>
@@ -18856,7 +18856,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="s-sub">${Number(ingestTotals.total||0).toLocaleString()} total records · ${Number(ingestTotals.pending||0).toLocaleString()} pending · ${Number(ingestTotals.processed||0).toLocaleString()} processed</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full 43-source ingest pass? This runs in background.')"><button class="a-btn a-btn-ok" type="submit">▶ Full Ingest</button></form>
+      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full ${DATA_SOURCES.length}-source ingest pass? This runs in background.')"><button class="a-btn a-btn-ok" type="submit">▶ Full Ingest</button></form>
       <form method="POST" action="/api/signals/derive-from-ingest"><button class="a-btn" type="submit">⚡ Derive Signals</button></form>
       <a href="/api/ingest/status" target="_blank" class="a-btn">Status JSON</a>
     </div>
@@ -18891,7 +18891,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="s-sub">${DATA_SOURCES.filter(s => s.live).length} live · ${liveSourcesCount} last-fetch OK · ${warnSourcesCount} warn · ${failSourcesCount} fail · ${neverFetchedCount} never fetched</div>
     </div>
     <div style="display:flex;gap:8px">
-      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full 43-source ingest?')"><button class="a-btn a-btn-ok" type="submit">▶ Run All</button></form>
+      <form method="POST" action="/api/ingest/full" onsubmit="return confirm('Run full ${DATA_SOURCES.length}-source ingest?')"><button class="a-btn a-btn-ok" type="submit">▶ Run All</button></form>
       <a href="/sources" target="_blank" class="a-btn">Public Sources</a>
     </div>
   </div>
