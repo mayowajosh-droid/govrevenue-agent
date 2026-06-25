@@ -7469,6 +7469,8 @@ app.get("/", asyncRoute(async (req, res) => {
 .gh-main-nav::-webkit-scrollbar{display:none}
 .gh-main-nav a{font-size:13px;font-weight:500;color:var(--text-mid);padding:0 11px;height:60px;display:flex;align-items:center;white-space:nowrap;transition:color .15s}
 .gh-main-nav a:hover{color:var(--text)}
+.gh-nav-atlas{color:var(--brand,#B4924E)!important;font-weight:600!important;margin-left:4px}
+.gh-nav-atlas:hover{color:#d4b070!important}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--base);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden;-webkit-text-size-adjust:100%}
