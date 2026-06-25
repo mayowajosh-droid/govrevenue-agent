@@ -9594,44 +9594,63 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
 
   const merged = new Map<string, { contracts: number; planning: number; value: number }>();
 
-  // ── 1. Live query to Contracts Finder ────────────────────────────────────────
+  // ── 1. Live query to Contracts Finder (proven REST API + synonym expansion) ──
+  // Consumer-style search terms ("electric cars") rarely appear verbatim in
+  // procurement titles, which use procurement language ("electric vehicles",
+  // "ULEV", "EV charging"). Expand common terms so the map finds real demand.
+  const synonyms: Record<string, string[]> = {
+    "electric car": ["electric vehicle", "electric vehicles", "ev charging", "ulev", "zero emission vehicle"],
+    "electric cars": ["electric vehicle", "electric vehicles", "ev charging", "ulev", "zero emission vehicle"],
+    "ev": ["electric vehicle", "ev charging", "charge point"],
+    "solar": ["solar", "photovoltaic", "solar pv", "renewable energy"],
+    "broadband": ["broadband", "fibre", "full fibre", "connectivity"],
+    "cars": ["vehicles", "fleet", "vehicle"],
+    "bins": ["waste collection", "refuse", "recycling"],
+    "computers": ["it hardware", "laptops", "end user devices"],
+  };
+  const queryTerms = synonyms[qLower] ?? [q];
+
+  const cfCtrl = new AbortController();
+  const cfTimer = setTimeout(() => cfCtrl.abort(), 9000);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const cfResp = await fetch(
-      "https://www.contractsfinder.service.gov.uk/Published/Notices/PublishedNoticeList/Search",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "User-Agent": "AtlasRevenue/1.0" },
-        body: JSON.stringify({ searchCriteria: { keywords: q, size: 100, from: 0 } }),
-        signal: ctrl.signal,
-      }
-    ).finally(() => clearTimeout(timer));
-    if (cfResp.ok) {
-      const cfData = await cfResp.json() as any;
-      for (const notice of cfData?.notices ?? []) {
-        const item = notice?.item ?? notice;
-        const buyer = String(item?.organizationName || item?.buyerOrganisationName || item?.contactDetails?.name || "");
-        const district = matchDistrict(buyer);
+    const results = await Promise.allSettled(
+      queryTerms.slice(0, 5).map(term =>
+        contractsFinderPage({ keywords: term }, term, 0, 100, cfCtrl.signal)
+      )
+    );
+    const seenNotice = new Set<string>();
+    for (const r of results) {
+      if (r.status !== "fulfilled") continue;
+      for (const notice of r.value.notices) {
+        if (notice.id && seenNotice.has(notice.id)) continue;
+        if (notice.id) seenNotice.add(notice.id);
+        // Match a district from the buyer name first, then the notice region.
+        const district = matchDistrict(notice.buyer) ?? matchDistrict(notice.region || "");
         if (!district) continue;
-        const val = parseFloat(item?.value?.amount ?? item?.awardedValue ?? 0) || 0;
+        const val = notice.awardedValue ?? notice.valueHigh ?? notice.valueLow ?? 0;
         const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
         e.contracts++;
-        e.value += val;
+        e.value += val || 0;
         merged.set(district, e);
       }
     }
-  } catch {}
+  } catch {} finally { clearTimeout(cfTimer); }
+
+  // SQL LIKE clauses for the query + its synonyms, so DB sources broaden too.
+  const likeTerms = [qLower, ...queryTerms.map(t => t.toLowerCase())]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .map(t => `%${t}%`);
+  const likeOr = (col: string) => likeTerms.map((_, i) => `LOWER(${col}) LIKE $${i + 1}`).join(" OR ");
 
   // ── 2. Planning applications (DB) ────────────────────────────────────────────
   if (pool) {
     const planningR = await pool.query<{ district: string; count: string }>(
       `SELECT local_authority AS district, COUNT(*) AS count
        FROM planning_applications
-       WHERE (LOWER(description) LIKE $1 OR LOWER(applicant_name) LIKE $1)
+       WHERE ((${likeOr("description")}) OR (${likeOr("applicant_name")}))
          AND local_authority IS NOT NULL
        GROUP BY local_authority ORDER BY count DESC LIMIT 150`,
-      [`%${qLower}%`]
+      likeTerms
     ).catch(() => ({ rows: [] as any[] }));
     for (const r of planningR.rows as any[]) {
       const raw = String(r.district || "").trim();
@@ -9646,9 +9665,9 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
     const sigsR = await pool.query<{ buyer: string; count: string; total_value: string }>(
       `SELECT buyer, COUNT(*) AS count, COALESCE(SUM(value_amount),0) AS total_value
        FROM homepage_signals
-       WHERE LOWER(title) LIKE $1 AND buyer IS NOT NULL AND buyer != ''
+       WHERE (${likeOr("title")}) AND buyer IS NOT NULL AND buyer != ''
        GROUP BY buyer`,
-      [`%${qLower}%`]
+      likeTerms
     ).catch(() => ({ rows: [] as any[] }));
     for (const r of sigsR.rows as any[]) {
       const district = matchDistrict(String(r.buyer || ""));
