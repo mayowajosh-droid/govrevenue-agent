@@ -2830,8 +2830,11 @@ function enforceDataQualityLanguage(report: string) {
   return stripLlmNarration(String(report || ""))
     .replace(/\bConfirmed\b/g, "Source-labelled")
     .replace(/\bconfirmed\b/g, "source-labelled")
-    .replace(/\bsource-backed\b/gi, "source-labelled")
-    .replace(/\bSource-backed\b/g, "Source-labelled");
+    // Case-specific first so capitalised forms keep their capital (heading-safe),
+    // then the lowercase catch-all for any remaining mid-sentence uses.
+    .replace(/\bSource-Backed\b/g, "Source-labelled")
+    .replace(/\bSource-backed\b/g, "Source-labelled")
+    .replace(/\bsource-backed\b/g, "source-labelled");
 }
 
 
@@ -3862,7 +3865,7 @@ SOURCE  ·  [specific statistic with number]  ·  [geography]  ·  [date/period]
 
 Rules: Real numbers only. Model/brand/category level, not just totals. No generic signals.
 
-## 4. Source-Backed Demand Evidence
+## 4. Verified Demand Evidence
 Present the 5–8 strongest demand signals as full evidence entries. For each:
 - **Signal**: The specific data point
 - **Source**: Where it came from
@@ -4350,8 +4353,8 @@ async function callClaudeReport(prompt: string): Promise<string> {
   return withTimeout(150_000, async signal => {
     const message = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 8000,
-      system: "You are AtlasRevenue's senior UK public-sector procurement analyst. Follow the user's instructions exactly. Return only the finished report as clean GitHub-flavored Markdown — no preamble, no sign-off, no commentary outside the report itself.",
+      max_tokens: 16000,
+      system: "You are AtlasRevenue's senior UK market and procurement intelligence analyst. Follow the user's instructions exactly and complete EVERY section requested — never stop early or truncate. Return only the finished report as clean GitHub-flavored Markdown — no preamble, no sign-off, no commentary outside the report itself.",
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] as any
     }, { signal });
