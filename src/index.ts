@@ -12180,7 +12180,13 @@ app.get("/pricing", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — AtlasRevenue</title>
+<title>Pricing — AtlasRevenue | From £29 per Intelligence Scan</title>
+<meta name="description" content="AtlasRevenue pricing. Pay £29 per scan or subscribe for continuous UK demand and contract intelligence. Real data, named buyers, 90-day plans — no guesses.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/pricing">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="AtlasRevenue Pricing — From £29 per scan">
+<meta property="og:description" content="Pay per scan or subscribe for continuous UK demand and contract intelligence built on real data.">
+<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/pricing">
 <style>
 ${pageShellCss()}
 .pr-wrap{max-width:960px;margin:0 auto;padding:0 32px}
@@ -12228,20 +12234,20 @@ ${pageShellHeader(null, getAuthUser(req))}
 <div class="pr-wrap">
   <div class="pr-hero">
     <div class="pr-eye">Pricing</div>
-    <h1 class="pr-h1">One scan or a standing desk.</h1>
-    <p class="pr-sub">Pay per scan or subscribe for continuous intelligence across every desk that matters to your firm.</p>
+    <h1 class="pr-h1">Real intelligence, priced to pay for itself.</h1>
+    <p class="pr-sub">One scan tells you who wants what you sell and which contracts you can win. Pay per scan, or subscribe for continuous demand and contract intelligence in your sector.</p>
   </div>
   <div class="plans">
     <div class="plan">
       <div class="plan-name">Pay as you go</div>
       <div class="plan-price"><sup>£</sup>29</div>
       <div class="plan-period">per scan &middot; one-time</div>
-      <div class="plan-desc">A single full scan. The 10-section report, buyer watchlist, and PDF — no subscription needed.</div>
+      <div class="plan-desc">A single full scan — demand intelligence, contracts, or both. Sourced report, buyer watchlist, money map and PDF. No subscription needed.</div>
       <ul>
-        <li><span class="tick">&#10003;</span> Full 10-section intelligence report</li>
-        <li><span class="tick">&#10003;</span> Buyer watchlist &amp; route-to-revenue map</li>
-        <li><span class="tick">&#10003;</span> PDF export</li>
-        <li><span class="tick">&#10003;</span> Evidence grade &amp; verdict</li>
+        <li><span class="tick">&#10003;</span> Demand signals + live contracts (your choice)</li>
+        <li><span class="tick">&#10003;</span> Named buyers &amp; route-to-revenue money map</li>
+        <li><span class="tick">&#10003;</span> Regional demand heat map</li>
+        <li><span class="tick">&#10003;</span> 90-day activation plan + PDF export</li>
         <li><span class="dash">&ndash;</span> Weekly opportunity alerts</li>
         <li><span class="dash">&ndash;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
         <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
@@ -12253,7 +12259,7 @@ ${pageShellHeader(null, getAuthUser(req))}
       <div class="plan-name">Pro</div>
       <div class="plan-price"><sup>£</sup>79</div>
       <div class="plan-period">per month &middot; cancel anytime</div>
-      <div class="plan-desc">Unlimited scans plus weekly alerts when new contracts land in your categories. Built for firms actively chasing public sector.</div>
+      <div class="plan-desc">Unlimited scans plus weekly alerts when new demand or contracts land in your categories. Built for firms actively growing revenue.</div>
       <ul>
         <li><span class="tick">&#10003;</span> Unlimited scans</li>
         <li><span class="tick">&#10003;</span> Weekly opportunity alerts (email)</li>
@@ -12714,8 +12720,13 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Submit your company profile and get a structured commercial intelligence report against UK public procurement data in minutes.">
-<title>Run a Scan &mdash; AtlasRevenue</title>
+<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — get a sourced report on who's buying it, where demand is concentrated, and the contracts you can win. Real UK data, 2-4 minutes, from £29.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/scan">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="Run an AtlasRevenue intelligence scan">
+<meta property="og:description" content="Who's buying what you sell + contracts you can win. Real UK data, one scan.">
+<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/scan">
+<title>Run a Scan — Demand &amp; Contract Intelligence | AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -12825,8 +12836,8 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 <main class="page">
   <div class="page-head">
     <div class="eyebrow">Intelligence scan</div>
-    <h1>Tell us about your firm.</h1>
-    <p class="sub">The more context you give, the sharper the signal. We scan Contracts Finder, Find a Tender and LA spend data, then return a sourced verdict on where the money is and how to reach it.</p>
+    <h1>Tell us what you sell.</h1>
+    <p class="sub">The more context you give, the sharper the signal. We read real UK data — DVLA, ONS, SMMT, Land Registry, Companies House, Contracts Finder — then return a sourced plan on who's buying, where the demand is, and how to reach it.</p>
     <details style="margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6;cursor:pointer">
       <summary style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);cursor:pointer">What is an Evidence Grade?</summary>
       <p style="margin-top:10px">Every report receives a grade from <strong style="color:var(--text)">A</strong> (strongest fit) to <strong style="color:var(--text)">E</strong> (weakest). The grade measures how well your profile matches live public contracts: buyer overlap, contract size fit, sector relevance, and track record. Filling in experience, certifications, and past wins strengthens the grade. First-time bidders typically start at C and improve as they build evidence.</p>
@@ -12873,8 +12884,8 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
           <input id="location" name="location" placeholder="e.g. Birmingham, West Midlands">
         </div>
         <div class="field">
-          <label for="idealBuyers">Ideal public-sector buyers</label>
-          <textarea id="idealBuyers" name="idealBuyers" placeholder="e.g. NHS trusts, local authorities, housing associations"></textarea>
+          <label for="idealBuyers">Ideal buyers <span style="color:var(--faint);font-weight:400;text-transform:none;letter-spacing:0">— public sector or private</span></label>
+          <textarea id="idealBuyers" name="idealBuyers" placeholder="e.g. NHS trusts &amp; councils — or fleet managers, dealerships, distributors"></textarea>
         </div>
         <div class="field">
           <label for="mainGoal">Main business goal</label>
@@ -13465,7 +13476,10 @@ svg.addEventListener('mouseleave',hide);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live Signals — AtlasRevenue</title>
+<title>Live UK Demand Signals — DVLA, ONS, Land Registry, Companies House | AtlasRevenue</title>
+<meta name="description" content="Live UK market demand signals from DVLA, ONS, Land Registry, Companies House and government procurement. Spot demand building in your sector before competitors act.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/signals">
+<meta name="robots" content="index, follow">
 <style>${pageShellCss()}
 /* ── signals page ── */
 .sig-outer{max-width:1320px;margin:0 auto;padding:0 48px}
@@ -16733,8 +16747,10 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>All Intelligence Desks — AtlasRevenue</title>
-<meta name="description" content="UK public-sector procurement intelligence across ${DESK_PROFILES.filter(d => d.live).length} industry desks. Live data from Contracts Finder and Find a Tender.">
+<title>UK Public-Sector Contracts by Sector — ${DESK_PROFILES.filter(d => d.live).length} Intelligence Desks | AtlasRevenue</title>
+<meta name="description" content="Live UK public-sector contracts across ${DESK_PROFILES.filter(d => d.live).length} industry desks — construction, health, education, transport, facilities and more. Real data from Contracts Finder and Find a Tender, updated hourly.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/desks">
+<meta name="robots" content="index, follow">
 <style>
 ${pageShellCss()}
 .dl-hero{background:radial-gradient(120% 170% at 82% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6;padding:60px 0 56px}
