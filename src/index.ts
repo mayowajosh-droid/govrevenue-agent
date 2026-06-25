@@ -9029,7 +9029,7 @@ ${pageShellHeader(null, authCtx)}
     </div>
     <div class="atl-hero-stats">
       <div class="atl-hstat"><span class="atl-hstat-val">350+</span><span class="atl-hstat-lbl">Districts indexed</span></div>
-      <div class="atl-hstat"><span class="atl-hstat-val">43</span><span class="atl-hstat-lbl">Live data sources</span></div>
+      <div class="atl-hstat"><span class="atl-hstat-val">${DATA_SOURCES.length}</span><span class="atl-hstat-lbl">Live data sources</span></div>
       <div class="atl-hstat"><span class="atl-hstat-val">Live</span><span class="atl-hstat-lbl">Contracts Finder</span></div>
       <div class="atl-hstat"><span class="atl-hstat-val">Free</span><span class="atl-hstat-lbl">No account needed</span></div>
     </div>
@@ -18050,7 +18050,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="#ingest" class="sb-link">Ingest Pipeline <span class="sb-count">${Number(ingestTotals.total||0).toLocaleString()}</span></a>
     <a href="#geospatial" class="sb-link">Geospatial <span class="sb-count">${(geoLocationCount+geoPlanningCount).toLocaleString()}</span></a>
     <a href="#relationships" class="sb-link">Relationships <span class="sb-count">${(aliasCount+ownershipCount+directorCount).toLocaleString()}</span></a>
-    <a href="#source-registry" class="sb-link">43 Sources <span class="sb-count" style="color:${failSourcesCount>0?"var(--red)":warnSourcesCount>5?"var(--amber)":"var(--green)"}">${liveSourcesCount}✓ ${failSourcesCount>0?failSourcesCount+"✗":""}</span></a>
+    <a href="#source-registry" class="sb-link">${DATA_SOURCES.length} Sources <span class="sb-count" style="color:${failSourcesCount>0?"var(--red)":warnSourcesCount>5?"var(--amber)":"var(--green)"}">${liveSourcesCount}✓ ${failSourcesCount>0?failSourcesCount+"✗":""}</span></a>
     <a href="#governance" class="sb-link">Governance <span class="sb-count" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${(govSummary.qualityPassRate||0)}%</span></a>
     <a href="#webhooks" class="sb-link">Webhooks <span class="sb-count">${webhookList.length}</span></a>
     <div class="sb-group">Admin</div>
@@ -18887,7 +18887,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Data Platform</div>
-      <div class="s-title">43 Source Registry</div>
+      <div class="s-title">${DATA_SOURCES.length} Source Registry</div>
       <div class="s-sub">${DATA_SOURCES.filter(s => s.live).length} live · ${liveSourcesCount} last-fetch OK · ${warnSourcesCount} warn · ${failSourcesCount} fail · ${neverFetchedCount} never fetched</div>
     </div>
     <div style="display:flex;gap:8px">
