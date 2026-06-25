@@ -2799,8 +2799,35 @@ ${allErrors.length ? allErrors.map(error => `- ${error}`).join("\n") : "- None"}
 
 
 
+// Strip web-search narration / thinking text that Claude emits between tool calls.
+// With the web_search tool, the model interleaves text like "Let me search for...",
+// "I now have comprehensive data. Building the report." before the actual report.
+// The real report always starts at the first markdown heading.
+function stripLlmNarration(report: string): string {
+  let text = String(report || "").trim();
+
+  // 1. Cut everything before the first top-level heading (## 1. or # ).
+  const firstHeading = text.search(/^#{1,3}\s+/m);
+  if (firstHeading > 0) {
+    text = text.slice(firstHeading);
+  }
+
+  // 2. Remove common narration sentences if any slipped past (defensive).
+  const narrationPatterns = [
+    /^I'll (gather|search|look|find|now|start|build|put together)[^.\n]*\.\s*/gim,
+    /^Let me (search|gather|get|find|look|pull|check|verify)[^.\n]*\.\s*/gim,
+    /^I (now |)have (strong |comprehensive |good |enough |solid )?(supporting |)data[^.\n]*\.\s*/gim,
+    /^(Now |)Building the report\.\s*/gim,
+    /^I'll (now |)(write|compile|assemble|produce)[^.\n]*\.\s*/gim,
+    /^Based on (my |the )(search|research|findings)[^.\n]*, I'll[^.\n]*\.\s*/gim,
+  ];
+  for (const p of narrationPatterns) text = text.replace(p, "");
+
+  return text.trim();
+}
+
 function enforceDataQualityLanguage(report: string) {
-  return String(report || "")
+  return stripLlmNarration(String(report || ""))
     .replace(/\bConfirmed\b/g, "Source-labelled")
     .replace(/\bconfirmed\b/g, "source-labelled")
     .replace(/\bsource-backed\b/gi, "source-labelled")
@@ -3278,48 +3305,77 @@ function renderRegionHeatMap(data: ProcurementData, scan: ScanRecord): string {
     if (servedRegions.size === 0) servedRegions.add("London"); // default fallback
   }
 
-  // Always show the map — use contract data if available, market coverage if not
+  // UK regional consumer market index — share of national consumer/economic demand.
+  // Based on GVA + population + household spend share. Used to weight the heat map
+  // when there is no contract data so it shows REAL demand intensity, not a flat grid.
+  const REGION_DEMAND_INDEX: Record<string, number> = {
+    "London":        1.00, // highest consumer spend concentration
+    "South East":    0.82,
+    "North West":    0.58,
+    "West Midlands": 0.52,
+    "East England":  0.50,
+    "Yorkshire":     0.47,
+    "South West":    0.46,
+    "Scotland":      0.45,
+    "East Midlands": 0.40,
+    "Wales":         0.28,
+    "North East":    0.25,
+    "N. Ireland":    0.20,
+  };
+
   const companyRegion = areasServed;
 
   const tiles = regionList.map(r => {
-    const pct = hasContractData ? r.total / maxTotal : 0;
     const isServed = servedRegions.has(r.name);
     const isHome = !isNational && companyRegion.includes(r.name.toLowerCase().split(" ")[0]);
+    // pct drives the heat colour. With contract data → notice density.
+    // Without → regional consumer-demand index (only for served regions).
+    const demandIdx = REGION_DEMAND_INDEX[r.name] ?? 0.3;
+    const pct = hasContractData
+      ? r.total / maxTotal
+      : (isServed ? demandIdx : 0);
     const bg = pct === 0
-      ? (isServed ? "rgba(180,146,78,.10)" : "rgba(255,255,255,.04)")
+      ? "rgba(255,255,255,.04)"
       : pct < 0.2 ? "rgba(180,146,78,.12)"
-      : pct < 0.4 ? "rgba(180,146,78,.22)"
-      : pct < 0.6 ? "rgba(180,146,78,.35)"
-      : pct < 0.8 ? "rgba(180,146,78,.50)"
-      : "rgba(180,146,78,.68)";
+      : pct < 0.35 ? "rgba(180,146,78,.22)"
+      : pct < 0.5 ? "rgba(180,146,78,.34)"
+      : pct < 0.7 ? "rgba(180,146,78,.48)"
+      : pct < 0.85 ? "rgba(180,146,78,.60)"
+      : "rgba(180,146,78,.74)";
     const border = isHome ? "border:1px solid #B4924E;" : isServed ? "border:1px solid rgba(180,146,78,.3);" : "border:1px solid rgba(255,255,255,.07);";
     const valStr = r.value > 0 ? (r.value >= 1_000_000 ? `£${(r.value / 1_000_000).toFixed(1)}m` : `£${Math.round(r.value / 1000)}k`) : "";
+    // Label: contract count, or a demand band (HIGH/MED/LOW) in coverage mode
+    const demandBand = demandIdx >= 0.7 ? "HIGH" : demandIdx >= 0.45 ? "MED" : "LOW";
     const label = hasContractData
       ? (r.total > 0 ? String(r.total) : "—")
-      : (isServed ? "▸" : "—");
-    const subLabel = hasContractData && r.total > 0
-      ? `${r.open > 0 ? `${r.open} open` : ""}${r.open > 0 && r.awarded > 0 ? " · " : ""}${r.awarded > 0 ? `${r.awarded} awarded` : ""}`
-      : (isServed && !hasContractData ? "in scope" : "");
+      : (isServed ? demandBand : "—");
+    const subLabel = hasContractData
+      ? (r.total > 0 ? `${r.open > 0 ? `${r.open} open` : ""}${r.open > 0 && r.awarded > 0 ? " · " : ""}${r.awarded > 0 ? `${r.awarded} awarded` : ""}` : "")
+      : (isServed ? `demand index ${(demandIdx * 100).toFixed(0)}` : "out of scope");
+    const labelSize = hasContractData ? "18px" : "13px";
     return `<div style="background:${bg};${border}padding:10px 12px;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;position:relative">
       ${isHome ? `<div style="position:absolute;top:5px;right:6px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:#B4924E">HOME</div>` : ""}
       <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;color:${pct > 0.4 ? "#ECE6D6" : "var(--text-mid)"};line-height:1.2">${r.name}</div>
       <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px">
-        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:${pct === 0 && !isServed ? "var(--faint)" : "#ECE6D6"}">${label}</div>
+        <div style="font-family:${hasContractData ? "var(--serif)" : "var(--mono)"};font-size:${labelSize};font-weight:600;letter-spacing:${hasContractData ? "0" : ".08em"};color:${pct === 0 ? "var(--faint)" : "#ECE6D6"}">${label}</div>
         ${valStr ? `<div style="font-family:var(--mono);font-size:9px;color:var(--brand);text-align:right">${valStr}</div>` : ""}
       </div>
-      ${subLabel ? `<div style="font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--faint);margin-top:2px">${subLabel}</div>` : ""}
+      ${subLabel ? `<div style="font-family:var(--mono);font-size:8px;letter-spacing:.05em;color:var(--faint);margin-top:2px">${subLabel}</div>` : ""}
     </div>`;
   }).join("");
 
   const topRegion = regionList.find(r => r.total > 0);
   const topName = topRegion?.name ?? "";
   const totalNotices = regionList.reduce((s, r) => s + r.total, 0);
+  // Top demand region among served (coverage mode)
+  const topDemand = [...servedRegions]
+    .sort((a, b) => (REGION_DEMAND_INDEX[b] ?? 0) - (REGION_DEMAND_INDEX[a] ?? 0))[0];
   const mapTitle = hasContractData
     ? `${totalNotices} notices across UK regions${topName ? ` — ${topName} leads` : ""}`
-    : `Market coverage map — ${[...servedRegions].slice(0, 4).join(", ")}${servedRegions.size > 4 ? ` +${servedRegions.size - 4} more` : ""}`;
+    : `Consumer demand concentration${topDemand ? ` — ${topDemand} is your strongest market` : ""}`;
   const mapNote = hasContractData
     ? "Derived from buyer name and notice geography in pulled records."
-    : "Showing your stated service regions. Contract notice data will populate this map once procurement activity is found.";
+    : "Heat reflects regional consumer-demand index (GVA, population and household spend share) across your service area. Darker = stronger market.";
 
   return `<div style="background:var(--surface);border:1px solid var(--border-2);border-top:2px solid var(--brand);margin-top:16px;padding:28px 32px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap">
@@ -7673,7 +7729,7 @@ function reportPage(scan: ScanRecord) {
       </div>
     </section>
 
-    ${premiumDashboardHtml(scan)}
+    ${((scan.input_json as any)?.scanMode ?? "both") === "intelligence" ? "" : premiumDashboardHtml(scan)}
 
     ${data && scan.status === "completed" ? renderRegionHeatMap(data, scan) : ""}
 
@@ -7683,6 +7739,7 @@ function reportPage(scan: ScanRecord) {
 
     ${scan.report_markdown ? premiumClosingHtml(scan, parsedEdp) : ""}
 
+    ${((scan.input_json as any)?.scanMode ?? "both") === "intelligence" ? "" : `
     ${data ? renderScanSpendTrend(data) : ""}
 
     ${data ? renderBuyerConcentration(data) : ""}
@@ -7707,7 +7764,7 @@ function reportPage(scan: ScanRecord) {
       };
       const scored = scoreAndBucketNotices(allNotices.map(normaliseFromProcurementNotice), scanCtx);
       return renderChaseNowPanel(scored, scanCtx);
-    })()}
+    })()}`}
 
     <p class="footer">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
 
