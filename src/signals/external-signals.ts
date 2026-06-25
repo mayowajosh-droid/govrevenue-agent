@@ -191,9 +191,11 @@ async function fetchWebSearchSignals(
   const primarySector = sectors[0] ?? "general";
   const primaryQueries = SECTOR_SEARCH_QUERIES[primarySector] ?? SECTOR_SEARCH_QUERIES.general;
   const secondaryQueries = sectors[1]
-    ? (SECTOR_SEARCH_QUERIES[sectors[1]] ?? []).slice(0, 4)
+    ? (SECTOR_SEARCH_QUERIES[sectors[1]] ?? []).slice(0, 2)
     : [];
-  const queries = [...primaryQueries, ...secondaryQueries].slice(0, 14);
+  // Keep the query list aligned with the search budget (8) so we don't ask the model
+  // to cover more topics than it has searches for. Credit-conscious: each search costs.
+  const queries = [...primaryQueries, ...secondaryQueries].slice(0, 8);
 
   const prompt = `You are a UK market research analyst compiling a signals brief for "${companyName}".
 
@@ -220,7 +222,8 @@ MINTEL|71% of luxury car owners say interior personalisation matters|UK|2024|sce
 
 Rules:
 - Real numbers only. Never invent statistics.
-- Minimum 14 lines. Aim for 18.
+- Be efficient with searches — a single good search often yields several usable stats. Extract multiple signals per search result.
+- Minimum 12 lines. Aim for 16.
 - Return ONLY the pipe-separated lines.`;
 
   try {
@@ -228,7 +231,7 @@ Rules:
       model: "claude-sonnet-4-6",
       max_tokens: 3000,
       messages: [{ role: "user", content: prompt }],
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 20 }] as any,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }] as any,
     });
 
     const raw = message.content
