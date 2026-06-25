@@ -9914,17 +9914,26 @@ const REGION_CENTROIDS: Record<string, [number, number]> = {
 };
 
 // Keyword → which demand-signal source(s) light up the map.
+// Checked in order: VEHICLE first (so "electric cars" beats the "electric" in the
+// property list), then PROPERTY, then BUSINESS. Short tokens use word boundaries.
 type DemandSource = "property" | "vehicle" | "business";
-const DEMAND_KEYWORD_MAP: { source: DemandSource; terms: string[] }[] = [
-  { source: "property", terms: ["roof", "construction", "building", "builder", "extension", "loft", "window", "door", "solar", "scaffold", "plumb", "electric", "heating", "boiler", "kitchen", "bathroom", "driveway", "landscap", "fencing", "render", "plaster", "insulation", "conservatory", "groundwork", "joinery", "carpentry", "brick", "flooring", "guttering", "cladding", "damp", "survey", "estate agent", "property", "home improvement", "new build", "house"] },
-  { source: "vehicle", terms: ["car", "vehicle", "electric car", "ev", "van", "fleet", "tyre", "mot", "valet", "garage", "automotive", "motor", "lease", "charging", "charge point", "transport", "haulage", "logistics", "driving"] },
-  { source: "business", terms: ["account", "legal", "solicitor", "consult", "marketing", "recruit", "it service", "software", "saas", "insurance", "bookkeep", "payroll", "hr ", "advisory", "agency", "design", "web", "finance", "startup", "b2b", "office", "coworking"] },
+const DEMAND_KEYWORD_MAP: { source: DemandSource; terms: string[]; word?: string[] }[] = [
+  { source: "vehicle",
+    terms: ["electric car", "electric vehicle", "vehicle", "fleet", "tyre", "valet", "automotive", "motor", "charge point", "charging", "haulage", "logistics", "dealership", "car dealer", "car park", "car wash", "minibus", "lorry", "hgv"],
+    word: ["car", "cars", "ev", "evs", "van", "vans", "mot", "lease", "truck", "trucks"] },
+  { source: "property",
+    terms: ["roof", "construction", "building", "builder", "extension", "loft", "window", "door", "solar", "scaffold", "plumb", "electrician", "electrical", "heating", "boiler", "kitchen", "bathroom", "driveway", "landscap", "fencing", "render", "plaster", "insulation", "conservatory", "groundwork", "joinery", "carpentry", "brick", "flooring", "guttering", "cladding", "damp", "estate agent", "property", "home improvement", "new build", "house", "housing", "refurb", "fit out", "fit-out"],
+    word: ["survey"] },
+  { source: "business",
+    terms: ["account", "legal", "solicitor", "consult", "marketing", "recruit", "it service", "software", "saas", "insurance", "bookkeep", "payroll", "advisory", "agency", "web design", "startup", "coworking", "co-working"],
+    word: ["hr", "b2b", "finance"] },
 ];
 
 function detectDemandSource(q: string): DemandSource | null {
   const ql = q.toLowerCase();
-  for (const { source, terms } of DEMAND_KEYWORD_MAP) {
+  for (const { source, terms, word } of DEMAND_KEYWORD_MAP) {
     if (terms.some(t => ql.includes(t))) return source;
+    if (word && word.some(w => new RegExp(`\\b${w}\\b`).test(ql))) return source;
   }
   return null;
 }
