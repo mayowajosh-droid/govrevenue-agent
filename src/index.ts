@@ -9504,7 +9504,7 @@ function renderAtlasSignals(signals){
   if(title)title.textContent='Market signals — '+document.getElementById('atl-q').value.trim();
   grid.innerHTML=signals.map(function(s){
     var icon=SRC_ICON[s.source]||'●';
-    var chg=s.changePercent!=null?'<span style="font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px;'+(s.changePercent>=0?'color:#2F8A52;background:rgba(47,138,82,.1)':'color:#9b2d20;background:rgba(155,45,32,.1)'"+">"+(s.changePercent>=0?'▲':'▼')+' '+Math.abs(s.changePercent).toFixed(1)+'%</span>':'';
+    var chg=s.changePercent!=null?'<span style="font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px;'+(s.changePercent>=0?'color:#2F8A52;background:rgba(47,138,82,.1)':'color:#9b2d20;background:rgba(155,45,32,.1)')+'">'+( s.changePercent>=0?'▲':'▼')+' '+Math.abs(s.changePercent).toFixed(1)+'%</span>':'';
     return'<div style="background:var(--surface);border:1px solid var(--border);padding:20px 22px;display:flex;flex-direction:column;gap:8px">'
       +'<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">'+icon+' '+s.source+'</span>'+chg+'</div>'
       +'<div style="font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text);line-height:1.2">'+s.stat+'</div>'
