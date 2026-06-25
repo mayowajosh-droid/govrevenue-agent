@@ -16559,9 +16559,8 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
         <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
       </div>
       <nav class="gh-main-nav">
-        <a href="/market-intelligence">Market Demand</a>
-        <a href="/desks">Contracts</a>
         <a href="/atlas" class="gh-nav-atlas">Atlas</a>
+        <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
