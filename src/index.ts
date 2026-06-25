@@ -8767,6 +8767,119 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 </html>`);
 }));
 
+app.get("/market-intelligence", asyncRoute(async (req, res) => {
+  const auth = getAuthUser(req);
+  const mktSnap = pool ? await generateMarketSignals(pool, { limit: 8 }).catch(() => null) : null;
+  const sigs: MarketSignal[] = mktSnap?.signals ?? [];
+  const BASE = "https://atlasrevenue-agent-production.up.railway.app";
+  const sigCards = sigs.length > 0
+    ? sigs.map(s => `
+      <div style="background:var(--surface-2);border:1px solid var(--border-2);border-left:3px solid var(--brand);padding:18px 20px">
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:7px">${escapeHtml(s.source)}</div>
+        <div style="font-family:var(--serif);font-size:18px;color:var(--text);line-height:1.25;margin-bottom:6px">${escapeHtml(s.stat)}</div>
+        <div style="font-size:13.5px;color:var(--text-mid);line-height:1.5">${escapeHtml(s.implication)}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:9px">${escapeHtml(s.geography)} &middot; ${escapeHtml(s.period)}</div>
+      </div>`).join("")
+    : `<div style="grid-column:1/-1;background:var(--surface-2);border:1px solid var(--border-2);padding:24px;text-align:center;color:var(--muted);font-size:14px">Live demand signals load on the next data refresh. <a href="/scan" style="color:var(--brand)">Run a scan</a> to generate signals for your sector now.</div>`;
+
+  const faqs: [string, string][] = [
+    ["What is market demand intelligence?", "It is the practice of using real data — government datasets, registrations, spending indices, search and platform trends — to work out who is buying a product or service, how much, where, and which way demand is moving, before committing sales and marketing spend. AtlasRevenue does this for UK businesses using DVLA, ONS, SMMT, Land Registry and Companies House data."],
+    ["How is this different from a generic market report?", "A generic report gives you broad industry numbers. AtlasRevenue gives you signals specific to what you sell and where you operate — named buyer segments, regional demand concentration, competitor positioning, and the exact routes to reach buyers — with every figure sourced and dated. It ends with a 90-day action plan, not a slide deck."],
+    ["What data sources do you use?", "DVLA vehicle registrations and fleet data, ONS consumer spending and economic output, SMMT new-car and segment data, HM Land Registry completions, Companies House incorporations, and market research where relevant (Mintel, Euromonitor), plus platform demand signals like Amazon UK and Google Trends."],
+    ["Do I need to sell to government to use this?", "No. Market demand intelligence is for any business selling a product or service. If you also sell to the public sector, AtlasRevenue layers live contracts on top — but the demand scan works entirely on its own."],
+  ];
+
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UK Market Demand Intelligence — Know Who's Buying What You Sell | AtlasRevenue</title>
+<meta name="description" content="Market demand intelligence for UK businesses. Find out who is buying what you sell, where demand is concentrated, and how to reach buyers — built on real DVLA, ONS, SMMT, Land Registry and Companies House data. No guesses.">
+<meta name="keywords" content="market demand intelligence, UK demand data, who is buying my product, B2B sales intelligence UK, market research alternative, demand signals, sales targeting data">
+<link rel="canonical" href="${BASE}/market-intelligence">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:title" content="UK Market Demand Intelligence — Know Who's Buying What You Sell">
+<meta property="og:description" content="Real UK demand data turned into named buyers, regional heat maps and a 90-day plan. DVLA, ONS, SMMT, Companies House.">
+<meta property="og:url" content="${BASE}/market-intelligence">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": faqs.map(([q, a]) => ({ "@type": "Question", "name": q, "acceptedAnswer": { "@type": "Answer", "text": a } })),
+})}</script>
+<style>${pageShellCss()}</style>
+</head>
+<body>
+${pageShellHeader(null, auth)}
+<main>
+  <section style="background:radial-gradient(120% 160% at 85% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6;border-bottom:1px solid var(--border-2)">
+    <div style="max-width:1100px;margin:0 auto;padding:72px 40px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px">Market Demand Intelligence</div>
+      <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(34px,4.4vw,54px);line-height:1.05;letter-spacing:-.02em;margin-bottom:18px;max-width:16em">Stop guessing who wants what you sell. The demand is already in the data.</h1>
+      <p style="font-size:17px;line-height:1.6;color:#C5C9BC;max-width:40em;margin-bottom:28px">AtlasRevenue reads real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — and turns it into a demand map for your product or service: named buyers, regional concentration, competitor gaps, and exactly how to reach them.</p>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <a href="/scan" style="background:var(--brand);color:#10110D;font-weight:600;font-size:14px;padding:14px 24px">Map my market demand &rarr;</a>
+        <a href="/scan" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#C5C9BC;text-decoration:underline;text-underline-offset:4px">See a sample report &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--base);border-bottom:1px solid var(--border)">
+    <div style="max-width:1100px;margin:0 auto;padding:64px 40px">
+      <div style="text-align:center;max-width:640px;margin:0 auto 40px">
+        <div class="eyebrow">Live demand signals</div>
+        <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.2vw,38px);line-height:1.1;letter-spacing:-.02em;margin:12px 0;color:var(--text)">Real numbers, sourced and dated — not AI guesses</h2>
+        <p style="color:var(--muted);font-size:15px;line-height:1.6">A sample of the signals our engine is tracking right now across UK sectors.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+        ${sigCards}
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--surface)">
+    <div style="max-width:1000px;margin:0 auto;padding:64px 40px">
+      <div class="eyebrow" style="text-align:center;display:block">How it works</div>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.2vw,38px);line-height:1.1;text-align:center;margin:12px 0 40px;color:var(--text)">From "who would buy this?" to a 90-day plan</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px">
+        ${[
+          ["01", "Tell us what you sell", "Your product or service, your ideal buyers, and where you operate. Two minutes."],
+          ["02", "We pull the real data", "The engine searches DVLA, ONS, SMMT, Land Registry, Companies House and market research for signals specific to your category."],
+          ["03", "We score the demand", "Demand strength, regional concentration, competitor positioning, and the fastest routes to first revenue."],
+          ["04", "You get a plan", "Named buyers, a money map, a regional demand heat map, and a 90-day activation plan with copy-ready outreach."],
+        ].map(([n, t, d]) => `
+        <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:24px 22px">
+          <div style="font-family:var(--mono);font-size:22px;color:var(--brand);margin-bottom:10px">${n}</div>
+          <div style="font-family:var(--serif);font-size:19px;color:var(--text);margin-bottom:8px">${t}</div>
+          <div style="font-size:14px;color:var(--text-mid);line-height:1.55">${d}</div>
+        </div>`).join("")}
+      </div>
+      <div style="text-align:center;margin-top:40px">
+        <a href="/scan" style="background:var(--hero-cta);color:#F3EFE6;font-weight:600;font-size:14px;padding:14px 28px;display:inline-block">Run a demand scan &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--base);border-top:1px solid var(--border)">
+    <div style="max-width:840px;margin:0 auto;padding:64px 40px">
+      <div style="text-align:center;margin-bottom:36px">
+        <div class="eyebrow">FAQ</div>
+        <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(24px,3vw,34px);line-height:1.12;margin:12px 0;color:var(--text)">Market demand intelligence, explained</h2>
+      </div>
+      ${faqs.map(([q, a]) => `
+      <details style="border-bottom:1px solid var(--border-2);padding:18px 0">
+        <summary style="font-family:var(--sans);font-weight:600;font-size:17px;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px">${escapeHtml(q)}<span style="color:var(--brand);font-size:20px">+</span></summary>
+        <p style="color:var(--text-mid);font-size:15px;line-height:1.65;margin-top:12px">${escapeHtml(a)}</p>
+      </details>`).join("")}
+    </div>
+  </section>
+</main>
+${pageShellFoot()}
+</body>
+</html>`);
+}));
 
 app.get("/api/scans/:id/status", asyncRoute(async (req, res) => {
   const scan = await getScan(req.params.id);
@@ -16432,8 +16545,9 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
         <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
       </div>
       <nav class="gh-main-nav">
+        <a href="/market-intelligence">Market Demand</a>
+        <a href="/desks">Contracts</a>
         <a href="/atlas" class="gh-nav-atlas">Atlas</a>
-        <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
