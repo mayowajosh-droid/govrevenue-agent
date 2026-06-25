@@ -81,7 +81,7 @@ import {
   exportSignalsCsv, exportIngestCsv, exportCatalogCsv, exportPlanningCsv,
 } from "./integrations/csv-export.js";
 import { generateMarketSignals, getSignalsForSector, getRegionalIntelligence } from "./signals/market-intel.js";
-import type { MarketSignalSector, RegionIntel } from "./signals/market-intel.js";
+import type { MarketSignal, MarketSignalSector, RegionIntel } from "./signals/market-intel.js";
 
 type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
@@ -4710,6 +4710,38 @@ const DESK_PROFILES: DeskProfile[] = [
   },
 ];
 
+// Maps each desk to the market-signal sectors its intelligence should draw from
+const DESK_SECTORS: Record<string, MarketSignalSector[]> = {
+  "construction":       ["construction", "property"],
+  "highways":           ["construction", "transport"],
+  "facilities":         ["construction", "professional_services"],
+  "education":          ["education"],
+  "transport":          ["transport"],
+  "fleet-automotive":   ["automotive", "transport", "energy"],
+  "recruitment":        ["professional_services"],
+  "health":             ["health"],
+  "digital":            ["tech"],
+  "social-care":        ["health"],
+  "childrens":          ["health", "education"],
+  "waste":              ["energy", "general"],
+  "energy":             ["energy"],
+  "security":           ["tech"],
+  "catering":           ["food_beverage"],
+  "legal":              ["professional_services", "finance"],
+  "housing-support":    ["property", "health"],
+  "finance":            ["finance"],
+  "comms":              ["retail", "tech"],
+  "leisure-sport":      ["health", "general"],
+  "arts-culture-heritage": ["general"],
+  "planning":           ["property", "construction"],
+  "justice":            ["general"],
+  "emergency":          ["general"],
+  "research":           ["tech", "professional_services"],
+  "consulting":         ["professional_services"],
+  "events-venues":      ["retail", "general"],
+  "uniforms-workwear":  ["retail"],
+};
+
 const SIGNAL_CATEGORIES: Array<{ key: string; label: string; input: z.infer<typeof intakeSchema> }> =
   DESK_PROFILES.filter(d => d.live).map(d => ({ key: d.slug, label: d.label, input: d.pinnedProfile }));
 
@@ -8324,6 +8356,68 @@ app.get("/api/signals/market", asyncRoute(async (req, res) => {
   res.json(snap);
 }));
 
+app.get("/api/signals/for-keyword", asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ signals: [], totalSignals: 0 }); return; }
+  const q = String(req.query.q || "").trim().toLowerCase();
+  if (!q) { res.json({ signals: [], totalSignals: 0 }); return; }
+  // Map keyword to sectors — intentionally broad to surface all relevant signals
+  const KEYWORD_SECTORS: Record<string, MarketSignalSector[]> = {
+    construction: ["construction", "property"],
+    building: ["construction", "property"],
+    roofing: ["construction"],
+    housing: ["property", "construction"],
+    planning: ["property", "construction"],
+    property: ["property"],
+    "land registry": ["property"],
+    highway: ["construction", "transport"],
+    road: ["construction", "transport"],
+    transport: ["transport"],
+    fleet: ["automotive", "transport"],
+    vehicle: ["automotive", "transport"],
+    automotive: ["automotive"],
+    car: ["automotive"],
+    energy: ["energy"],
+    "net zero": ["energy"],
+    renewable: ["energy"],
+    ev: ["automotive", "energy"],
+    electric: ["automotive", "energy"],
+    health: ["health"],
+    medical: ["health"],
+    nhs: ["health"],
+    social: ["health"],
+    care: ["health"],
+    digital: ["tech"],
+    technology: ["tech"],
+    it: ["tech"],
+    software: ["tech"],
+    data: ["tech"],
+    ai: ["tech"],
+    finance: ["finance"],
+    financial: ["finance"],
+    legal: ["professional_services", "finance"],
+    education: ["education"],
+    school: ["education"],
+    training: ["education"],
+    waste: ["energy", "general"],
+    recycling: ["energy", "general"],
+    water: ["general"],
+    food: ["food_beverage"],
+    catering: ["food_beverage"],
+    retail: ["retail"],
+    fashion: ["retail"],
+    research: ["tech", "professional_services"],
+    science: ["tech"],
+  };
+  const sectors: MarketSignalSector[] = [];
+  for (const [kw, secs] of Object.entries(KEYWORD_SECTORS)) {
+    if (q.includes(kw) || kw.includes(q)) {
+      for (const s of secs) if (!sectors.includes(s)) sectors.push(s);
+    }
+  }
+  const snap = await generateMarketSignals(pool, { sectors: sectors.length ? sectors : undefined, limit: 12 });
+  res.json({ signals: snap.signals, totalSignals: snap.totalSignals, sectors, sourcesCovered: snap.sourcesCovered });
+}));
+
 // ── Relationship Graph API ────────────────────────────────────────────────────
 
 app.get("/api/entities/:id/relationships", asyncRoute(async (req, res) => {
@@ -9181,13 +9275,27 @@ ${pageShellHeader(null, authCtx)}
   </div>
 </section>
 
+<!-- Market Intelligence signals (shown when a search is run) -->
+<section class="atl-map-section" id="atl-signals-section" style="display:none">
+  <div class="atl-map-inner">
+    <div class="atl-section-hd">
+      <div>
+        <div class="atl-section-label">Sector Intelligence</div>
+        <div class="atl-section-title" id="atl-sig-title">Market signals for this sector</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em">From DVLA · Land Registry · Companies House · ONS · UKRI</div>
+    </div>
+    <div id="atl-sig-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
+  </div>
+</section>
+
 <!-- Feature blocks -->
 <section class="atl-features">
   <div class="atl-feat-inner">
     <div class="atl-feat-hd">
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px">How Atlas works</div>
       <h2>Intelligence layered onto geography</h2>
-      <p>Atlas combines live Contracts Finder data with planning applications and procurement signals to show you exactly where public-sector buyers are spending.</p>
+      <p>Atlas combines live market data (DVLA, Land Registry, Companies House, ONS) with procurement signals to show you where demand is concentrated — public sector and wider economy.</p>
     </div>
     <div class="atl-feat-grid">
       <div class="atl-feat-card">
@@ -9361,6 +9469,27 @@ document.addEventListener('click',function(e){
 
 function hideLdr(){var ldr=document.getElementById('atl-ldr');if(ldr){ldr.classList.add('gone');ldr.style.display='none';}}
 
+var SRC_ICON={'DVLA':'🚗','LAND REG':'🏠','COMPANIES HOUSE':'🏢','ONS':'📊','UKRI':'🔬','BBC':'📰'};
+function renderAtlasSignals(signals){
+  var sec=document.getElementById('atl-signals-section');
+  var grid=document.getElementById('atl-sig-grid');
+  var title=document.getElementById('atl-sig-title');
+  if(!sec||!grid)return;
+  if(!signals||!signals.length){sec.style.display='none';return;}
+  sec.style.display='';
+  if(title)title.textContent='Market signals — '+document.getElementById('atl-q').value.trim();
+  grid.innerHTML=signals.map(function(s){
+    var icon=SRC_ICON[s.source]||'●';
+    var chg=s.changePercent!=null?'<span style="font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px;'+(s.changePercent>=0?'color:#2F8A52;background:rgba(47,138,82,.1)':'color:#9b2d20;background:rgba(155,45,32,.1)'"+">"+(s.changePercent>=0?'▲':'▼')+' '+Math.abs(s.changePercent).toFixed(1)+'%</span>':'';
+    return'<div style="background:var(--surface);border:1px solid var(--border);padding:20px 22px;display:flex;flex-direction:column;gap:8px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)">'+icon+' '+s.source+'</span>'+chg+'</div>'
+      +'<div style="font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text);line-height:1.2">'+s.stat+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);line-height:1.5">'+s.implication+'</div>'
+      +'<div style="font-family:var(--mono);font-size:9.5px;color:var(--muted)">'+s.geography+' · '+s.period+'</div>'
+      +'</div>';
+  }).join('');
+}
+
 function doSearch(){
   var q=document.getElementById('atl-q').value.trim();
   if(!q){hideLdr();return;}
@@ -9385,6 +9514,11 @@ function doSearch(){
     })
     .catch(function(){})
     .finally(function(){clearTimeout(guard);if(!done){done=true;hideLdr();}});
+  // Also fetch market signals for this keyword
+  fetch('/api/signals/for-keyword?q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(data){renderAtlasSignals(data.signals||[]);})
+    .catch(function(){});
 }
 
 document.querySelectorAll('.atl-layer').forEach(function(btn){
@@ -13732,9 +13866,14 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
 
-  const [cached, earlySignals] = await Promise.all([
+  const sectors = DESK_SECTORS[profile.slug] ?? [];
+
+  const [cached, earlySignals, mktSnap] = await Promise.all([
     getDeskCache(profile.slug).catch(() => null),
     getEarlySignalsByDesk(profile.slug).catch(() => []),
+    pool && sectors.length
+      ? generateMarketSignals(pool, { sectors, limit: 10 }).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
 
@@ -13743,7 +13882,7 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
     compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   }
 
-  res.type("html").send(deskPage(profile, cached, getAuthUser(req), earlySignals));
+  res.type("html").send(deskPage(profile, cached, getAuthUser(req), earlySignals, mktSnap?.signals ?? []));
 }));
 
 app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
@@ -14049,7 +14188,7 @@ ${pageShellFoot()}
 </body></html>`;
 }
 
-function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null, earlySignals: import("./intelligence/early-signals/types.js").EarlySignal[] = []): string {
+function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_at: string } | null, authCtx?: { email: string; tier: UserTier } | null, earlySignals: import("./intelligence/early-signals/types.js").EarlySignal[] = [], mktSignals: MarketSignal[] = []): string {
   const isCompiling = cached === null;
   const data = cached?.data;
 
@@ -14177,6 +14316,68 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     if (pct >= 0.2) return ["T2", "bw-tier-2"];
     return ["T3", "bw-tier-3"];
   };
+
+  // ── Sector market intelligence panel ─────────────────────────────────────
+  const SOURCE_ICON: Record<string, string> = {
+    "DVLA": "🚗", "LAND REG": "🏠", "COMPANIES HOUSE": "🏢",
+    "ONS": "📊", "UKRI": "🔬", "BBC": "📰",
+  };
+  const mktIntelHtml = mktSignals.length > 0
+    ? `<section class="mki-section">
+  <div class="mki-inner">
+    <div class="mki-hd">
+      <div>
+        <div class="mki-eyebrow">Sector Intelligence</div>
+        <h2 class="mki-title">${escapeHtml(profile.label)} — Market Signals</h2>
+        <p class="mki-sub">Live market data from DVLA, Land Registry, Companies House, ONS and UKRI — independent of government procurement.</p>
+      </div>
+      <div class="mki-src-badges">
+        ${[...new Set(mktSignals.map(s => s.source))].map(src =>
+          `<span class="mki-src-badge">${escapeHtml(SOURCE_ICON[src] ?? "●")} ${escapeHtml(src)}</span>`
+        ).join("")}
+      </div>
+    </div>
+    <div class="mki-grid">
+      ${mktSignals.map(s => {
+        const changeBadge = s.changePercent != null
+          ? `<span class="mki-chg ${s.changePercent >= 0 ? "mki-chg-up" : "mki-chg-dn"}">${s.changePercent >= 0 ? "▲" : "▼"} ${Math.abs(s.changePercent).toFixed(1)}%</span>`
+          : "";
+        return `<div class="mki-card">
+          <div class="mki-card-top">
+            <span class="mki-card-src">${escapeHtml(SOURCE_ICON[s.source] ?? "●")} ${escapeHtml(s.source)}</span>
+            ${changeBadge}
+          </div>
+          <div class="mki-card-stat">${escapeHtml(s.stat)}</div>
+          <div class="mki-card-impl">${escapeHtml(s.implication)}</div>
+          <div class="mki-card-foot">${escapeHtml(s.geography)} &middot; ${escapeHtml(s.period)}</div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>
+</section>
+<style>
+.mki-section{background:var(--base);border-bottom:1px solid var(--border);padding:56px 0}
+.mki-inner{max-width:1200px;margin:0 auto;padding:0 56px}
+.mki-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:32px}
+.mki-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.mki-title{font-family:var(--serif);font-size:24px;font-weight:500;color:var(--text);letter-spacing:-.01em;line-height:1.15;margin-bottom:6px}
+.mki-sub{font-size:13px;color:var(--muted);max-width:520px;line-height:1.6;margin:0}
+.mki-src-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;padding-top:4px}
+.mki-src-badge{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:4px 10px}
+.mki-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.mki-card{background:var(--surface);border:1px solid var(--border);padding:20px 22px;display:flex;flex-direction:column;gap:8px}
+.mki-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mki-card-src{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.mki-chg{font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px}
+.mki-chg-up{color:#2F8A52;background:rgba(47,138,82,.1)}
+.mki-chg-dn{color:#9b2d20;background:rgba(155,45,32,.1)}
+.mki-card-stat{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text);line-height:1.2}
+.mki-card-impl{font-size:12.5px;color:var(--text);opacity:.7;line-height:1.5}
+.mki-card-foot{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:2px}
+@media(max-width:900px){.mki-inner{padding:0 24px}.mki-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.mki-grid{grid-template-columns:1fr}}
+</style>`
+    : "";
 
   // Demand signal panel
   const demandHtml = profile.live && !isCompiling
@@ -14899,7 +15100,7 @@ ${pageShellHeader(profile, authCtx)}
       <p class="dm-mast-lede">${escapeHtml(profile.standfirst)}</p>
       <div class="dm-source-badge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 4.9V12c0 5.5-3.8 10.7-9 12-5.2-1.3-9-6.5-9-12V6.9z"/></svg>
-        <span>Public record only. Sourced from Contracts Finder and Find a Tender.</span>
+        <span>Market signals from DVLA, Land Registry, Companies House, ONS &amp; UKRI. Procurement from Contracts Finder &amp; Find a Tender.</span>
       </div>
     </div>
     <div></div>
@@ -14971,6 +15172,8 @@ ${earlySignals.length > 0 ? `
 .es-change-dn{color:#9b2d20;background:rgba(155,45,32,.1)}
 @media(max-width:600px){.es-card{flex-direction:column;gap:10px}.es-card-left{flex-direction:row}}
 </style>
+
+${mktIntelHtml}
 
 <section class="dm-section" id="demand-map">
   <div class="dm-section-inner">
@@ -15784,8 +15987,8 @@ ${pageShellHeader(null, authCtx)}
 <section class="dl-hero">
   <div class="dl-hero-inner">
     <div class="dl-eyebrow">All Intelligence Desks</div>
-    <h1>UK Public-Sector<br>Contract Intelligence</h1>
-    <p class="dl-hero-sub">Live procurement data across ${liveCount} active desks. Sourced from Contracts Finder and Find a Tender. Updated continuously.</p>
+    <h1>UK Sector<br>Intelligence</h1>
+    <p class="dl-hero-sub">Market signals, economic indicators and procurement intelligence across ${liveCount} sectors. DVLA, Land Registry, Companies House, ONS, UKRI and public contracts — in one place.</p>
     <div class="dl-agg">
       <div class="dl-agg-stat"><div class="dl-agg-val">${grandTotal > 0 ? fmtMoney(grandTotal)+"+" : "—"}</div><div class="dl-agg-lbl">Awarded Value (12 months)</div></div>
       <div class="dl-agg-stat"><div class="dl-agg-val">${totalOpen > 0 ? totalOpen.toLocaleString() : "—"}</div><div class="dl-agg-lbl">Open Now</div></div>
