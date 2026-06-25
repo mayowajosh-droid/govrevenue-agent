@@ -360,7 +360,8 @@ const intakeSchema = z.object({
   biggestConcern: z.string().optional().default(""),
   preferredOutput: z.string().optional().default(""),
   frameworkStatus: z.string().optional().default(""),
-  lastPublicContract: z.string().optional().default("")
+  lastPublicContract: z.string().optional().default(""),
+  scanMode: z.enum(["contracts", "intelligence", "both"]).optional().default("both"),
 });
 
 function nowIso() {
@@ -3251,43 +3252,80 @@ function renderRegionHeatMap(data: ProcurementData, scan: ScanRecord): string {
     .sort((a, b) => b.total - a.total);
 
   const maxTotal = Math.max(...regionList.map(r => r.total), 1);
-  const hasData = regionList.some(r => r.total > 0);
-  if (!hasData) return "";
+  const hasContractData = regionList.some(r => r.total > 0);
 
   const intake = scan.input_json as any;
-  const companyRegion = String(intake?.areasServed || data.regions || "").toLowerCase();
+  const areasServed = String(intake?.areasServed || data.regions || "").toLowerCase();
+  const isNational = /national|all uk|uk-wide|england|united kingdom/.test(areasServed);
+
+  // Detect which regions the company serves from areasServed text
+  const servedRegions = new Set<string>();
+  if (isNational) {
+    regionList.forEach(r => servedRegions.add(r.name));
+  } else {
+    for (const [, name] of regionPatterns) {
+      if (areasServed.includes(name.toLowerCase().split(" ")[0].toLowerCase())) {
+        servedRegions.add(name);
+      }
+    }
+    // always include home location
+    const loc = String(intake?.location || "").toLowerCase();
+    for (const [, name] of regionPatterns) {
+      if (loc.includes(name.toLowerCase().split(" ")[0].toLowerCase())) {
+        servedRegions.add(name);
+      }
+    }
+    if (servedRegions.size === 0) servedRegions.add("London"); // default fallback
+  }
+
+  // Always show the map — use contract data if available, market coverage if not
+  const companyRegion = areasServed;
 
   const tiles = regionList.map(r => {
-    const pct = r.total / maxTotal;
-    const isHome = companyRegion.toLowerCase().includes(r.name.toLowerCase().split(" ")[0]);
-    const bg = pct === 0 ? "rgba(255,255,255,.04)"
-      : pct < 0.2 ? "rgba(180,146,78,.08)"
-      : pct < 0.4 ? "rgba(180,146,78,.16)"
-      : pct < 0.6 ? "rgba(180,146,78,.28)"
-      : pct < 0.8 ? "rgba(180,146,78,.44)"
-      : "rgba(180,146,78,.65)";
-    const border = isHome ? "border:1px solid #B4924E;" : "border:1px solid rgba(255,255,255,.07);";
+    const pct = hasContractData ? r.total / maxTotal : 0;
+    const isServed = servedRegions.has(r.name);
+    const isHome = !isNational && companyRegion.includes(r.name.toLowerCase().split(" ")[0]);
+    const bg = pct === 0
+      ? (isServed ? "rgba(180,146,78,.10)" : "rgba(255,255,255,.04)")
+      : pct < 0.2 ? "rgba(180,146,78,.12)"
+      : pct < 0.4 ? "rgba(180,146,78,.22)"
+      : pct < 0.6 ? "rgba(180,146,78,.35)"
+      : pct < 0.8 ? "rgba(180,146,78,.50)"
+      : "rgba(180,146,78,.68)";
+    const border = isHome ? "border:1px solid #B4924E;" : isServed ? "border:1px solid rgba(180,146,78,.3);" : "border:1px solid rgba(255,255,255,.07);";
     const valStr = r.value > 0 ? (r.value >= 1_000_000 ? `£${(r.value / 1_000_000).toFixed(1)}m` : `£${Math.round(r.value / 1000)}k`) : "";
+    const label = hasContractData
+      ? (r.total > 0 ? String(r.total) : "—")
+      : (isServed ? "▸" : "—");
+    const subLabel = hasContractData && r.total > 0
+      ? `${r.open > 0 ? `${r.open} open` : ""}${r.open > 0 && r.awarded > 0 ? " · " : ""}${r.awarded > 0 ? `${r.awarded} awarded` : ""}`
+      : (isServed && !hasContractData ? "in scope" : "");
     return `<div style="background:${bg};${border}padding:10px 12px;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;position:relative">
       ${isHome ? `<div style="position:absolute;top:5px;right:6px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:#B4924E">HOME</div>` : ""}
       <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;color:${pct > 0.4 ? "#ECE6D6" : "var(--text-mid)"};line-height:1.2">${r.name}</div>
       <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px">
-        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:${pct === 0 ? "var(--faint)" : "#ECE6D6"}">${r.total > 0 ? r.total : "—"}</div>
+        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:${pct === 0 && !isServed ? "var(--faint)" : "#ECE6D6"}">${label}</div>
         ${valStr ? `<div style="font-family:var(--mono);font-size:9px;color:var(--brand);text-align:right">${valStr}</div>` : ""}
       </div>
-      ${r.total > 0 ? `<div style="font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--faint);margin-top:2px">${r.open > 0 ? `${r.open} open` : ""}${r.open > 0 && r.awarded > 0 ? " · " : ""}${r.awarded > 0 ? `${r.awarded} awarded` : ""}</div>` : ""}
+      ${subLabel ? `<div style="font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--faint);margin-top:2px">${subLabel}</div>` : ""}
     </div>`;
   }).join("");
 
   const topRegion = regionList.find(r => r.total > 0);
   const topName = topRegion?.name ?? "";
   const totalNotices = regionList.reduce((s, r) => s + r.total, 0);
+  const mapTitle = hasContractData
+    ? `${totalNotices} notices across UK regions${topName ? ` — ${topName} leads` : ""}`
+    : `Market coverage map — ${[...servedRegions].slice(0, 4).join(", ")}${servedRegions.size > 4 ? ` +${servedRegions.size - 4} more` : ""}`;
+  const mapNote = hasContractData
+    ? "Derived from buyer name and notice geography in pulled records."
+    : "Showing your stated service regions. Contract notice data will populate this map once procurement activity is found.";
 
   return `<div style="background:var(--surface);border:1px solid var(--border-2);border-top:2px solid var(--brand);margin-top:16px;padding:28px 32px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap">
       <div>
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:7px">BUYER DEMAND — REGIONAL HEAT MAP</div>
-        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text);line-height:1.2">${totalNotices} notices across UK regions${topName ? ` — ${topName} leads` : ""}</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:7px">${hasContractData ? "BUYER DEMAND — REGIONAL HEAT MAP" : "MARKET COVERAGE — REGIONAL MAP"}</div>
+        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text);line-height:1.2">${mapTitle}</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--faint)">
         <div style="display:flex;gap:3px;align-items:center">
@@ -3304,7 +3342,7 @@ function renderRegionHeatMap(data: ProcurementData, scan: ScanRecord): string {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
       ${tiles}
     </div>
-    <p style="font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--faint);margin:14px 0 0">Derived from buyer name and notice geography in pulled records. Some notices may be national or unclassified.</p>
+    <p style="font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--faint);margin:14px 0 0">${mapNote}</p>
   </div>`;
 }
 
@@ -3712,7 +3750,90 @@ function evidenceDashboard(scan: ScanRecord) {
 
 
 
+function buildIntelligencePrompt(input: z.infer<typeof intakeSchema>, preloadedSignals: import("./signals/external-signals.js").PreloadedSignal[]): string {
+  const signalBlock = preloadedSignals.length > 0
+    ? `PRE-FETCHED SIGNALS (use ALL of these as your foundation — real data from UK sources):\n${preloadedSignals.map(s => s.formatted).join("\n")}`
+    : "Use web search aggressively to find real UK market statistics for this company's sector.";
+
+  return `You are AtlasRevenue Agent, a senior UK market intelligence analyst.
+
+This is a MARKET DEMAND INTELLIGENCE scan — NOT a contract/tender scan. The company wants to understand who wants what they sell, where demand is growing, and how to reach buyers. Do NOT include public sector procurement sections, tender notices, contract references, or framework recommendations.
+
+Company:
+${JSON.stringify(input, null, 2)}
+
+PARTNER VOICE: Write as a senior commercial partner addressing the MD directly. Confident where the data supports it. Honest where it does not. No passive voice. No meta-commentary about the report.
+
+---
+
+Return a clean Markdown report with exactly these sections:
+
+## 1. Market Verdict
+One direct paragraph: What is the actual market opportunity for this company right now? State the size of the total addressable market, the growth rate, and the single most important commercial signal. End with: "The move is [specific action this quarter]."
+
+## 2. Demand Signal Dashboard
+${signalBlock}
+
+Present ALL pre-fetched signals in this EXACT format — no deviations:
+SOURCE  ·  [statistic]  ·  [geography]  ·  [period]  ·  [direct commercial implication]  →
+
+Add more signals via web search to reach 18–22 total. Every signal must have a real number.
+
+## 3. Who Is Buying (Buyer Map)
+Name the actual buyer categories — not "potential customers" but specific named organisations, buyer types, or segments actively spending on this category. For each:
+- **Buyer type**: e.g. Corporate fleet managers, NHS procurement teams
+- **Volume**: How many exist in UK? Spend level?
+- **Access route**: How does this company reach them?
+- **Timing signal**: When do they buy? (contract renewals, seasonal, event-driven?)
+
+## 4. Channel Intelligence
+For each viable sales channel, state:
+- Channel name
+- Why it works for this company specifically (not generically)
+- Entry point (named platform, event, framework, or contact type)
+- Expected conversion timeline
+
+## 5. Competitive Landscape
+Who already owns this space? Name actual brands/companies where possible. What gap exists for this company to enter through?
+
+## 6. Seasonal & Event Calendar
+A 12-month demand calendar. When does spend peak? What triggers purchase? (New reg plates, quarter-end fleet reviews, budget cycles, gifting seasons, trade shows)
+
+## 7. Revenue Activation Plan — 90 Days
+### 7.1 Week-by-Week Actions (Days 1–90)
+**Week 1 (Days 1–7):**
+- Day 1: [specific action]
+- Day 2–3: [specific action]
+- Day 4–5: [specific action]
+- Day 6–7: [specific action]
+
+**Week 2 (Days 8–14):** [daily breakdown]
+**Week 3 (Days 15–21):** [daily breakdown]
+**Week 4 (Days 22–30):** [daily breakdown]
+**Month 2 (Days 31–60):** [weekly milestones]
+**Month 3 (Days 61–90):** [weekly milestones]
+
+### 7.2 Outreach Templates
+Provide 3 copy-ready outreach messages with subject lines — one email to a fleet manager, one LinkedIn DM to a procurement head, one B2B cold email to a dealership or distributor.
+
+### 7.3 90-Day Revenue Pipeline Forecast
+| Channel | Target accounts | Est. conversion | Pipeline value | Close date |
+|---|---|---|---|---|
+
+### 7.4 Key Metrics to Track
+What 5 numbers should this company watch weekly to know if the strategy is working?
+
+## 8. Intelligence Sources & Confidence
+List the sources used in the demand signals, with confidence level (High/Medium) for each statistic.
+
+Return clean Markdown only. No preamble, no sign-off.`;
+}
+
 function buildPrompt(input: z.infer<typeof intakeSchema>, data: ProcurementData, preloadedSignals: import("./signals/external-signals.js").PreloadedSignal[] = []) {
+  if ((input.scanMode ?? "both") === "intelligence") {
+    return buildIntelligencePrompt(input, preloadedSignals);
+  }
+
   return `
 You are AtlasRevenue Agent, a sharp UK public-sector revenue intelligence analyst.
 
@@ -4169,8 +4290,25 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
   const fetchTimeout = setTimeout(() => fetchController.abort(), SCAN_FETCH_TIMEOUT_MS);
 
   try {
-    const data = await pullProcurementData(input, fetchController.signal);
-    clearTimeout(fetchTimeout);
+    const scanMode = input.scanMode ?? "both";
+    const isIntelligenceOnly = scanMode === "intelligence";
+
+    // Intelligence-only mode skips procurement pull entirely — no contract notices fetched.
+    // A minimal empty ProcurementData structure is used so the rest of the pipeline works.
+    let data: ProcurementData;
+    if (isIntelligenceOnly) {
+      clearTimeout(fetchTimeout);
+      data = {
+        contractsFinder: { open: [], awarded: [], total: 0, keywords: [] },
+        findTender: { notices: [], total: 0 },
+        regions: input.areasServed || input.location || "UK",
+        quality: { level: "low", reasons: [] },
+        summary: { totalOpen: 0, totalAwarded: 0, totalValue: 0, topBuyers: [], topCategories: [] },
+      } as unknown as ProcurementData;
+    } else {
+      data = await pullProcurementData(input, fetchController.signal);
+      clearTimeout(fetchTimeout);
+    }
     await emitScanStage(id, "scoring");
 
     // Pre-fetch market signals before report generation so the main LLM call
@@ -12332,7 +12470,17 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
     <!-- ─── STEP 1: Core profile (5 fields) ─── -->
     <div class="form-step visible" id="step1">
       <div class="form-grid">
-        <div class="step-intro">Five fields. That is all we need to search the public record and return a verdict. Fill these and you can submit immediately, or continue to step 2 for a sharper report.</div>
+        <div class="step-intro">Five fields. That is all we need to return a verdict. Fill these and submit immediately, or continue to step 2 for a sharper report.</div>
+
+        <div class="field" style="background:rgba(180,146,78,.06);margin:0 -32px;padding:18px 32px;border-bottom:2px solid var(--brand)">
+          <label for="scanMode" style="color:var(--brand)">What do you want from this scan? <span>*</span></label>
+          <select id="scanMode" name="scanMode" style="font-size:15px;font-family:var(--sans)">
+            <option value="both">Find contracts + understand market demand</option>
+            <option value="contracts">Find public sector contracts only</option>
+            <option value="intelligence">Understand market demand for my products/services (no contracts)</option>
+          </select>
+          <div class="hint">Choosing <b>market demand only</b> skips procurement data and focuses the report on who wants what you sell, where demand is growing, and how to reach buyers — without contract notices.</div>
+        </div>
 
         <div class="field" data-required>
           <label for="companyName">Company name <span>*</span></label>
@@ -12340,10 +12488,10 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
           <div class="err-msg">Company name is required</div>
         </div>
         <div class="field" data-required>
-          <label for="mainServices">Main services <span>*</span></label>
+          <label for="mainServices">Main services / products <span>*</span></label>
           <textarea id="mainServices" name="mainServices" required placeholder="${mainServicesPlaceholder}">${mainServicesValue}</textarea>
-          <div class="hint">Be specific &mdash; these become the search terms we use against the public record.</div>
-          <div class="err-msg">Describe your main services so we can match you to contracts</div>
+          <div class="hint">Be specific — these become the search terms and signal filters.</div>
+          <div class="err-msg">Describe your main services so we can match you to signals</div>
         </div>
         <div class="field">
           <label for="location">Location / base</label>
