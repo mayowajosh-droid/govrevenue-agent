@@ -14455,20 +14455,34 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     </div>`
     : "";
 
+  // Top 2 market signals to embed in the live panel
+  const panelSignals = mktSignals.slice(0, 2);
+  const panelSignalHtml = panelSignals.length
+    ? `<div style="margin-bottom:18px;display:flex;flex-direction:column;gap:8px">
+        ${panelSignals.map(s => `<div style="border-left:2px solid var(--brand);padding:8px 12px;background:rgba(180,146,78,.06)">
+          <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);margin-bottom:3px">${escapeHtml(s.source)} &nbsp;·&nbsp; ${escapeHtml(s.period)}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.4;font-weight:500">${escapeHtml(s.stat)}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4">${escapeHtml(s.implication)}</div>
+        </div>`).join("")}
+      </div>`
+    : "";
+
   const liveHtml = `<div class="dp-head-row" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px">
       <span class="live-dot"></span>
-      <span class="dp-eyebrow">LIVE OPPORTUNITIES IN THIS DESK</span>
+      <span class="dp-eyebrow">LIVE MARKET DEMAND</span>
     </div>
-    <a href="/desk/${profile.slug}/notices" class="dp-link-sm">Opportunity board &rarr;</a>
+    <a href="/desk/${profile.slug}/notices" class="dp-link-sm">Procurement board &rarr;</a>
   </div>
+  ${panelSignalHtml}
   ${!profile.live || isCompiling
-    ? `<p class="dp-caveat-sm">Opportunity feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
+    ? `<p class="dp-caveat-sm">Procurement feed compiles on first request.<br>Refresh after ~90 seconds.</p>`
     : deskScoredOpen.length
-      ? urgencyStripHtml + regularCards.slice(0, 3).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("") + `<a href="/desk/${profile.slug}/notices" class="dp-link-sm" style="display:inline-block;margin-top:14px">See all opportunities &rarr;</a>`
+      ? `<div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">GOVERNMENT TENDERS</div>`
+        + urgencyStripHtml + regularCards.slice(0, 3).map(n => renderOpportunityCard(n, { deskSlug: profile.slug })).join("") + `<a href="/desk/${profile.slug}/notices" class="dp-link-sm" style="display:inline-block;margin-top:14px">See all tenders &rarr;</a>`
       : `<p class="dp-caveat-sm">No open notices at last refresh.</p><a href="/desk/${profile.slug}/notices" class="dp-map-link" style="font-weight:700">Check the full board &rarr;</a>`
   }
-  <p class="ls-foot">Sourced from Contracts Finder and Find a Tender &nbsp;&middot;&nbsp; Public record only</p>`;
+  <p class="ls-foot">Market signals: DVLA, Land Registry, ONS &nbsp;&middot;&nbsp; Tenders: Contracts Finder &amp; Find a Tender</p>`;
 
   // Buyer watchlist panel
   const watchlistHtml = `<div class="dp-head-row" style="margin-bottom:16px">
