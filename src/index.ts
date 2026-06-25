@@ -7153,8 +7153,13 @@ function reportPage(scan: ScanRecord) {
   const regions = data?.regions || "Pending";
   const scores = calcPremiumScores(scan);
 
-  const parsedEdp = scan.report_markdown
-    ? parseEdpFromMarkdown(scan.report_markdown)
+  // Safety net: strip any LLM web-search narration that leaked into stored markdown
+  // (e.g. produced by an older worker before the scan-time strip shipped). This makes
+  // the rendered report clean regardless of which code version generated it.
+  const cleanMarkdown = scan.report_markdown ? stripLlmNarration(scan.report_markdown) : null;
+
+  const parsedEdp = cleanMarkdown
+    ? parseEdpFromMarkdown(cleanMarkdown)
     : null;
 
   const edpVerdict = parsedEdp?.verdict || "";
@@ -7165,8 +7170,8 @@ function reportPage(scan: ScanRecord) {
   const edpFastestAction = parsedEdp?.fastestActionThisWeek || "";
   const edpMainBlocker = parsedEdp?.mainBlocker || "";
 
-  const bodyMarkdown = scan.report_markdown
-    ? stripEdpFromMarkdown(stripReportTitleFromMarkdown(scan.report_markdown))
+  const bodyMarkdown = cleanMarkdown
+    ? stripEdpFromMarkdown(stripReportTitleFromMarkdown(cleanMarkdown))
     : null;
 
   const content = bodyMarkdown
