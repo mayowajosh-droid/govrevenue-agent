@@ -227,14 +227,20 @@ app.use(cookieParser());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
-// Page-view tracker — fire-and-forget, never blocks a request
+// Bot UA patterns — crawlers, monitors, scrapers, headless browsers
+const BOT_UA_RE = /bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|moz|majestic|screaming|dataforseo|pingdom|uptimerobot|statuspage|newrelic|datadog|nagios|zabbix|curl|wget|python|java\/|ruby|go-http|axios|node-fetch|node\/|libwww|okhttp|httpclient|headless|phantomjs|selenium|puppeteer|playwright|lighthouse|pagespeed|vercel|cloudflare|prerender|facebookexternalhit|twitterbot|linkedinbot|slackbot|whatsapp|telegram|discord|applebot|bingpreview|gptbot|anthropic|claudebot|openai|chatgpt|bytespider|petalbot|pinterestbot|snapchat/i;
+
+// Page-view tracker — human traffic only, fire-and-forget, never blocks a request
 app.use((req, _res, next) => {
   if (pool && req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/admin") && !req.path.startsWith("/billing") && req.path !== "/health" && !req.path.includes(".")) {
-    const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 64);
-    pool.query(
-      `INSERT INTO visitor_logs (ip, path, user_agent, referer) VALUES ($1,$2,$3,$4)`,
-      [ip, req.path.slice(0, 200), String(req.headers["user-agent"] || "").slice(0, 300), String(req.headers.referer || req.headers.referrer || "").slice(0, 300)]
-    ).catch(() => {});
+    const ua = String(req.headers["user-agent"] || "");
+    if (ua && !BOT_UA_RE.test(ua)) {
+      const ip = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 64);
+      pool.query(
+        `INSERT INTO visitor_logs (ip, path, user_agent, referer) VALUES ($1,$2,$3,$4)`,
+        [ip, req.path.slice(0, 200), ua.slice(0, 300), String(req.headers.referer || req.headers.referrer || "").slice(0, 300)]
+      ).catch(() => {});
+    }
   }
   next();
 });
@@ -17414,14 +17420,20 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM alert_subscriptions ORDER BY created_at DESC LIMIT 200`),
     safePool(`SELECT * FROM briefing_subscribers ORDER BY created_at DESC`),
     safePool(`SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health' GROUP BY day ORDER BY day DESC`),
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health'
+    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+    GROUP BY day ORDER BY day DESC`),
     safePool(`SELECT path, COUNT(*)::int AS visits FROM visitor_logs
-    WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health' GROUP BY path ORDER BY visits DESC LIMIT 15`),
+    WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health'
+    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+    GROUP BY path ORDER BY visits DESC LIMIT 15`),
     safePool(`SELECT ip, COUNT(*)::int AS visits, MAX(visited_at) AS last_seen
     FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != '' AND path != '/health'
+    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
     GROUP BY ip ORDER BY visits DESC LIMIT 30`),
     safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'`),
+    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'
+    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'`),
     safePool(`SELECT COALESCE(SUM(amount),0)::int AS total_pence,COUNT(*)::int AS order_count,
       COALESCE(SUM(amount) FILTER(WHERE plan='payg'),0)::int AS payg_pence,
       COALESCE(SUM(amount) FILTER(WHERE plan='pro'),0)::int AS pro_pence,
@@ -17463,7 +17475,9 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     safePool(`SELECT event, meta_json, created_at, ip, user_agent
     FROM visitor_events ORDER BY created_at DESC LIMIT 100`),
     safePool(`SELECT ip, path, user_agent, visited_at
-    FROM visitor_logs WHERE path != '/health' ORDER BY visited_at DESC LIMIT 100`),
+    FROM visitor_logs WHERE path != '/health'
+    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+    ORDER BY visited_at DESC LIMIT 100`),
     safePool(`SELECT cl.comment_id, cl.ip, cl.created_at, c.author_name, c.body
     FROM comment_likes cl LEFT JOIN comments c ON c.id=cl.comment_id ORDER BY cl.created_at DESC LIMIT 100`),
     safePool(`SELECT id, category, title, buyer, source, status, value_amount, notice_date, deadline_date
@@ -18244,7 +18258,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       <div class="s-eyebrow">Analytics</div>
       <div class="s-title">Visitor Intelligence</div>
     </div>
-    <div class="s-sub">HTML page views only &middot; x-forwarded-for IPs &middot; API/admin excluded</div>
+    <div class="s-sub">Human traffic only &middot; bots/crawlers excluded &middot; API/admin excluded</div>
   </div>
   <div class="stat-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
     <div class="stat-cell"><div class="stat-val" style="color:var(--blue)">${Number(vToday.total || 0).toLocaleString()}</div><div class="stat-lbl">Views today</div></div>
