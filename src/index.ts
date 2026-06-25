@@ -80,8 +80,8 @@ import {
   exportOpportunitiesCsv, exportSuppliersCsv, exportBuyersCsv,
   exportSignalsCsv, exportIngestCsv, exportCatalogCsv, exportPlanningCsv,
 } from "./integrations/csv-export.js";
-import { generateMarketSignals, getSignalsForSector } from "./signals/market-intel.js";
-import type { MarketSignalSector } from "./signals/market-intel.js";
+import { generateMarketSignals, getSignalsForSector, getRegionalIntelligence } from "./signals/market-intel.js";
+import type { MarketSignalSector, RegionIntel } from "./signals/market-intel.js";
 
 type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
@@ -17382,6 +17382,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     govSummaryRes, govCatalogRes, govQualityRes, govRetentionRes,
     webhookListRes,
     mktIntelRes,
+    regionIntelRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -17567,6 +17568,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     pool ? listWebhooks(pool).then(w => ({ rows: w })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     // Market Intelligence
     pool ? generateMarketSignals(pool, { limit: 50 }).catch(() => ({ generatedAt: "", signals: [], sourcesCovered: [], totalSignals: 0 })) : Promise.resolve({ generatedAt: "", signals: [], sourcesCovered: [], totalSignals: 0 }),
+    // Regional Intelligence
+    pool ? getRegionalIntelligence(pool).catch(() => [] as RegionIntel[]) : Promise.resolve([] as RegionIntel[]),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -17645,6 +17648,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const failSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "fail").length;
   const neverFetchedCount = DATA_SOURCES.length - govCatalog.length;
   const mktIntel = mktIntelRes as { generatedAt: string; signals: any[]; sourcesCovered: string[]; totalSignals: number };
+  const regionIntel = regionIntelRes as RegionIntel[];
 
   const gradeCount: Record<string, number> = {};
   gradeDistDb.forEach((r: any) => {
@@ -18109,7 +18113,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <div class="sb-group">Data Platform</div>
     <a href="#market-intel" class="sb-link">Market Signals <span class="sb-count" style="color:var(--green)">${mktIntel.totalSignals}</span></a>
     <a href="#ingest" class="sb-link">Ingest Pipeline <span class="sb-count">${Number(ingestTotals.total||0).toLocaleString()}</span></a>
-    <a href="#geospatial" class="sb-link">Geospatial <span class="sb-count">${(geoLocationCount+geoPlanningCount).toLocaleString()}</span></a>
+    <a href="#geospatial" class="sb-link">Atlas Intelligence <span class="sb-count" style="color:var(--brand)">${regionIntel.length}</span></a>
     <a href="#relationships" class="sb-link">Relationships <span class="sb-count">${(aliasCount+ownershipCount+directorCount).toLocaleString()}</span></a>
     <a href="#source-registry" class="sb-link">${DATA_SOURCES.length} Sources <span class="sb-count" style="color:${failSourcesCount>0?"var(--red)":warnSourcesCount>5?"var(--amber)":"var(--green)"}">${liveSourcesCount}✓ ${failSourcesCount>0?failSourcesCount+"✗":""}</span></a>
     <a href="#governance" class="sb-link">Governance <span class="sb-count" style="color:${(govSummary.criticalRulesFailing||0)>0?'var(--red)':'var(--green)'}">${(govSummary.qualityPassRate||0)}%</span></a>
@@ -19025,25 +19029,70 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
   <div class="s-head">
     <div>
       <div class="s-eyebrow">Data Platform</div>
-      <div class="s-title">Geospatial Layer</div>
-      <div class="s-sub">${geoLocationCount.toLocaleString()} entity locations · ${geoPlanningCount.toLocaleString()} planning applications indexed</div>
+      <div class="s-title">Atlas Intelligence — UK Regional Map</div>
+      <div class="s-sub">${regionIntel.length} regions indexed · DVLA · Land Registry · Companies House · live market signals overlay</div>
     </div>
-    <a href="/api/geo/stats" target="_blank" class="a-btn">Stats JSON</a>
+    <a href="/api/signals/market?sector=property" target="_blank" class="a-btn">Property JSON</a>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-    <div class="metric-card"><div class="mc-val">${geoLocationCount.toLocaleString()}</div><div class="mc-lbl">Spatial Locations</div></div>
-    <div class="metric-card"><div class="mc-val" style="color:var(--brand)">${geoPlanningCount.toLocaleString()}</div><div class="mc-lbl">Planning Applications</div></div>
-    <div class="metric-card"><div class="mc-val">${geoPlanningByDistrict.length}</div><div class="mc-lbl">Districts with Data</div></div>
+
+  ${regionIntel.length === 0 ? `
+  <div style="padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No regional data yet — run a full ingest to populate market intelligence</div>` : `
+
+  <div style="margin-bottom:14px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+    Activity score = composite of property completions + vehicle registrations + new business incorporations · sorted highest first
   </div>
-  ${geoPlanningByDistrict.length > 0 ? `
-  <div class="card-head" style="margin-bottom:10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Top districts by planning applications</div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px">
-    ${geoPlanningByDistrict.map((d: any) => `<span style="background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-family:var(--mono);font-size:10px">${escapeHtml(d.local_authority)} <strong style="color:var(--brand)">${d.count}</strong></span>`).join("")}
-  </div>` : `<div style="padding:24px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)">No geospatial data yet — populates from Planning Data and location enrichment</div>`}
-  <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px">
-    <a href="/api/geo/nearby?lat=51.5&lon=-0.1&radius=5" target="_blank" class="a-btn">Test Nearby (London)</a>
-    <a href="/api/geo/planning/London" target="_blank" class="a-btn">Test Planning (London)</a>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px">
+    ${regionIntel.map((r: RegionIntel) => {
+      const score = r.activityScore;
+      const scoreColor = score >= 60 ? "var(--green)" : score >= 30 ? "var(--amber)" : "var(--muted)";
+      const barWidth = Math.min(score, 100);
+      return `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700;font-size:13px">${escapeHtml(r.region)}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:${scoreColor};font-weight:700">Score ${score}</div>
+        </div>
+        <div style="height:3px;background:var(--surface-3);border-radius:2px;margin-bottom:10px">
+          <div style="height:3px;width:${barWidth}%;background:${scoreColor};border-radius:2px;transition:width .4s"></div>
+        </div>
+        ${r.dvla ? `<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted);min-width:60px;padding-top:1px">DVLA</span>
+          <div style="font-size:11px">
+            <span style="font-weight:600">${(r.dvla.totalCars/1_000_000).toFixed(2)}m</span> vehicles
+            <span style="color:var(--muted);margin-left:4px">${r.dvla.fleetPct}% fleet · ${r.dvla.quarter}</span>
+          </div>
+        </div>` : ""}
+        ${r.landReg ? `<div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted);min-width:60px;padding-top:1px">LAND REG</span>
+          <div style="font-size:11px">
+            <span style="font-weight:600">${r.landReg.completions.toLocaleString()}</span> completions
+            · <span style="color:var(--brand)">avg £${Math.round(r.landReg.avgPrice/1000)}k</span>
+            ${r.landReg.newBuilds > 0 ? `· <span style="color:var(--green)">${r.landReg.newBuilds} new builds</span>` : ""}
+            <span style="color:var(--muted);margin-left:4px">${r.landReg.period}</span>
+          </div>
+        </div>` : ""}
+        ${r.newBusinesses ? `<div style="display:flex;gap:6px;align-items:flex-start">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted);min-width:60px;padding-top:1px">CO. HOUSE</span>
+          <div style="font-size:11px">
+            <span style="font-weight:600">${r.newBusinesses.count.toLocaleString()}</span> new incorporations
+            <span style="color:var(--muted);margin-left:4px">${r.newBusinesses.period}</span>
+          </div>
+        </div>` : ""}
+        ${r.topSectors.length > 0 ? `<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+          ${r.topSectors.map(s => `<span style="font-family:var(--mono);font-size:9px;background:var(--surface-3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--muted)">${s}</span>`).join("")}
+        </div>` : ""}
+      </div>`;
+    }).join("")}
   </div>
+
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Spatial layer (entity locations + planning applications)</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div class="metric-card" style="min-width:120px"><div class="mc-val">${geoLocationCount.toLocaleString()}</div><div class="mc-lbl">Entity Locations</div></div>
+      <div class="metric-card" style="min-width:120px"><div class="mc-val" style="color:var(--brand)">${geoPlanningCount.toLocaleString()}</div><div class="mc-lbl">Planning Apps</div></div>
+      <div class="metric-card" style="min-width:120px"><div class="mc-val">${geoPlanningByDistrict.length}</div><div class="mc-lbl">Districts</div></div>
+    </div>
+  </div>`}
 </section>
 <div class="gap"></div>
 

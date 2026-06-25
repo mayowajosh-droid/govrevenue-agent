@@ -533,3 +533,115 @@ export async function getSignalsForSector(
 export function formatSignalLine(s: MarketSignal): string {
   return s.formatted;
 }
+
+// ── Regional Intelligence ──────────────────────────────────────────────────────
+
+export type RegionIntel = {
+  region: string;
+  dvla?: { totalCars: number; companyCars: number; fleetPct: number; quarter: string };
+  landReg?: { completions: number; avgPrice: number; newBuilds: number; period: string };
+  newBusinesses?: { count: number; period: string };
+  topSectors: string[];
+  activityScore: number; // 0–100 composite
+};
+
+const COUNTY_TO_REGION: Record<string, string> = {
+  "GREATER LONDON": "London",
+  "GREATER MANCHESTER": "North West", "LANCASHIRE": "North West", "MERSEYSIDE": "North West", "CHESHIRE": "North West", "CUMBRIA": "North West",
+  "WEST YORKSHIRE": "Yorkshire", "SOUTH YORKSHIRE": "Yorkshire", "NORTH YORKSHIRE": "Yorkshire", "EAST RIDING OF YORKSHIRE": "Yorkshire",
+  "WEST MIDLANDS": "West Midlands", "STAFFORDSHIRE": "West Midlands", "WARWICKSHIRE": "West Midlands", "WORCESTERSHIRE": "West Midlands", "SHROPSHIRE": "West Midlands", "HEREFORDSHIRE": "West Midlands",
+  "DERBYSHIRE": "East Midlands", "NOTTINGHAMSHIRE": "East Midlands", "LEICESTERSHIRE": "East Midlands", "NORTHAMPTONSHIRE": "East Midlands", "LINCOLNSHIRE": "East Midlands", "RUTLAND": "East Midlands",
+  "ESSEX": "East of England", "HERTFORDSHIRE": "East of England", "NORFOLK": "East of England", "SUFFOLK": "East of England", "CAMBRIDGESHIRE": "East of England", "BEDFORDSHIRE": "East of England",
+  "KENT": "South East", "SURREY": "South East", "HAMPSHIRE": "South East", "WEST SUSSEX": "South East", "EAST SUSSEX": "South East", "OXFORDSHIRE": "South East", "BERKSHIRE": "South East", "BUCKINGHAMSHIRE": "South East", "ISLE OF WIGHT": "South East",
+  "DEVON": "South West", "CORNWALL": "South West", "SOMERSET": "South West", "WILTSHIRE": "South West", "GLOUCESTERSHIRE": "South West", "DORSET": "South West", "BRISTOL": "South West",
+  "TYNE AND WEAR": "North East", "COUNTY DURHAM": "North East", "NORTHUMBERLAND": "North East", "CLEVELAND": "North East",
+  "SOUTH GLAMORGAN": "Wales", "WEST GLAMORGAN": "Wales", "MID GLAMORGAN": "Wales", "GWENT": "Wales", "CLWYD": "Wales", "POWYS": "Wales", "DYFED": "Wales", "GWYNEDD": "Wales",
+  "STRATHCLYDE": "Scotland", "LOTHIAN": "Scotland", "TAYSIDE": "Scotland", "GRAMPIAN": "Scotland", "HIGHLAND": "Scotland", "FIFE": "Scotland", "CENTRAL": "Scotland", "BORDERS": "Scotland",
+};
+
+// DVLA regional names → canonical region
+const DVLA_TO_REGION: Record<string, string> = {
+  "London": "London", "South East": "South East", "East": "East of England",
+  "East Midlands": "East Midlands", "West Midlands": "West Midlands",
+  "Yorkshire and The Humber": "Yorkshire", "North West": "North West",
+  "North East": "North East", "South West": "South West",
+  "Wales": "Wales", "Scotland": "Scotland", "Northern Ireland": "Northern Ireland",
+};
+
+export async function getRegionalIntelligence(pool: Pool): Promise<RegionIntel[]> {
+  type DvlaRegion = { region: string; totalCars: number; companyCars: number; quarter: string };
+  type LandReg = { fetchedAt: string; periodCovered: string[]; byCounty: { county: string; transactionCount: number; avgPrice: number; newBuildCount: number }[] };
+  type ChSnapshot = { fetchedAt: string; totalFound: number; periodFrom: string; periodTo: string; topCounties: { county: string; count: number }[] };
+
+  const [dvlaRows, landRegData, chData] = await Promise.all([
+    getLatestPayloads<DvlaRegion>(pool, "dvla_ods_regional", 12),
+    getLatestPayload<LandReg>(pool, "land_registry_transactions"),
+    getLatestPayload<ChSnapshot>(pool, "ch_new_businesses"),
+  ]);
+
+  const regionMap: Record<string, Partial<RegionIntel>> = {};
+
+  const ensure = (r: string) => {
+    if (!regionMap[r]) regionMap[r] = { region: r, topSectors: [] };
+    return regionMap[r];
+  };
+
+  // DVLA regional data
+  for (const row of dvlaRows) {
+    const p = row.payload;
+    const region = DVLA_TO_REGION[p.region] ?? p.region;
+    if (!region) continue;
+    const fleetPct = p.totalCars ? Math.round((p.companyCars / p.totalCars) * 100) : 0;
+    ensure(region).dvla = { totalCars: p.totalCars, companyCars: p.companyCars, fleetPct, quarter: p.quarter };
+    if (fleetPct > 20) ensure(region).topSectors?.push("fleet");
+  }
+
+  // Land Registry county → region aggregation
+  if (landRegData?.byCounty) {
+    const periods = landRegData.periodCovered ?? [];
+    const period = periods.length >= 2
+      ? `${new Date(periods[0] + "-01").toLocaleDateString("en-GB", { month: "short", year: "numeric" })}–${new Date(periods[periods.length - 1] + "-01").toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`
+      : periods[0] ?? "recent";
+
+    const regionAgg: Record<string, { completions: number; totalPrice: number; newBuilds: number; countyCount: number }> = {};
+
+    for (const county of landRegData.byCounty) {
+      const region = COUNTY_TO_REGION[county.county.toUpperCase()] ?? county.county;
+      if (!regionAgg[region]) regionAgg[region] = { completions: 0, totalPrice: 0, newBuilds: 0, countyCount: 0 };
+      regionAgg[region].completions += county.transactionCount;
+      regionAgg[region].totalPrice += county.avgPrice * county.transactionCount;
+      regionAgg[region].newBuilds += county.newBuildCount ?? 0;
+      regionAgg[region].countyCount++;
+    }
+
+    for (const [region, agg] of Object.entries(regionAgg)) {
+      const avgPrice = agg.completions ? Math.round(agg.totalPrice / agg.completions) : 0;
+      ensure(region).landReg = { completions: agg.completions, avgPrice, newBuilds: agg.newBuilds, period };
+      if (agg.completions > 500) ensure(region).topSectors?.push("property");
+    }
+  }
+
+  // Companies House county breakdown
+  if (chData?.topCounties) {
+    const from = chData.periodFrom ? new Date(chData.periodFrom).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "";
+    const to = chData.periodTo ? new Date(chData.periodTo).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "";
+    const period = from && to ? `${from}–${to}` : "last 30 days";
+    for (const c of chData.topCounties) {
+      const region = DVLA_TO_REGION[c.county] ?? COUNTY_TO_REGION[c.county.toUpperCase()] ?? c.county;
+      ensure(region).newBusinesses = { count: c.count, period };
+      if (c.count > 5) ensure(region).topSectors?.push("startups");
+    }
+  }
+
+  // Compute composite activity score and deduplicate sectors
+  const regions = Object.values(regionMap).map(r => {
+    const landScore = Math.min((r.landReg?.completions ?? 0) / 50, 40);
+    const dvlaScore = Math.min((r.dvla?.totalCars ?? 0) / 200_000, 30);
+    const bizScore = Math.min((r.newBusinesses?.count ?? 0) * 2, 20);
+    const nbScore = Math.min((r.landReg?.newBuilds ?? 0) * 2, 10);
+    const topSectors = [...new Set(r.topSectors ?? [])];
+    return { ...r, region: r.region ?? "Unknown", topSectors, activityScore: Math.round(landScore + dvlaScore + bizScore + nbScore) } as RegionIntel;
+  });
+
+  return regions.sort((a, b) => b.activityScore - a.activityScore);
+}
