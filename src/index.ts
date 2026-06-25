@@ -3842,37 +3842,50 @@ Write as if briefing the client on their market position, not summarising a tool
 Use compact value notation (£k / £m / £bn). No sentence may start with "The data shows..." or "This section..." — start every sentence with a commercial insight.
 
 ## 3a. Market Intelligence & Demand Signals
-This section is required and must contain a minimum of 14 specific data signals.
+This section is required and must contain a minimum of 16 specific data signals.
 
-You have access to web search. Use it to find current UK statistics from authoritative sources for the company's specific sector before writing this section. Pull real numbers.
+You have access to web search. Search aggressively — run multiple searches to find granular, category-specific UK statistics. Do not rely on totals when breakdowns exist. Search for:
+- Model/brand-level breakdowns (not just total registrations — find specific marques if automotive)
+- Consumer demographic spending splits (e.g. age 35–54 luxury spend)
+- Category-specific CAGR from Mintel, Euromonitor, or IBISWorld
+- Amazon UK search volume trends for this product category
+- Google Trends UK for specific product/service terms
+- Gifting and seasonal behaviour data where relevant
+- ONS demographic and spending cohort data
 
-For each signal, use this exact format:
-**[SOURCE]** · [specific statistic with number] · [geography] · [date/period] · [direct commercial implication for this company]
+Use this EXACT format for every signal — no deviations:
+SOURCE  ·  [specific statistic with number]  ·  [geography]  ·  [date/period]  ·  [direct commercial implication — one sharp sentence ending with →]
 
-Sources to draw from (use what is relevant to this company's sector):
-- DVLA / SMMT — vehicle registrations, fleet data, EV transition data
-- ONS — consumer spending, employment data, regional economic output, sector output indices
-- Land Registry / HM Land Registry — property transactions, completions, new builds
-- Companies House — incorporations, dissolved companies, sector formation trends
-- HMRC — VAT registrations, payroll data, sector tax receipts
-- Construction Output (DLUHC / ONS) — new orders, output by sector, pipeline
-- NHS Digital / NHS England — procurement spend, digital transformation budgets
-- Crown Commercial Service — framework spend data, procurement volumes
-- Trade associations relevant to this sector (e.g. FMB, BUILD UK, CIPS, BIFA, CIPD, techUK, FSB, REC)
-- Market research: Mintel, Euromonitor, IBISWorld, GlobalData — size, CAGR, demand trends
-- Platform data: Amazon UK category trends, Google Trends UK, LinkedIn job posting volumes
-- Public sector spend data: Contracts Finder total value, Find a Tender volumes, G-Cloud spend
+Example of correct format:
+DVLA  ·  Porsche: 16,800 new registrations  ·  UK-wide  ·  2024  ·  +8% YoY — core luxury buyer, new keys in new hands →
+EUROMONITOR  ·  car fragrance & ambient category  ·  +19% CAGR  ·  Europe  ·  2022–2026  ·  fastest-growing in-car accessory segment — category tailwind →
+AMAZON UK  ·  "luxury car air freshener" search volume  ·  +43% YoY  ·  UK  ·  Apr–Jun 2026  ·  demand is real and growing →
+
+Sources to search (pick what is sector-relevant, ignore what is not):
+- DVLA / SMMT — vehicle registrations by brand/model, fleet data, EV transition data, motorparc
+- ONS — consumer spending by category and age cohort, household expenditure, sector output
+- Land Registry — completions by region, average prices, new build volumes
+- Companies House — incorporation rates, sector formation trends
+- HMRC — VAT registrations, payroll, sector tax receipts
+- Mintel / Euromonitor / IBISWorld / GlobalData — market size, CAGR, consumer behaviour reports
+- AMAZON UK — category search trends, bestseller movement, review velocity
+- GOOGLE TRENDS UK — search interest over time, seasonal peaks, related queries
+- SMMT — new car registrations by segment and fuel type
+- Trade associations relevant to this company's sector
+- CCS / Contracts Finder — total framework spend in this category, if relevant
+- LinkedIn — job posting volumes as proxy for sector hiring/expansion
 
 Structure:
-1. Open with a short paragraph (3-4 sentences) framing the macro market backdrop for this company's sector.
-2. List 14-18 demand signals in the SOURCE format above — mix of macro indicators, sector-specific stats, and buyer behaviour signals.
-3. Close with a SHORT "What this means for [Company]" paragraph: pull the 2-3 most commercially actionable signals and state exactly what the company should do with them this quarter.
+1. Open with 3-4 sentences framing the macro market backdrop specific to this company's category and buyer type.
+2. List 16–20 demand signals in the exact SOURCE format above. Go deep — specific models, specific demographics, specific search terms, specific CAGR figures. Mix of: macro demand indicators, category-specific stats, buyer behaviour, seasonal signals, and geographic concentration.
+3. Close with "What this means for [Company Name]" — 2-3 sentences, name the 2-3 most actionable signals and say exactly what the company should do this quarter.
 
 Rules:
-- Every signal must have a specific number (not "market is growing" — give the growth %).
-- Signals must be relevant to this specific company's sector and geography.
-- Use web search to find 2026 or 2025 data where available. If only older data exists, state the year.
-- Do not use generic signals that could apply to any company.
+- Every signal must contain a real number. Never write "the market is growing" — write "+19% CAGR 2022–2026".
+- Go model/brand/category level — not just industry totals.
+- Use web search to find 2025 or 2026 data. State the year clearly.
+- No signal should be generic enough to apply to a different company in a different sector.
+- Minimum 4 signals must come from consumer/demand-side sources (Mintel, Euromonitor, Amazon UK, Google Trends, ONS spending cohorts).
 
 ## 4. Source-Backed Evidence
 Only use pulled source records or clearly labelled client-provided evidence.
