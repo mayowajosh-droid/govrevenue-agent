@@ -47,6 +47,44 @@ import { fetchNiProcurementNotices } from "../../fetchers/esourcing-ni.js";
 import { fetchCqcProviders } from "../../fetchers/cqc.js";
 import { fetchOfstedInspectionDatasets } from "../../fetchers/ofsted.js";
 
+// ── Consumer Demand ───────────────────────────────────────────────────────────
+import { fetchTopUKPageviews } from "../../fetchers/wikipedia-pageviews.js";
+import { fetchUkDemandSignals } from "../../fetchers/reddit-signals.js";
+import { fetchUkEvents } from "../../fetchers/eventbrite.js";
+import { fetchTrendingVideos } from "../../fetchers/youtube-data.js";
+import { fetchSpotifyCategories } from "../../fetchers/spotify-api.js";
+
+// ── Market Intelligence ───────────────────────────────────────────────────────
+import { fetchUkriProjects, fetchInnovateUkProjects } from "../../fetchers/ukri-grants.js";
+import { fetchTopTradeFlows } from "../../fetchers/hmrc-trade.js";
+import { fetchIpoDatasets } from "../../fetchers/ipo-trademarks.js";
+import { fetchInsolvencyDatasets } from "../../fetchers/insolvency-register.js";
+
+// ── Regulatory Directories ────────────────────────────────────────────────────
+import { searchFcaFirms } from "../../fetchers/fca-register.js";
+import { fetchSraDatasets } from "../../fetchers/sra-register.js";
+import { fetchDvlaVehicleDatasets } from "../../fetchers/dvla-vehicles.js";
+import { fetchDvsaMotDatasets } from "../../fetchers/dvsa-mot.js";
+import { fetchMhraDatasets } from "../../fetchers/mhra-register.js";
+
+// ── Creative & Cultural ───────────────────────────────────────────────────────
+import { fetchArtsCouncilGrants } from "../../fetchers/arts-council.js";
+import { fetchBfiDatasets } from "../../fetchers/bfi-data.js";
+import { fetchOfcomDatasets } from "../../fetchers/ofcom-data.js";
+
+// ── Devolved Nations ──────────────────────────────────────────────────────────
+import { fetchStatsWalesDatasets } from "../../fetchers/stats-wales.js";
+import { fetchNisraDatasets } from "../../fetchers/nisra.js";
+import { fetchScottishGovDatasets } from "../../fetchers/scottish-gov-stats.js";
+
+// ── Real-Figure Parsers ───────────────────────────────────────────────────────
+import { fetchLandRegistryTransactions } from "../../fetchers/land-registry-transactions.js";
+import { fetchOnsCardSpending } from "../../fetchers/ons-consumer-spending.js";
+import { fetchNewBusinessRegistrations } from "../../fetchers/ch-new-businesses.js";
+import { fetchDvlaVehicleStats } from "../../fetchers/dvla-vehicle-stats.js";
+import { fetchDvlaRegionalStats } from "../../fetchers/dvla-ods-regional.js";
+import { fetchFsaFoodBusinesses } from "../../fetchers/fsa-food-businesses.js";
+
 // ── Early Signals (already integrated) ───────────────────────────────────────
 import { fetchConstructionOutput, fetchBusinessDemography } from "../../intelligence/early-signals/ons-fetcher.js";
 import { fetchPlanningSnapshot } from "../../intelligence/early-signals/planning-data-fetcher.js";
@@ -129,7 +167,7 @@ async function runSource(sourceId: string, fn: () => Promise<unknown[]>): Promis
  * Sources run in parallel within each category batch.
  */
 export async function runFullIngest(): Promise<IngestResult[]> {
-  console.log("[ingest] Starting full 43-source ingest pass");
+  console.log("[ingest] Starting full ingest pass across all sources");
 
   // Run all source batches in parallel within each group
   const [
@@ -142,6 +180,12 @@ export async function runFullIngest(): Promise<IngestResult[]> {
     crimeResults,
     otherResults,
     signalResults,
+    consumerResults,
+    marketResults,
+    regulatoryResults,
+    creativeResults,
+    devolvedResults,
+    realFigureResults,
   ] = await Promise.all([
 
     // PROCUREMENT & CONTRACTS
@@ -215,6 +259,57 @@ export async function runFullIngest(): Promise<IngestResult[]> {
       runSource("govuk_content", () => fetchGovukSnapshot().then(d => d ? [d] : []).catch(() => [])),
       runSource("land_registry", () => fetchRecentTransactions("London").catch(() => [])),
     ]),
+
+    // CONSUMER DEMAND
+    Promise.all([
+      runSource("wikipedia_pageviews", () => fetchTopUKPageviews()),
+      runSource("reddit_signals", () => fetchUkDemandSignals()),
+      runSource("eventbrite", () => fetchUkEvents()),
+      runSource("youtube_data", () => fetchTrendingVideos()),
+      runSource("spotify_api", () => fetchSpotifyCategories()),
+    ]),
+
+    // MARKET INTELLIGENCE
+    Promise.all([
+      runSource("ukri_grants", () => fetchUkriProjects()),
+      runSource("ukri_innovate", () => fetchInnovateUkProjects()),
+      runSource("hmrc_trade", () => fetchTopTradeFlows()),
+      runSource("ipo_trademarks", () => fetchIpoDatasets()),
+      runSource("insolvency_register", () => fetchInsolvencyDatasets()),
+    ]),
+
+    // REGULATORY DIRECTORIES
+    Promise.all([
+      runSource("fca_register", () => searchFcaFirms("financial services")),
+      runSource("sra_register", () => fetchSraDatasets()),
+      runSource("dvla_vehicles", () => fetchDvlaVehicleDatasets()),
+      runSource("dvsa_mot", () => fetchDvsaMotDatasets()),
+      runSource("mhra_register", () => fetchMhraDatasets()),
+    ]),
+
+    // CREATIVE & CULTURAL
+    Promise.all([
+      runSource("arts_council", () => fetchArtsCouncilGrants()),
+      runSource("bfi_data", () => fetchBfiDatasets()),
+      runSource("ofcom_data", () => fetchOfcomDatasets()),
+    ]),
+
+    // DEVOLVED NATIONS
+    Promise.all([
+      runSource("stats_wales", () => fetchStatsWalesDatasets()),
+      runSource("nisra", () => fetchNisraDatasets()),
+      runSource("scottish_gov_stats", () => fetchScottishGovDatasets()),
+    ]),
+
+    // REAL-FIGURE PARSERS
+    Promise.all([
+      runSource("land_registry_transactions", () => fetchLandRegistryTransactions().then(d => [d])),
+      runSource("ons_card_spending", () => fetchOnsCardSpending().then(d => d.categories.length ? [d] : [])),
+      runSource("ch_new_businesses", () => fetchNewBusinessRegistrations().then(d => d.businesses.length ? [d] : [])),
+      runSource("dvla_vehicle_stats", () => fetchDvlaVehicleStats().then(d => d.totalLicensedVehicles ? [d] : [])),
+      runSource("dvla_ods_regional", () => fetchDvlaRegionalStats().then(d => d.byRegion.length ? d.byRegion : [])),
+      runSource("fsa_food_businesses", () => fetchFsaFoodBusinesses().then(d => d.byCityStats.length ? d.byCityStats : [])),
+    ]),
   ]);
 
   const results = [
@@ -227,6 +322,12 @@ export async function runFullIngest(): Promise<IngestResult[]> {
     ...crimeResults,
     ...otherResults,
     ...signalResults,
+    ...consumerResults,
+    ...marketResults,
+    ...regulatoryResults,
+    ...creativeResults,
+    ...devolvedResults,
+    ...realFigureResults,
   ];
 
   const total = results.reduce((s, r) => s + r.recordsIngested, 0);
@@ -274,6 +375,39 @@ export async function runSourceIngest(sourceId: string): Promise<IngestResult> {
     planning_data: () => fetchPlanningSnapshot().then(d => d ? [d] : []).catch(() => []),
     govuk_content: () => fetchGovukSnapshot().then(d => d ? [d] : []).catch(() => []),
     land_registry: () => fetchRecentTransactions("London").catch(() => []),
+    // Consumer demand
+    wikipedia_pageviews: () => fetchTopUKPageviews(),
+    reddit_signals: () => fetchUkDemandSignals(),
+    eventbrite: () => fetchUkEvents(),
+    youtube_data: () => fetchTrendingVideos(),
+    spotify_api: () => fetchSpotifyCategories(),
+    // Market intelligence
+    ukri_grants: () => fetchUkriProjects(),
+    ukri_innovate: () => fetchInnovateUkProjects(),
+    hmrc_trade: () => fetchTopTradeFlows(),
+    ipo_trademarks: () => fetchIpoDatasets(),
+    insolvency_register: () => fetchInsolvencyDatasets(),
+    // Regulatory directories
+    fca_register: () => searchFcaFirms("financial services"),
+    sra_register: () => fetchSraDatasets(),
+    dvla_vehicles: () => fetchDvlaVehicleDatasets(),
+    dvsa_mot: () => fetchDvsaMotDatasets(),
+    mhra_register: () => fetchMhraDatasets(),
+    // Creative & cultural
+    arts_council: () => fetchArtsCouncilGrants(),
+    bfi_data: () => fetchBfiDatasets(),
+    ofcom_data: () => fetchOfcomDatasets(),
+    // Devolved nations
+    stats_wales: () => fetchStatsWalesDatasets(),
+    nisra: () => fetchNisraDatasets(),
+    scottish_gov_stats: () => fetchScottishGovDatasets(),
+    // Real-figure parsers
+    land_registry_transactions: () => fetchLandRegistryTransactions().then(d => [d]),
+    ons_card_spending: () => fetchOnsCardSpending().then(d => d.categories.length ? [d] : []),
+    ch_new_businesses: () => fetchNewBusinessRegistrations().then(d => d.businesses.length ? [d] : []),
+    dvla_vehicle_stats: () => fetchDvlaVehicleStats().then(d => d.totalLicensedVehicles ? [d] : []),
+    dvla_ods_regional: () => fetchDvlaRegionalStats().then(d => d.byRegion.length ? d.byRegion : []),
+    fsa_food_businesses: () => fetchFsaFoodBusinesses().then(d => d.byCityStats.length ? d.byCityStats : []),
   };
 
   const fn = sourceMap[sourceId];

@@ -36,6 +36,7 @@
     "resend": "^6.12.4",
     "stripe": "^22.2.2",
     "uuid": "^14.0.1",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

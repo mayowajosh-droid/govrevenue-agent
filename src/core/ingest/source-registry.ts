@@ -6,6 +6,11 @@ export type SourceCategory =
   | "environment_energy"
   | "news_media"
   | "crime_justice"
+  | "consumer_demand"
+  | "market_intelligence"
+  | "regulatory_directories"
+  | "creative_cultural"
+  | "devolved_nations"
   | "other";
 
 export type UpdateCadence = "realtime" | "daily" | "weekly" | "monthly";
@@ -415,6 +420,230 @@ export const DATA_SOURCES: DataSource[] = [
     baseUrl: "https://etl.beis.gov.uk",
   },
 
+  // ── CONSUMER DEMAND ──────────────────────────────────────────────────────
+  {
+    id: "wikipedia_pageviews",
+    name: "Wikipedia Pageviews API",
+    category: "consumer_demand",
+    cadence: "daily",
+    requiresKey: false,
+    live: true,
+    description: "Top 200 most-viewed English Wikipedia articles daily. Topic interest proxy — spikes signal emerging cultural demand before it hits search trends.",
+    baseUrl: "https://wikimedia.org/api/rest_v1/metrics/pageviews",
+  },
+  {
+    id: "reddit_signals",
+    name: "Reddit Public JSON API",
+    category: "consumer_demand",
+    cadence: "daily",
+    requiresKey: false,
+    live: true,
+    description: "Hot and rising posts from UK business, finance, and lifestyle subreddits. Community-level demand signals before they reach mainstream media.",
+    baseUrl: "https://www.reddit.com",
+  },
+  {
+    id: "eventbrite",
+    name: "Eventbrite Events API",
+    category: "consumer_demand",
+    cadence: "daily",
+    requiresKey: true,
+    keyEnvVar: "EVENTBRITE_API_KEY",
+    live: true,
+    description: "UK events — concerts, markets, festivals, trade shows, fitness classes. Demand concentration signals for catering, fashion, entertainment, and hospitality.",
+    baseUrl: "https://www.eventbriteapi.com/v3",
+  },
+  {
+    id: "youtube_data",
+    name: "YouTube Data API v3",
+    category: "consumer_demand",
+    cadence: "daily",
+    requiresKey: true,
+    keyEnvVar: "YOUTUBE_API_KEY",
+    live: true,
+    description: "UK trending videos by category and view count. Content creator and entertainment demand signals. Free Google Cloud API key required.",
+    baseUrl: "https://www.googleapis.com/youtube/v3",
+  },
+  {
+    id: "spotify_api",
+    name: "Spotify Web API",
+    category: "consumer_demand",
+    cadence: "daily",
+    requiresKey: true,
+    keyEnvVar: "SPOTIFY_CLIENT_ID",
+    live: true,
+    description: "UK music categories, featured playlists, trending genres. Cultural demand signals for events, lifestyle brands, and entertainment businesses.",
+    baseUrl: "https://api.spotify.com/v1",
+  },
+
+  // ── MARKET INTELLIGENCE ──────────────────────────────────────────────────
+  {
+    id: "ukri_grants",
+    name: "UKRI Gateway to Research",
+    category: "market_intelligence",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description: "UK Research & Innovation funded projects — innovation, science, and tech grant data. Signals emerging sectors before they become commercial markets.",
+    baseUrl: "https://gtr.ukri.org/gtr/api",
+  },
+  {
+    id: "ukri_innovate",
+    name: "Innovate UK Grants (UKRI)",
+    category: "market_intelligence",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description: "Innovate UK specific project funding — technology commercialisation signals. Identifies which sectors government is backing for near-term growth.",
+    baseUrl: "https://gtr.ukri.org/gtr/api",
+  },
+  {
+    id: "hmrc_trade",
+    name: "HMRC UK Trade Info (OData)",
+    category: "market_intelligence",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "UK import/export flows by commodity code. Demand signals for manufacturers, wholesalers, importers, and any business with supply-chain exposure.",
+    baseUrl: "https://www.uktradeinfo.com/api/odata",
+  },
+  {
+    id: "ipo_trademarks",
+    name: "IPO Trademarks & Patents (data.gov.uk)",
+    category: "market_intelligence",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description: "Intellectual Property Office trademark filings, patent applications, and design rights. Brand and innovation activity signals — new market entrants and product categories.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "insolvency_register",
+    name: "Insolvency Service Register (data.gov.uk)",
+    category: "market_intelligence",
+    cadence: "daily",
+    requiresKey: false,
+    live: true,
+    description: "Business insolvency, administration, and liquidation datasets. Market exit signals — competitors closing, supply chain gaps, distressed-asset opportunities.",
+    baseUrl: "https://data.gov.uk",
+  },
+
+  // ── REGULATORY DIRECTORIES ───────────────────────────────────────────────
+  {
+    id: "fca_register",
+    name: "FCA Financial Services Register",
+    category: "regulatory_directories",
+    cadence: "weekly",
+    requiresKey: true,
+    keyEnvVar: "FCA_API_KEY",
+    live: true,
+    description: "50,000+ FCA-regulated firms. B2B buyer directory for any business selling into financial services — software, compliance, HR, legal, office services, events.",
+    baseUrl: "https://register.fca.org.uk/services/V0.1",
+  },
+  {
+    id: "sra_register",
+    name: "SRA Solicitors Register (data.gov.uk)",
+    category: "regulatory_directories",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description: "Solicitors Regulation Authority registered law firms. Buyer directory for legal tech, CPD training, office services, and professional services suppliers.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "dvla_vehicles",
+    name: "DVLA Vehicle Licensing Statistics",
+    category: "regulatory_directories",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "UK registered vehicles by make, body type, fuel, and postcode area. Demand signals for automotive accessories, EV charging, fleet services, and insurance.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "dvsa_mot",
+    name: "DVSA MOT Test Results",
+    category: "regulatory_directories",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Anonymised MOT test data — vehicle age and condition by area. Signals for garages, parts suppliers, fleet operators, and vehicle safety businesses.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "mhra_register",
+    name: "MHRA Medical Devices Register (data.gov.uk)",
+    category: "regulatory_directories",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description: "MHRA registered medical devices and medicines. Healthcare supply chain buyer directory — medical equipment, lab supplies, pharmaceuticals.",
+    baseUrl: "https://data.gov.uk",
+  },
+
+  // ── CREATIVE & CULTURAL ───────────────────────────────────────────────────
+  {
+    id: "arts_council",
+    name: "Arts Council England Grants (data.gov.uk)",
+    category: "creative_cultural",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Arts Council England grant funding datasets. Cultural activity signals for event planners, creatives, venues, fashion designers, and media businesses.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "bfi_data",
+    name: "BFI Film & TV Data (data.gov.uk)",
+    category: "creative_cultural",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "British Film Institute industry datasets — productions, admissions, screen counts. Signals for location services, catering, costume, and production supply chains.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "ofcom_data",
+    name: "Ofcom Media & Communications Data",
+    category: "creative_cultural",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Ofcom internet usage, streaming habits, device adoption, and broadcast data. Signals for content creators, media businesses, tech companies, and advertisers.",
+    baseUrl: "https://data.gov.uk",
+  },
+
+  // ── DEVOLVED NATIONS ─────────────────────────────────────────────────────
+  {
+    id: "stats_wales",
+    name: "StatsWales API",
+    category: "devolved_nations",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Welsh Government statistical datasets — population, economy, health, business activity. Fills the Wales-specific gap in ONS/Nomis coverage.",
+    baseUrl: "https://statswales.gov.wales/api/v1",
+  },
+  {
+    id: "nisra",
+    name: "NISRA (Northern Ireland Statistics)",
+    category: "devolved_nations",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Northern Ireland Statistics and Research Agency datasets. Fills the NI-specific gap in UK-wide data coverage.",
+    baseUrl: "https://data.gov.uk",
+  },
+  {
+    id: "scottish_gov_stats",
+    name: "Scottish Government Statistics",
+    category: "devolved_nations",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description: "Scottish national statistics via data.gov.uk and statistics.gov.scot SPARQL. Population, economy, and business data for Scotland-specific signals.",
+    baseUrl: "https://statistics.gov.scot",
+  },
+
   // ── MISSING 6 — closes gap to 43 ─────────────────────────────────────────
 
   // ONS core — already used in early-signals; register here for ingest tracking
@@ -487,6 +716,76 @@ export const DATA_SOURCES: DataSource[] = [
     live: true,
     description: "Ofsted school and provider inspection datasets. Indexed via data.gov.uk.",
     baseUrl: "https://data.gov.uk",
+  },
+
+  // ── REAL-FIGURE PARSERS ─────────────────────────────────────────────────
+  {
+    id: "land_registry_transactions",
+    name: "Land Registry Price Paid",
+    category: "market_intelligence",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description:
+      "HM Land Registry monthly price paid CSV — actual transaction counts and average prices by county and property type.",
+    baseUrl:
+      "http://prod.publicdata.landregistry.gov.uk.s3-website-eu-west-1.amazonaws.com",
+  },
+  {
+    id: "ons_card_spending",
+    name: "ONS UK Card Spending",
+    category: "consumer_demand",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description:
+      "ONS experimental weekly card spending index by category (Social, Staple, Discretionary). YoY change computed from CSV download.",
+    baseUrl: "https://api.beta.ons.gov.uk/v1",
+  },
+  {
+    id: "ch_new_businesses",
+    name: "Companies House New Registrations",
+    category: "market_intelligence",
+    cadence: "daily",
+    requiresKey: true,
+    keyEnvVar: "COMPANIES_HOUSE_API_KEY",
+    live: true,
+    description:
+      "New company incorporations by SIC sector and region via Companies House advanced search API.",
+    baseUrl: "https://api.company-information.service.gov.uk",
+  },
+  {
+    id: "dvla_vehicle_stats",
+    name: "DVLA Vehicle Licensing Statistics",
+    category: "market_intelligence",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description:
+      "DVLA headline vehicle registration and licensing figures parsed from GOV.UK statistical publication — total fleet, new registrations, zero-emission counts.",
+    baseUrl: "https://www.gov.uk/government/statistics",
+  },
+  {
+    id: "dvla_ods_regional",
+    name: "DVLA Regional Vehicle Fleet (ODS)",
+    category: "market_intelligence",
+    cadence: "monthly",
+    requiresKey: false,
+    live: true,
+    description:
+      "DVLA VEH0105 ODS — licensed cars by region, fuel type, and keepership. Real counts by English region + devolved nations, latest quarter.",
+    baseUrl: "https://assets.publishing.service.gov.uk",
+  },
+  {
+    id: "fsa_food_businesses",
+    name: "FSA Food Business Register",
+    category: "market_intelligence",
+    cadence: "weekly",
+    requiresKey: false,
+    live: true,
+    description:
+      "FSA food establishment counts by city and business type (restaurants, takeaways, pubs, cafes) via the Food Standards Agency Establishments API.",
+    baseUrl: "https://api.ratings.food.gov.uk",
   },
 ];
 
