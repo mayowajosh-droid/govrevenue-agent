@@ -15257,6 +15257,8 @@ a{color:inherit;text-decoration:none}
 .gh-main-nav::-webkit-scrollbar{display:none}
 .gh-main-nav a{font-size:13px;font-weight:500;color:var(--text-mid,#B0BAC8);padding:0 11px;height:60px;display:flex;align-items:center;white-space:nowrap;transition:color .15s}
 .gh-main-nav a:hover{color:var(--text)}
+.gh-nav-atlas{color:var(--brand,#B4924E)!important;font-weight:600!important;margin-left:4px}
+.gh-nav-atlas:hover{color:#d4b070!important}
 /* ── page masthead ── */
 .pg-mast{padding:40px 0 32px;border-bottom:1px solid var(--border-2);background:var(--base)}
 .pg-mast-inner{padding:0 32px;max-width:1200px;margin:0 auto}
@@ -15428,10 +15430,10 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
       <nav class="gh-main-nav">
         <a href="/desks">Desks</a>
         <a href="/signals">Signals</a>
-        <a href="/atlas">Atlas</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
+        <a href="/atlas" class="gh-nav-atlas">Atlas</a>
       </nav>
       ${authHtml}
     </div>
