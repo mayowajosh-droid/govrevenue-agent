@@ -183,7 +183,7 @@ async function dvlaRegionalSignals(pool: Pool): Promise<MarketSignal[]> {
       `${fmt(r.totalCars)} licensed vehicles — ${companyShare}% fleet/company`,
       r.region, quarter,
       `Fleet concentration signals B2B aftermarket opportunity — company car drivers are serviced separately from retail`,
-      ["automotive", "professional_services"],
+      ["automotive", "transport"],
       { value: r.totalCars, sourceUrl: "https://www.gov.uk/government/statistical-data-sets/vehicle-licensing-statistics-data-files", fetchedAt: rows[0].fetchedAt },
     ));
   }
@@ -215,7 +215,7 @@ async function landRegistrySignals(pool: Pool): Promise<MarketSignal[]> {
       `${fmt(data.totalTransactions)} property completions`,
       "UK-wide", period,
       `Each completion triggers legal, survey, removals & fit-out spend — avg ${fmtGbp(data.ukAvgPrice)} transaction value`,
-      ["property", "construction", "professional_services", "retail"],
+      ["property", "construction", "professional_services"],
       { value: data.totalTransactions, sourceUrl: url, fetchedAt: data.fetchedAt },
     ));
   }
@@ -234,8 +234,8 @@ async function landRegistrySignals(pool: Pool): Promise<MarketSignal[]> {
       `land-reg-${c.county.toLowerCase().replace(/\s+/g, "-")}`, "LAND REG",
       `${fmt(c.transactionCount)} completions  ·  avg ${fmtGbp(c.avgPrice)}`,
       c.county, period,
-      `New owners at this price point are active buyers — solicitors, surveyors, tradespeople & furniture all procured within 60 days${newBuildNote}`,
-      ["property", "construction", "professional_services"],
+      `New owners at this price point are active buyers — solicitors, surveyors, tradespeople & builders all procured within 60 days${newBuildNote}`,
+      ["property", "construction"],
       { value: c.transactionCount, sourceUrl: url, fetchedAt: data.fetchedAt },
     ));
   }

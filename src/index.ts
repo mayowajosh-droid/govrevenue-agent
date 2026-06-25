@@ -4710,6 +4710,38 @@ const DESK_PROFILES: DeskProfile[] = [
   },
 ];
 
+// Preferred source order for each desk — signals from earlier sources are surfaced first in the panel
+const DESK_SOURCE_PRIORITY: Record<string, string[]> = {
+  "construction":        ["LAND REG", "COMPANIES HOUSE", "ONS", "UKRI", "DVLA"],
+  "highways":            ["COMPANIES HOUSE", "ONS", "DVLA"],
+  "facilities":          ["LAND REG", "COMPANIES HOUSE", "ONS"],
+  "education":           ["ONS", "UKRI", "COMPANIES HOUSE"],
+  "transport":           ["DVLA", "ONS", "COMPANIES HOUSE"],
+  "fleet-automotive":    ["DVLA", "COMPANIES HOUSE", "ONS"],
+  "recruitment":         ["COMPANIES HOUSE", "ONS", "LAND REG"],
+  "health":              ["ONS", "UKRI", "COMPANIES HOUSE"],
+  "digital":             ["COMPANIES HOUSE", "UKRI", "ONS"],
+  "social-care":         ["ONS", "COMPANIES HOUSE"],
+  "childrens":           ["ONS", "UKRI", "COMPANIES HOUSE"],
+  "waste":               ["COMPANIES HOUSE", "ONS"],
+  "energy":              ["DVLA", "UKRI", "COMPANIES HOUSE", "ONS"],
+  "security":            ["COMPANIES HOUSE", "ONS"],
+  "catering":            ["COMPANIES HOUSE", "ONS"],
+  "legal":               ["COMPANIES HOUSE", "LAND REG", "ONS"],
+  "housing-support":     ["LAND REG", "ONS", "COMPANIES HOUSE"],
+  "finance":             ["COMPANIES HOUSE", "ONS"],
+  "comms":               ["COMPANIES HOUSE", "ONS"],
+  "leisure-sport":       ["ONS", "COMPANIES HOUSE"],
+  "arts-culture-heritage": ["COMPANIES HOUSE", "ONS"],
+  "planning":            ["LAND REG", "COMPANIES HOUSE", "ONS"],
+  "justice":             ["ONS", "COMPANIES HOUSE"],
+  "emergency":           ["ONS", "COMPANIES HOUSE"],
+  "research":            ["UKRI", "COMPANIES HOUSE", "ONS"],
+  "consulting":          ["COMPANIES HOUSE", "ONS"],
+  "events-venues":       ["COMPANIES HOUSE", "ONS"],
+  "uniforms-workwear":   ["COMPANIES HOUSE", "ONS"],
+};
+
 // Maps each desk to the market-signal sectors its intelligence should draw from
 const DESK_SECTORS: Record<string, MarketSignalSector[]> = {
   "construction":       ["construction", "property"],
@@ -13891,14 +13923,26 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
 
   const sectors = DESK_SECTORS[profile.slug] ?? [];
+  const sourcePriority = DESK_SOURCE_PRIORITY[profile.slug] ?? [];
 
   const [cached, earlySignals, mktSnap] = await Promise.all([
     getDeskCache(profile.slug).catch(() => null),
     getEarlySignalsByDesk(profile.slug).catch(() => []),
     pool && sectors.length
-      ? generateMarketSignals(pool, { sectors, limit: 10 }).catch(() => null)
+      ? generateMarketSignals(pool, { sectors, limit: 20 }).catch(() => null)
       : Promise.resolve(null),
   ]);
+
+  // Sort signals by per-desk source priority so the most relevant source leads
+  const rawSignals = mktSnap?.signals ?? [];
+  const sortedMktSignals = sourcePriority.length
+    ? [...rawSignals].sort((a, b) => {
+        const ai = sourcePriority.indexOf(a.source);
+        const bi = sourcePriority.indexOf(b.source);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+    : rawSignals;
+
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
 
   if (isStale) {
@@ -13906,7 +13950,7 @@ app.get("/desk/:slug", asyncRoute(async (req, res) => {
     compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: profile.slug } }));
   }
 
-  res.type("html").send(deskPage(profile, cached, getAuthUser(req), earlySignals, mktSnap?.signals ?? []));
+  res.type("html").send(deskPage(profile, cached, getAuthUser(req), earlySignals, sortedMktSignals));
 }));
 
 app.get("/desk/:slug/sub/:sub", asyncRoute(async (req, res) => {
