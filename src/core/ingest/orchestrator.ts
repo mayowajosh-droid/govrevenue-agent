@@ -123,8 +123,10 @@ async function runSource(sourceId: string, fn: () => Promise<unknown[]>): Promis
     const records = await fn();
     const ingested = await ingestRecords(sourceId, records);
     const durationMs = Date.now() - start;
+    // Quality is based on whether the fetch returned data — not on new inserts,
+    // since ON CONFLICT DO NOTHING means duplicates return count=0 on repeat runs
+    const fetchedCount = records.length;
 
-    // Update metadata catalog with latest fetch stats
     if (pool) {
       const src = DATA_SOURCES.find(s => s.id === sourceId);
       if (src) {
@@ -132,10 +134,10 @@ async function runSource(sourceId: string, fn: () => Promise<unknown[]>): Promis
           sourceId: src.id, sourceName: src.name, category: src.category,
           isLive: src.live, cadence: src.cadence,
           lastFetchedAt: new Date().toISOString(),
-          lastRecordCount: ingested,
+          lastRecordCount: fetchedCount,
           avgFetchMs: durationMs,
-          qualityStatus: ingested > 0 ? "pass" : "warn",
-          qualityScore: ingested > 0 ? 1.0 : 0.5,
+          qualityStatus: fetchedCount > 0 ? "pass" : "warn",
+          qualityScore: fetchedCount > 0 ? 1.0 : 0.5,
         }).catch(() => null);
       }
     }

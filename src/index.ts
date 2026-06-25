@@ -17419,21 +17419,44 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
       cardinality(alerted_notice_ids) AS alerted_count
     FROM alert_subscriptions ORDER BY created_at DESC LIMIT 200`),
     safePool(`SELECT * FROM briefing_subscribers ORDER BY created_at DESC`),
-    safePool(`SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health'
-    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+    safePool(`WITH human_ips AS (
+      SELECT ip FROM visitor_logs
+      WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health'
+        AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+      GROUP BY ip HAVING COUNT(*) <= 700
+    )
+    SELECT DATE(visited_at) AS day, COUNT(*)::int AS visits, COUNT(DISTINCT vl.ip)::int AS unique_ips
+    FROM visitor_logs vl JOIN human_ips h ON h.ip = vl.ip
+    WHERE visited_at > NOW() - INTERVAL '14 days' AND path != '/health'
     GROUP BY day ORDER BY day DESC`),
-    safePool(`SELECT path, COUNT(*)::int AS visits FROM visitor_logs
+    safePool(`WITH human_ips AS (
+      SELECT ip FROM visitor_logs
+      WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health'
+        AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+      GROUP BY ip HAVING COUNT(*) <= 350
+    )
+    SELECT path, COUNT(*)::int AS visits FROM visitor_logs vl JOIN human_ips h ON h.ip = vl.ip
     WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health'
-    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
     GROUP BY path ORDER BY visits DESC LIMIT 15`),
-    safePool(`SELECT ip, COUNT(*)::int AS visits, MAX(visited_at) AS last_seen
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != '' AND path != '/health'
-    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
-    GROUP BY ip ORDER BY visits DESC LIMIT 30`),
-    safePool(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
-    FROM visitor_logs WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'
-    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'`),
+    safePool(`WITH human_ips AS (
+      SELECT ip FROM visitor_logs
+      WHERE visited_at > NOW() - INTERVAL '7 days' AND ip IS NOT NULL AND ip != '' AND path != '/health'
+        AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+      GROUP BY ip HAVING COUNT(*) <= 350
+    )
+    SELECT vl.ip, COUNT(*)::int AS visits, MAX(vl.visited_at) AS last_seen
+    FROM visitor_logs vl JOIN human_ips h ON h.ip = vl.ip
+    WHERE visited_at > NOW() - INTERVAL '7 days' AND path != '/health'
+    GROUP BY vl.ip ORDER BY visits DESC LIMIT 30`),
+    safePool(`WITH human_ips AS (
+      SELECT ip FROM visitor_logs
+      WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'
+        AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+      GROUP BY ip HAVING COUNT(*) <= 50
+    )
+    SELECT COUNT(*)::int AS total, COUNT(DISTINCT vl.ip)::int AS unique_ips
+    FROM visitor_logs vl JOIN human_ips h ON h.ip = vl.ip
+    WHERE visited_at > NOW() - INTERVAL '24 hours' AND path != '/health'`),
     safePool(`SELECT COALESCE(SUM(amount),0)::int AS total_pence,COUNT(*)::int AS order_count,
       COALESCE(SUM(amount) FILTER(WHERE plan='payg'),0)::int AS payg_pence,
       COALESCE(SUM(amount) FILTER(WHERE plan='pro'),0)::int AS pro_pence,
@@ -17474,10 +17497,15 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     FROM visitor_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY event ORDER BY cnt DESC LIMIT 20`),
     safePool(`SELECT event, meta_json, created_at, ip, user_agent
     FROM visitor_events ORDER BY created_at DESC LIMIT 100`),
-    safePool(`SELECT ip, path, user_agent, visited_at
-    FROM visitor_logs WHERE path != '/health'
-    AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
-    ORDER BY visited_at DESC LIMIT 100`),
+    safePool(`WITH human_ips AS (
+      SELECT ip FROM visitor_logs
+      WHERE visited_at > NOW() - INTERVAL '30 days' AND path != '/health'
+        AND user_agent IS NOT NULL AND user_agent !~* 'bot|crawl|spider|slurp|search|archive|google|bing|yahoo|baidu|yandex|duckduck|semrush|ahrefs|curl|wget|python|java/|headless|phantomjs|selenium|puppeteer|lighthouse|pagespeed|facebookexternalhit|twitterbot|linkedinbot|slackbot|gptbot|anthropic|claudebot|openai|bytespider|petalbot'
+      GROUP BY ip HAVING COUNT(*) <= 1500
+    )
+    SELECT vl.ip, vl.path, vl.user_agent, vl.visited_at
+    FROM visitor_logs vl JOIN human_ips h ON h.ip = vl.ip
+    WHERE path != '/health' ORDER BY visited_at DESC LIMIT 100`),
     safePool(`SELECT cl.comment_id, cl.ip, cl.created_at, c.author_name, c.body
     FROM comment_likes cl LEFT JOIN comments c ON c.id=cl.comment_id ORDER BY cl.created_at DESC LIMIT 100`),
     safePool(`SELECT id, category, title, buyer, source, status, value_amount, notice_date, deadline_date
