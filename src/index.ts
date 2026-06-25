@@ -17764,21 +17764,49 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const activeSubCount = dbActiveSubCount;
 
   const envRows: [string, boolean][] = [
-    ["DATABASE_URL",            !!process.env.DATABASE_URL],
-    ["REDIS_URL",               !!process.env.REDIS_URL],
-    ["ANTHROPIC_API_KEY",       !!process.env.ANTHROPIC_API_KEY],
-    ["OPENAI_API_KEY",          !!process.env.OPENAI_API_KEY],
-    ["STRIPE_SECRET_KEY",       !!process.env.STRIPE_SECRET_KEY],
-    ["STRIPE_PAYG_PRICE_ID",    !!process.env.STRIPE_PAYG_PRICE_ID],
-    ["STRIPE_PRO_PRICE_ID",     !!process.env.STRIPE_PRO_PRICE_ID],
-    ["STRIPE_AGENCY_PRICE_ID",  !!process.env.STRIPE_AGENCY_PRICE_ID],
-    ["RESEND_API_KEY",          !!process.env.RESEND_API_KEY],
-    ["COMPANIES_HOUSE_API_KEY", !!process.env.COMPANIES_HOUSE_API_KEY],
-    ["SLACK_WEBHOOK_URL",       !!process.env.SLACK_WEBHOOK_URL],
-    ["SENTRY_DSN",              !!process.env.SENTRY_DSN],
-    ["PDF_STORAGE_ENDPOINT",    !!process.env.PDF_STORAGE_ENDPOINT],
-    ["SAMPLE_PDF_URL",          !!process.env.SAMPLE_PDF_URL],
-    ["BASE_URL",                !!process.env.BASE_URL],
+    // Core infrastructure
+    ["DATABASE_URL",                    !!process.env.DATABASE_URL],
+    ["REDIS_URL",                       !!process.env.REDIS_URL],
+    // AI providers
+    ["ANTHROPIC_API_KEY",               !!process.env.ANTHROPIC_API_KEY],
+    ["ANTHROPIC_MODEL",                 !!process.env.ANTHROPIC_MODEL],
+    ["OPENAI_API_KEY",                  !!process.env.OPENAI_API_KEY],
+    ["OPENAI_MODEL",                    !!process.env.OPENAI_MODEL],
+    ["OPENAI_REASONING_MODEL",          !!process.env.OPENAI_REASONING_MODEL],
+    // Payments
+    ["STRIPE_SECRET_KEY",               !!process.env.STRIPE_SECRET_KEY],
+    ["STRIPE_WEBHOOK_SECRET",           !!process.env.STRIPE_WEBHOOK_SECRET],
+    ["STRIPE_PAYG_PRICE_ID",            !!process.env.STRIPE_PAYG_PRICE_ID],
+    ["STRIPE_PRO_PRICE_ID",             !!process.env.STRIPE_PRO_PRICE_ID],
+    ["STRIPE_AGENCY_PRICE_ID",          !!process.env.STRIPE_AGENCY_PRICE_ID],
+    // Email
+    ["RESEND_API_KEY",                  !!process.env.RESEND_API_KEY],
+    ["FROM_EMAIL",                      !!process.env.FROM_EMAIL],
+    // Auth & admin
+    ["ADMIN_TOKEN",                     !!process.env.ADMIN_TOKEN],
+    ["ADMIN_EMAIL",                     !!process.env.ADMIN_EMAIL],
+    ["JWT_SECRET",                      !!process.env.JWT_SECRET],
+    // Data sources
+    ["COMPANIES_HOUSE_API_KEY",         !!process.env.COMPANIES_HOUSE_API_KEY],
+    ["EVENTBRITE_API_KEY",              !!process.env.EVENTBRITE_API_KEY],
+    ["YOUTUBE_API_KEY",                 !!process.env.YOUTUBE_API_KEY],
+    ["SPOTIFY_CLIENT_ID",               !!process.env.SPOTIFY_CLIENT_ID],
+    ["SPOTIFY_CLIENT_SECRET",           !!process.env.SPOTIFY_CLIENT_SECRET],
+    ["FCA_API_EMAIL",                   !!process.env.FCA_API_EMAIL],
+    ["FCA_API_KEY",                     !!process.env.FCA_API_KEY],
+    // PDF storage
+    ["PDF_STORAGE_ENDPOINT",            !!process.env.PDF_STORAGE_ENDPOINT],
+    ["PDF_STORAGE_BUCKET",              !!process.env.PDF_STORAGE_BUCKET],
+    ["PDF_STORAGE_ACCESS_KEY_ID",       !!process.env.PDF_STORAGE_ACCESS_KEY_ID],
+    ["PDF_STORAGE_SECRET_ACCESS_KEY",   !!process.env.PDF_STORAGE_SECRET_ACCESS_KEY],
+    ["PDF_STORAGE_PUBLIC_BASE_URL",     !!process.env.PDF_STORAGE_PUBLIC_BASE_URL],
+    // Notifications & monitoring
+    ["SLACK_WEBHOOK_URL",               !!process.env.SLACK_WEBHOOK_URL],
+    ["SENTRY_DSN",                      !!process.env.SENTRY_DSN],
+    ["SENTRY_ENVIRONMENT",              !!process.env.SENTRY_ENVIRONMENT],
+    // App config
+    ["BASE_URL",                        !!process.env.BASE_URL],
+    ["SAMPLE_PDF_URL",                  !!process.env.SAMPLE_PDF_URL],
   ];
 
   const configRows: [string, string][] = [
