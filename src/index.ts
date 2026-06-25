@@ -17622,10 +17622,10 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const revisionsMap = new Map<string, any>(articleRevisions.map((r: any) => [r.article_id, r]));
 
   // Build metadata_catalog lookup by source_id for Source Registry enrichment
-  const catalogMap = new Map<string, any>(govCatalog.map((r: any) => [String(r.source_id || r.sourceId || ""), r]));
-  const liveSourcesCount = govCatalog.filter((r: any) => r.quality_status === "pass").length;
-  const warnSourcesCount = govCatalog.filter((r: any) => r.quality_status === "warn").length;
-  const failSourcesCount = govCatalog.filter((r: any) => r.quality_status === "fail").length;
+  const catalogMap = new Map<string, any>(govCatalog.map((r: any) => [String(r.sourceId || r.source_id || ""), r]));
+  const liveSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "pass").length;
+  const warnSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "warn").length;
+  const failSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "fail").length;
   const neverFetchedCount = DATA_SOURCES.length - govCatalog.length;
 
   const gradeCount: Record<string, number> = {};
