@@ -2536,34 +2536,38 @@ Last public contract: ${input.lastPublicContract || "none stated"}`;
 // 45000000 (general construction) and 79000000 (all business services) are intentionally
 // excluded: too broad, they pull new-build and unrelated contracts.
 const SECTOR_CPV: Record<string, string[]> = {
-  "social-housing":    ["50700000", "45453100", "45262700"],  // maintenance, renovation, conversion
-  "cleaning":          ["90910000", "90911000", "90919000", "90920000"],
-  "facilities":        ["50700000", "79993000"],               // maintenance + facilities mgmt only
-  "built-environment": ["71315300", "71315200", "45453100"],   // building surveying, testing, renovation
-  "creative":          ["79342200", "79952000"],               // promotional, events
-  "photography":       ["79962000"],
-  "energy":            ["71314000", "50710000"],               // energy services, heating/ventilation maintenance
-  "health":            ["85100000", "85110000", "85140000", "85120000"],
-  "digital":          ["72000000", "48000000", "72212000"],   // IT services, software, programming
-  "social-care":      ["85311000", "85312000", "85320000"],   // social work with/without accommodation, social services
-  "childrens":        ["85312000", "85311200", "85321000"],   // social work without accommodation, child day care, admin social services
-  "waste":            ["90500000", "90511000", "90600000"],   // waste collection, street cleaning
-  "security":         ["79710000", "79711000", "79715000"],   // security services, alarm monitoring, patrol
-  "catering":         ["55500000", "55520000", "55523000"],   // canteen/catering, catering outside premises, catering for schools
-  "legal":            ["79100000", "79200000", "79212000"],   // legal services, accountancy, auditing
-  "housing-support":  ["85311000", "70220000"],               // social work, commercial property letting (supported housing)
-  "finance":          ["79200000", "66100000", "79212000"],   // accountancy, banking, auditing
-  "comms":            ["79340000", "79341000", "79960000"],   // advertising, general advertising, photography services
-  "leisure":          ["92000000", "92600000", "92610000"],   // recreational, sporting, sports grounds
-  "planning":         ["71400000", "71410000", "71420000"],   // urban planning, regional planning, landscape
-  "justice":          ["75231200", "75231210", "79997000"],   // rehabilitation, community service, business travel arrangements
-  "emergency":        ["75250000", "75252000", "35110000"],   // fire/rescue, ambulance, firefighting equipment
-  "research":         ["73100000", "73200000", "72316000"],   // R&D, business consultancy, data analysis
-  "consulting":       ["73200000", "72224000", "72220000"],   // business consultancy, project management consulting, systems/tech consulting
-  "training-skills":  ["80000000", "80500000", "80530000", "80521000", "80522000"], // education, training, vocational training, training programme, technical training
-  "transport":        ["60130000", "60112000", "60140000", "60100000"],             // public road transport, public bus, non-scheduled passenger transport, road transport
-  "recruitment":      ["79620000", "79621000", "79624000", "79625000"],             // supply of personnel, supply office staff, supply nursing, supply medical
-  "frameworks":       ["79000000", "72000000", "45000000"],                         // business services (broad), IT services (broad), construction works (broad)
+  "social-housing":       ["50700000", "45453100", "45262700"],
+  "cleaning":             ["90910000", "90911000", "90919000", "90920000"],
+  "facilities":           ["50700000", "79993000"],
+  "built-environment":    ["71315300", "71315200", "45453100"],
+  "creative":             ["79342200", "79952000"],
+  "photography":          ["79962000"],
+  "energy":               ["71314000", "50710000"],
+  "health":               ["85100000", "85110000", "85140000", "85120000"],
+  "digital":              ["72000000", "48000000", "72212000"],
+  "social-care":          ["85311000", "85312000", "85320000"],
+  "childrens":            ["85312000", "85311200", "85321000"],
+  "waste":                ["90500000", "90511000", "90600000"],
+  "security":             ["79710000", "79711000", "79715000"],
+  "catering":             ["55500000", "55520000", "55523000"],
+  "legal":                ["79100000", "79200000", "79212000"],
+  "housing-support":      ["85311000", "70220000"],
+  "finance":              ["79200000", "66100000", "79212000"],
+  "comms":                ["79340000", "79341000", "79960000"],
+  "leisure-sport":        ["92000000", "92600000", "92610000"],
+  "arts-culture-heritage":["92310000", "92312000", "92521000", "92522000"],
+  "planning":             ["71400000", "71410000", "71420000"],
+  "justice":              ["75231200", "75231210", "79997000"],
+  "emergency":            ["75250000", "75252000", "35110000"],
+  "research":             ["73100000", "73200000", "72316000"],
+  "consulting":           ["73200000", "72224000", "72220000"],
+  "training-skills":      ["80000000", "80500000", "80530000", "80521000", "80522000"],
+  "transport":            ["60130000", "60112000", "60140000", "60100000"],
+  "recruitment":          ["79620000", "79621000", "79624000", "79625000"],
+  "highways":             ["45233100", "45233120", "45316110", "34993000", "45232400"],
+  "fleet-automotive":     ["34100000", "34110000", "34113000", "50111000", "38112100"],
+  "events-venues":        ["79952000", "79951000", "79956000", "55120000"],
+  "uniforms-workwear":    ["18000000", "18100000", "18130000", "35113000", "18110000"],
 };
 
 async function pullProcurementData(input: z.infer<typeof intakeSchema>, signal?: AbortSignal): Promise<ProcurementData> {
@@ -2997,8 +3001,8 @@ function resolveSector(text: string): SectorResult {
   if (t.includes("framework agreement") || t.includes("dynamic purchasing") || t.includes("dps") ||
       t.includes("call-off") || t.includes("multi-provider") || t.includes("crown commercial")) {
     return {
-      key: "frameworks",
-      label: "Frameworks & dynamic purchasing systems",
+      key: "consulting",
+      label: "Programme & policy consulting",
       terms: ["framework agreement", "dynamic purchasing system", "DPS", "call-off", "multi-supplier", "Crown Commercial Service", "G-Cloud", "Digital Outcomes"]
     };
   }
@@ -3078,11 +3082,18 @@ function resolveSector(text: string): SectorResult {
   }
 
   if (t.includes("leisure management") || t.includes("leisure centre") || t.includes("library") ||
-      t.includes("arts services") || t.includes("museum") || t.includes("parks management") || t.includes("sports development")) {
+      t.includes("parks management") || t.includes("sports development")) {
     return {
-      key: "leisure",
-      label: "Leisure, culture & parks",
-      terms: ["leisure management", "libraries", "arts & culture", "museums", "parks management", "sports development", "heritage"]
+      key: "leisure-sport",
+      label: "Leisure, sport & recreation",
+      terms: ["leisure management", "libraries", "parks management", "sports development", "swimming pools", "active communities"]
+    };
+  }
+  if (t.includes("arts services") || t.includes("museum") || t.includes("gallery") || t.includes("heritage") || t.includes("cultural")) {
+    return {
+      key: "arts-culture-heritage",
+      label: "Arts, culture & heritage",
+      terms: ["museums", "galleries", "arts & culture", "heritage", "public art", "creative commissioning"]
     };
   }
 
@@ -4325,23 +4336,43 @@ const DESK_PROFILES: DeskProfile[] = [
   {
     slug: "construction",
     label: "Construction & Estates",
-    standfirst: "Capital works, refurbishment and estates services across the public sector.",
+    standfirst: "Capital works, refurbishment, M&E, fire safety, and building professional services across the public estate.",
     live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "AtlasRevenue Desk",
-      mainServices: "construction project management estate management building refurbishment capital works planned maintenance",
-      idealBuyers: "local authorities housing associations NHS trusts",
+      mainServices: "construction project management estate management building refurbishment capital works planned maintenance building fabric M&E fire safety compliance",
+      idealBuyers: "local authorities housing associations NHS trusts academy trusts",
       mainGoal: "find construction and estate management contracts"
     }),
     categories: [
-      { label: "Repairs, Maintenance & Voids",         keywords: ["repair", "maintenance", "void", "responsive", "reactive", "handyman"],                                          subcategories: ["Reactive repairs","Planned maintenance","Void property works","Minor works","Handyman services","Multi-trade repairs","Damp & mould works","Emergency repairs","Cyclical maintenance","Pre-void inspections","Void turnaround","Graffiti removal","Patch repairs","Drain unblocking","Gutter clearing","Pest control","Lock & key","Sash window repairs","Minor electrical","Minor plumbing"] },
-      { label: "Refurbishment & Fit-out",               keywords: ["refurb", "fit-out", "fitout", "renovation", "internal works", "conversion"],                                    subcategories: ["Refurbishment","Internal fit-out","Extensions","Classroom refurbishment","Toilet refurbishment","Kitchen refurbishment","Office fit-out","Strip-out & demolition","Major refurbishment","Window replacement","Door replacement","Flooring renewal","Bathroom pods","Accessible adaptations","Cosmetic upgrades","Loft conversion","Outbuilding conversion"] },
-      { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                 subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating","Flat roof replacement","Pitched roof repair","Fascias & soffits","UPVC replacement","Sash restoration","Curtain walling","Stonework","Pointing & repointing","External rendering","Leadwork","Roof inspection"] },
-      { label: "M&E, Plumbing & Electrical",            keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],          subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance","Hot water systems","Underfloor heating","Air conditioning","Switchgear","EV charging points","Solar panels","Mechanical ventilation","Data cabling","Emergency lighting","Sprinkler systems","Consumer units"] },
-      { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "remediation", "fire door", "fire stopping", "fire risk", "aov"],         subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Access control & CCTV","Fire risk assessment","ACM cladding removal","EWS1 surveys","Waking watch","Compartmentalisation","Cavity barriers","Fire stopping","Smoke detectors","AOV systems","Fire suppression"] },
-      { label: "Grounds, Civils & External Works",      keywords: ["grounds", "civil", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath"],    subcategories: ["Drainage","Surfacing","Landscaping","Fencing","Car parks","Playgrounds","Footpaths","Tarmac resurfacing","Block paving","Boundary walls","Security fencing","Cycle shelters","Bin stores","Street furniture","Retaining walls","Kerbing","SUDS drainage","Attenuation tanks"] },
-      { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],        subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins","Timber & joinery","Ironmongery","Fixings & fasteners","Paint & coatings","Insulation materials","Roof materials","Floor coverings","Aggregates","Ready-mixed concrete","Skip hire","Temporary electrics"] },
-      { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "construction project management", "architectural services", "quantity surveying", "structural engineering", "clerk of works"],  subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy","CDM coordination","Principal designer","Planning consultancy","Fire engineering","Mechanical design","Electrical design","Party wall surveying","Condition surveys","Asset management","Energy consultancy","Due diligence"] },
+      { label: "Repairs, Maintenance & Voids",         keywords: ["repair", "maintenance", "void", "responsive", "reactive", "handyman", "cyclical"],                             subcategories: ["Reactive repairs","Planned maintenance","Void property works","Minor works","Handyman services","Multi-trade repairs","Damp & mould works","Emergency repairs","Cyclical maintenance","Pre-void inspections","Void turnaround","Patch repairs","Drain unblocking","Gutter clearing","Pest control","Lock & key","Minor electrical","Minor plumbing"] },
+      { label: "Refurbishment & Fit-out",               keywords: ["refurb", "fit-out", "fitout", "renovation", "internal works", "conversion", "major works"],                    subcategories: ["Refurbishment","Internal fit-out","Extensions","Classroom refurbishment","Toilet refurbishment","Kitchen refurbishment","Office fit-out","Strip-out & demolition","Major refurbishment","Window replacement","Door replacement","Flooring renewal","Bathroom pods","Accessible adaptations","Loft conversion","Outbuilding conversion"] },
+      { label: "Roofing, Windows & Building Fabric",    keywords: ["roofing", "window", "cladding", "brickwork", "flooring", "ceiling", "glazing"],                                subcategories: ["Roofing works","Windows & doors","Cladding","Brickwork","Flooring","Ceilings & partitions","Painting & decorating","Flat roof replacement","Pitched roof repair","Fascias & soffits","UPVC replacement","Curtain walling","Stonework","Pointing & repointing","External rendering","Leadwork","Roof inspection"] },
+      { label: "M&E, Plumbing & Electrical",            keywords: ["mechanical", "electrical", "plumbing", "hvac", "ventilation", "heating", "boiler", "lift maintenance"],         subcategories: ["Plumbing","Heating & boilers","Electrical works","HVAC","Ventilation","Fire alarms","Lift maintenance","Hot water systems","Underfloor heating","Air conditioning","Switchgear","Solar panels","Mechanical ventilation","Data cabling","Emergency lighting","Sprinkler systems","Consumer units"] },
+      { label: "Fire Safety, Compliance & Remediation", keywords: ["fire safety", "asbestos", "legionella", "remediation", "fire door", "fire stopping", "fire risk", "aov"],        subcategories: ["Fire safety works","Fire doors","Asbestos removal","Legionella & water hygiene","Electrical testing","Emergency lighting","Fire risk assessment","ACM cladding removal","EWS1 surveys","Waking watch","Compartmentalisation","Cavity barriers","Fire stopping","Smoke detectors","AOV systems","Fire suppression"] },
+      { label: "Grounds & External Works",              keywords: ["grounds", "drainage", "surfacing", "landscaping", "fencing", "car park", "playground", "footpath", "external works"], subcategories: ["Site drainage","Hard surfacing","Landscaping","Fencing & gates","Car parks","Playgrounds","Footpaths","Block paving","Boundary walls","Security fencing","Cycle shelters","Bin stores","Retaining walls","SUDS drainage","Attenuation tanks","Site lighting"] },
+      { label: "Supplies, Materials & Hire",            keywords: ["materials", "supplies", "plant hire", "tool hire", "scaffolding", "welfare cabin", "building materials"],       subcategories: ["Building materials","Plumbing supplies","Electrical supplies","Plant hire","Tool hire","Scaffolding","Welfare cabins","Timber & joinery","Ironmongery","Paint & coatings","Insulation","Roof materials","Floor coverings","Aggregates","Ready-mixed concrete","Skip hire","Temporary electrics"] },
+      { label: "Professional Services & Consultancy",   keywords: ["consultancy", "surveying", "construction project management", "architectural services", "quantity surveying", "structural engineering", "clerk of works"], subcategories: ["Quantity surveying","Project management","Building surveying","Architectural services","Structural engineering","Clerk of works","Estate strategy","CDM coordination","Principal designer","Planning consultancy","Fire engineering","Mechanical design","Electrical design","Condition surveys","Asset management","Energy consultancy"] },
+    ]
+  },
+  {
+    slug: "highways",
+    label: "Highways & Infrastructure",
+    standfirst: "Road maintenance, street lighting, bridges, drainage, active travel infrastructure, and highway professional services for councils and National Highways.",
+    live: true,
+    pinnedProfile: intakeSchema.parse({
+      companyName: "AtlasRevenue Desk",
+      mainServices: "highway maintenance road resurfacing street lighting bridge inspection active travel infrastructure traffic signals winter maintenance highway design",
+      idealBuyers: "local authorities county councils combined authorities National Highways Transport for London",
+      mainGoal: "find highway maintenance and infrastructure contracts"
+    }),
+    categories: [
+      { label: "Road Maintenance & Resurfacing",     keywords: ["highway maintenance", "road maintenance", "carriageway", "resurfacing", "pothole", "patch repair", "tarmac", "asphalt", "surface dressing"], subcategories: ["Carriageway resurfacing","Pothole repairs","Patch repairs","Surface dressing","Micro-asphalt","Footway maintenance","Kerb replacement","Road marking & lining","Rutting repair","Ironworks","Drainage maintenance","Gully cleaning","Road sweeping","Barrier repairs","Central reservation maintenance","Cat's eyes"] },
+      { label: "Street Lighting & Traffic Signals",  keywords: ["street lighting", "street light", "lamp column", "led street", "traffic signal", "traffic light", "junction signals", "illuminated sign", "traffic management"], subcategories: ["LED street lighting","Column replacement","Lantern upgrade","Traffic signal installation","Traffic signal maintenance","Illuminated bollards","Pedestrian signals","School crossing lights","SCOOT systems","UTC systems","Variable message signs","Electronic signs"] },
+      { label: "Bridges & Structures",               keywords: ["bridge", "structure", "highway structure", "culvert", "overbridge", "underbridge", "retaining wall bridge", "viaduct", "subway"], subcategories: ["Bridge inspection","Parapet replacement","Bridge deck repair","Waterproofing (bridges)","Bearing replacement","Expansion joints","Culvert maintenance","Retaining walls (highway)","Subway refurbishment","Structural assessment","Concrete repair","Scour protection"] },
+      { label: "Active Travel & Walking Infrastructure", keywords: ["cycle lane", "cycleway", "footway", "shared path", "pedestrian crossing", "active travel", "cycling infrastructure", "walking route", "zebra crossing", "toucan crossing", "contraflow"], subcategories: ["Cycle lane construction","Segregated cycleway","Shared use path","Pedestrian crossing upgrade","Toucan & puffin crossings","Zebra crossings","School street schemes","Low traffic neighbourhood","Traffic calming","Speed reduction","Safe routes to school","Pop-up cycle infrastructure","Signage (active travel)"] },
+      { label: "Winter Maintenance",                 keywords: ["winter maintenance", "gritting", "salt spreading", "snow clearance", "ice", "road safety winter", "salt supply", "gritter"], subcategories: ["Reactive gritting","Pre-treatment","Salt supply & storage","Gritter vehicles","Snow clearance","Winter standby","Ice prediction systems","Winter service plan","Road temperature monitoring","Winter vegetation management","Bridge deck treatment","Footway gritting"] },
+      { label: "Highway Professional Services",      keywords: ["highway survey", "highway design", "transport study", "road safety audit", "traffic modelling", "highways consultancy", "highway engineering", "highway assessment"], subcategories: ["Highway design","Transport assessment","Traffic modelling","Road safety audit","Cycle network design","Highway survey","CCTV drainage survey","Structural condition survey","Skid resistance testing","Asset management (highways)","Local transport plan","Highway inspector training"] },
     ]
   },
   {
@@ -4383,20 +4414,21 @@ const DESK_PROFILES: DeskProfile[] = [
   },
   {
     slug: "transport",
-    label: "Transport & SEND",
-    standfirst: "Passenger transport, home-to-school travel, and SEND transport commissioned by councils across England and Wales.",
+    label: "Transport & Mobility",
+    standfirst: "Passenger transport, home-to-school travel, SEND transport, community mobility, and active travel programmes for councils and transport authorities.",
     live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "AtlasRevenue Desk",
-      mainServices: "passenger transport SEND transport home to school transport community transport taxi fleet management minibus accessible transport school transport bus services coach hire dial-a-ride",
+      mainServices: "passenger transport SEND transport home to school transport community transport taxi minibus accessible transport school transport bus services coach hire dial-a-ride active travel mobility",
       idealBuyers: "local authorities county councils transport authorities combined authorities metropolitan boroughs",
-      mainGoal: "find passenger transport and SEND transport contracts"
+      mainGoal: "find passenger transport SEND and mobility contracts"
     }),
     categories: [
-      { label: "SEND Transport",              keywords: ["send transport", "home to school", "school transport", "sen transport", "school bus", "pupil transport"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision"] },
-      { label: "Passenger Transport",         keywords: ["passenger transport", "bus service", "community transport", "minibus", "dial-a-ride", "public transport", "shuttle"], subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport"] },
-      { label: "Fleet & Vehicle Management",  keywords: ["fleet", "vehicle", "taxi", "wheelchair accessible", "transport contract", "vehicle hire"],  subcategories: ["Fleet management","Taxi commissioning","Wheelchair-accessible vehicles","Vehicle maintenance"] },
-      { label: "Rail & Specialist",           keywords: ["rail", "coach", "transport service", "escort", "patient transport", "non-emergency transport"], subcategories: ["Rail contracts","Coach hire","Escorted journeys","School crossings"] },
+      { label: "SEND Transport",              keywords: ["send transport", "home to school", "school transport", "sen transport", "school bus", "pupil transport"],  subcategories: ["SEND home-to-school","Post-16 SEND","Short breaks transport","SEN vehicle provision","Escort services","Out-of-borough transport","Transport co-ordination"] },
+      { label: "Passenger & Community Transport", keywords: ["passenger transport", "bus service", "community transport", "minibus", "dial-a-ride", "public transport", "shuttle", "ring and ride"], subcategories: ["Bus services","Community transport","Dial-a-ride","Ring & ride","Accessible transport","Demand-responsive transport","Bus replacement","Rural transport","Hospital transport","Airport transport"] },
+      { label: "Patient & Non-Emergency Transport", keywords: ["patient transport", "non-emergency transport", "nepts", "patient transfer", "hospital transport"], subcategories: ["Non-emergency patient transport","Ambulance car service","Renal patient transport","Discharge transport","Inter-hospital transfers","Voluntary car scheme","Transport booking"] },
+      { label: "Active Travel Programmes",    keywords: ["active travel", "cycling programme", "walking programme", "walk to school", "cycle training", "bikeability", "safer streets"], subcategories: ["Bikeability","Walk to school","Cycle training","Workplace travel plans","Active travel co-ordination","Safer streets programme","Sustainable travel","School streets","Park & stride","Cycle hire","E-scooter programmes","Active travel strategy"] },
+      { label: "Rail, Coach & Specialist",    keywords: ["rail", "coach", "escort", "ferry", "water transport", "heritage transport", "transport service"], subcategories: ["Rail contracts","Coach hire","Escorted journeys","Ferry services","Waterway transport","Heritage transport","Tour operations","Shuttle services"] },
     ]
   },
   {
@@ -4420,23 +4452,23 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   {
-    slug: "frameworks",
-    label: "Frameworks",
-    standfirst: "Open frameworks, Dynamic Purchasing Systems, and call-off routes across all public sectors — the fastest route to market for most SMEs.",
+    slug: "fleet-automotive",
+    label: "Fleet & Automotive",
+    standfirst: "Fleet vehicle procurement, management, telematics, fuel, EV fleet transition, and driver services across local authorities, NHS, blue-light, and central government.",
     live: true,
     pinnedProfile: intakeSchema.parse({
       companyName: "AtlasRevenue Desk",
-      mainServices: "framework agreement dynamic purchasing system DPS call-off multi-supplier Crown Commercial Service lot-based procurement multi-provider arrangement standing offer",
-      idealBuyers: "Crown Commercial Service local authorities NHS trusts central government combined authorities police forces",
-      mainGoal: "find framework agreements and DPS opportunities"
+      mainServices: "fleet vehicle procurement fleet management telematics tracking fuel card EV fleet driver training accident management vehicle hire MOT maintenance",
+      idealBuyers: "local authorities NHS trusts police forces fire services central government councils",
+      mainGoal: "find fleet vehicle and automotive contracts"
     }),
     categories: [
-      { label: "Construction Frameworks",         keywords: ["construction framework", "works framework", "building framework", "nec framework"],                 subcategories: ["Works frameworks","NEC contracts","JCT frameworks","Minor works","Capital delivery"] },
-      { label: "Professional Services",           keywords: ["professional services", "consultancy framework", "advisory framework", "managed service framework"], subcategories: ["Consultancy","Project management","Legal","Finance advisory","HR advisory"] },
-      { label: "IT & Digital",                    keywords: ["digital framework", "technology framework", "g-cloud", "digital outcomes", "ict framework"],         subcategories: ["G-Cloud","Digital Outcomes","Cyber","Hosting","Software"] },
-      { label: "Supplies & Goods",                keywords: ["supplies framework", "goods framework", "catalogue", "procurement framework"],                       subcategories: ["Office supplies","Medical consumables","FM materials","PPE","Catering supplies"] },
-      { label: "Dynamic Purchasing Systems",      keywords: ["dynamic purchasing", "dps", "dynamic market", "open framework"],                                     subcategories: ["Open DPS","Construction DPS","Temporary staffing DPS","Transport DPS"] },
-      { label: "Framework Agreements",            keywords: ["framework", "call-off", "lot", "multi-supplier", "standing offer", "approved list"],                  subcategories: ["Single-supplier frameworks","Multi-supplier frameworks","Call-off arrangements","Lot-based procurement","Approved supplier lists","Pre-qualification"] },
+      { label: "Vehicle Procurement",            keywords: ["vehicle procurement", "fleet vehicles", "fleet car", "fleet van", "electric vehicle fleet", "zero emission vehicle", "fleet replacement", "fleet supply", "lease vehicles"], subcategories: ["Passenger cars","Vans & light commercial","HGV & specialist","Minibuses","Electric vehicles (fleet)","Hybrid fleet","Wheelchair-accessible vehicles","4x4 & off-road","Lease & hire purchase","Short-term hire","Fleet remarketing","Emergency vehicles"] },
+      { label: "Fleet Management Services",      keywords: ["fleet management", "fleet maintenance", "fleet contract", "vehicle servicing", "mot", "garage", "breakdown recovery", "fleet outsourcing"], subcategories: ["Fleet management system","Breakdown recovery","Vehicle servicing","MOT testing","Bodyshop repairs","Tyre management","Vehicle inspection","Roadworthiness","Defect reporting","Vehicle washing","Pre-lease inspection","Disposal & remarketing"] },
+      { label: "Telematics & Fleet Technology",  keywords: ["telematics", "vehicle tracking", "gps tracking", "black box", "fleet management system", "dashcam", "fleet data", "connected vehicle"], subcategories: ["GPS vehicle tracking","Driver behaviour monitoring","Dashcams","Mileage capture","Fleet analytics","Maintenance alerts","Fuel monitoring","CO2 reporting","CCTV (in-vehicle)","Lone worker (fleet)","Routing optimisation","Fleet data platform"] },
+      { label: "Fuel & Energy Management",       keywords: ["fuel card", "fuel supply", "fuel management", "diesel supply", "electric charging fleet", "fuel procurement", "electric fleet charging"], subcategories: ["Fuel cards","Bulk diesel supply","Fuel management system","Electric fleet charging","Charge point installation (fleet)","Hydrogen vehicles","Fuel audit","Fuel reporting","AdBlue supply","LPG supply","Alternative fuels","Zero-emission strategy"] },
+      { label: "Accident & Risk Management",     keywords: ["accident management", "claims management", "fleet insurance", "vehicle repair", "bodyshop", "fleet risk"], subcategories: ["First notification of loss","Claims management","Repair network","Hire replacement","Driver risk assessment","Fleet insurance","Risk profiling","Whiplash management","FNOL technology","Driver licence checking","Medical declarations","Grey fleet"] },
+      { label: "Driver Training & Compliance",   keywords: ["driver training", "driver assessment", "driving licence checking", "driving risk", "fleet driver", "safe driving", "cpc training"], subcategories: ["Driver risk assessment","Licence verification","CPC training","Fleet induction","Advanced driver training","Eco-driving","Minibus driver assessment","Emergency response driving","In-vehicle coaching","Driver behaviour workshops","Drug & alcohol testing","Corporate driver policy"] },
     ]
   },
   {
@@ -4491,25 +4523,26 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Youth Services", keywords: ["youth service", "youth work", "young people", "detached youth", "youth club", "mentoring"], subcategories: ["Youth clubs","Detached youth work","Positive activities","Duke of Edinburgh","Youth offending support","Gangs intervention","County lines response","Youth mentoring","Sports & wellbeing","Holiday hunger","Youth justice prevention","Employability (young people)"] },
     ]
   },
-  { slug: "waste", label: "Waste & Environment", standfirst: "Waste collection, recycling, street cleansing, grounds maintenance, and environmental monitoring for councils and public bodies.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "waste collection recycling street cleansing grounds maintenance environmental monitoring composting", idealBuyers: "local authorities district councils county councils waste authorities", mainGoal: "find waste management and environmental services contracts" }),
+  { slug: "waste", label: "Waste & Water", standfirst: "Waste collection, recycling, street cleansing, water supply and drainage, and environmental monitoring for councils and public bodies.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "waste collection recycling street cleansing grounds maintenance environmental monitoring composting water supply drainage flood risk water quality", idealBuyers: "local authorities district councils county councils waste authorities water authorities environment agency", mainGoal: "find waste management water and environmental services contracts" }),
     categories: [
-      { label: "Waste Collection & Logistics", keywords: ["waste collection", "refuse", "bin collection", "bulky waste", "clinical waste", "commercial waste"], subcategories: ["Domestic refuse","Recycling collection","Bulky waste","Clinical waste","Commercial waste","Food waste","Garden waste","Hazardous waste","Specialist collection","Skip hire","Fly-tip removal","Street litter bins"] },
-      { label: "Recycling & Treatment", keywords: ["recycling", "treatment", "materials recovery", "mrf", "composting", "anaerobic digestion"], subcategories: ["Materials recovery facilities","Composting","Anaerobic digestion","Energy from waste","Glass processing","Metals recycling","Plastics processing","Electrical waste (WEEE)","Wood recycling","Textile reuse","Waste transfer stations","Sorting plants"] },
-      { label: "Street Cleansing & Grounds", keywords: ["street cleansing", "grounds maintenance", "litter", "sweeping", "grass cutting"], subcategories: ["Street sweeping","Litter picking","Grass cutting","Floral displays","Tree surgery","Hedge trimming","Weed control","Graffiti removal","Gully cleaning","Road sweeping","Pavement cleaning","Cemetery maintenance"] },
-      { label: "Environmental Monitoring", keywords: ["environmental monitoring", "air quality", "noise monitoring", "contaminated land", "ecology"], subcategories: ["Air quality monitoring","Noise monitoring","Contaminated land surveys","Ecological surveys","Water quality","Environmental impact","Carbon accounting","Flood risk","Tree surveys","Biodiversity net gain","Land remediation","Environmental audits"] },
-      { label: "Waste Infrastructure & Equipment", keywords: ["waste equipment", "refuse vehicle", "recycling vehicle", "compactor", "container", "recycling centre", "hwrc"], subcategories: ["Refuse vehicles","Recycling vehicles","Compactors","Wheeled bins","Containers","HWRCs","Civic amenity sites","Skip lorries","Bin sensors","Smart waste technology","Solar compactors","Underground bins"] },
+      { label: "Waste Collection & Logistics",    keywords: ["waste collection", "refuse", "bin collection", "bulky waste", "clinical waste", "commercial waste"], subcategories: ["Domestic refuse","Recycling collection","Bulky waste","Clinical waste","Commercial waste","Food waste","Garden waste","Hazardous waste","Specialist collection","Skip hire","Fly-tip removal","Street litter bins"] },
+      { label: "Recycling & Treatment",           keywords: ["recycling", "treatment", "materials recovery", "mrf", "composting", "anaerobic digestion"], subcategories: ["Materials recovery facilities","Composting","Anaerobic digestion","Energy from waste","Glass processing","Metals recycling","Plastics processing","Electrical waste (WEEE)","Wood recycling","Textile reuse","Waste transfer stations","Sorting plants"] },
+      { label: "Street Cleansing & Grounds",      keywords: ["street cleansing", "grounds maintenance", "litter", "sweeping", "grass cutting"], subcategories: ["Street sweeping","Litter picking","Grass cutting","Floral displays","Tree surgery","Hedge trimming","Weed control","Graffiti removal","Gully cleaning","Road sweeping","Pavement cleaning","Cemetery maintenance"] },
+      { label: "Water Services & Drainage",       keywords: ["water supply", "water treatment", "wastewater", "drainage", "flood risk", "sustainable drainage", "suds", "water quality", "water management"], subcategories: ["Water supply contracts","Wastewater treatment","Drainage maintenance","Sustainable drainage (SUDS)","Flood risk management","Surface water management","Water quality monitoring","Sewer maintenance","Pumping stations","Watercourse management","Riparian maintenance","Catchment management"] },
+      { label: "Environmental Monitoring",        keywords: ["environmental monitoring", "air quality", "noise monitoring", "contaminated land", "ecology", "biodiversity"], subcategories: ["Air quality monitoring","Noise monitoring","Contaminated land surveys","Ecological surveys","Water quality","Environmental impact assessment","Carbon accounting","Flood modelling","Tree surveys","Biodiversity net gain","Land remediation","Environmental audits"] },
+      { label: "Waste Infrastructure & Equipment",keywords: ["waste equipment", "refuse vehicle", "recycling vehicle", "compactor", "container", "recycling centre", "hwrc"], subcategories: ["Refuse vehicles","Recycling vehicles","Compactors","Wheeled bins","Containers","HWRCs","Civic amenity sites","Skip lorries","Bin sensors","Smart waste technology","Solar compactors","Underground bins"] },
     ]
   },
-  { slug: "energy", label: "Energy & Utilities", standfirst: "Energy procurement, decarbonisation, smart metering, EV charging, heat networks, and net zero strategy across the public estate.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "energy procurement decarbonisation solar heat pump retrofit smart metering EV charging net zero sustainability", idealBuyers: "local authorities NHS trusts central government housing associations", mainGoal: "find energy and decarbonisation contracts" }),
+  { slug: "energy", label: "Energy & Net Zero", standfirst: "Energy procurement, decarbonisation, retrofit, heat networks, smart metering, and public EV charging infrastructure across the public estate.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "energy procurement decarbonisation solar heat pump retrofit smart metering EV public charging net zero sustainability heat network", idealBuyers: "local authorities NHS trusts central government housing associations combined authorities", mainGoal: "find energy and net zero decarbonisation contracts" }),
     categories: [
-      { label: "Energy Procurement", keywords: ["energy", "gas supply", "electricity", "utilities", "fuel", "renewable"], subcategories: ["Electricity supply","Gas supply","Energy framework","Flexible purchasing","Renewable energy","Energy brokering","Half-hourly metering","Water supply","Telecoms contracts","Fuel supply","Energy data management","Utility management"] },
-      { label: "Decarbonisation & Retrofit", keywords: ["decarbonisation", "retrofit", "solar", "heat pump", "insulation", "net zero", "low carbon", "carbon"], subcategories: ["Solar PV","Heat pumps","Insulation works","LED upgrades","Voltage optimisation","Battery storage","EPC improvements","PAS 2035 retrofit","Net zero strategy","Carbon offsetting","Biomass heating","Fabric first retrofit"] },
-      { label: "Smart Metering & Monitoring", keywords: ["smart meter", "metering", "bms", "energy monitoring", "sub-meter"], subcategories: ["Smart meters","AMR metering","BMS upgrades","Energy monitoring","Sub-metering","ISO 50001 support","Carbon reporting","Tariff optimisation","Real-time dashboards","Automated meter reading","M&T systems","Energy certificates"] },
-      { label: "EV Charging & Transport", keywords: ["ev charg", "electric vehicle", "charge point", "zero emission", "ulev"], subcategories: ["EV charge points","Public charging network","Fleet charging","Ultra-low emission","EV strategy","Charge point management","Rapid charging hubs","On-street charging","Fleet decarbonisation","E-bike infrastructure","EV grid balancing","Workplace charging"] },
-      { label: "Heat Networks & District Energy", keywords: ["heat network", "district heating", "communal heating", "biomass", "heat interface"], subcategories: ["Heat network design","District heating","Communal heating","Heat interface units","ESCO contracts","Biomass district","Network metering","Connection agreements","Hydraulic modelling","Heat offtake","Heat pumps (district)","Thermal storage"] },
-      { label: "Energy Consultancy", keywords: ["energy consultancy", "energy management", "carbon strategy", "sustainability", "energy audit", "climate"], subcategories: ["Energy audits","Carbon strategy","Sustainability reporting","SECR compliance","Energy management","Green fleet strategy","Climate action plans","Scope 3 emissions","Net zero roadmaps","Public sector decarbonisation","BREEAM assessment","Lifecycle carbon"] },
+      { label: "Energy Procurement & Utilities", keywords: ["energy", "gas supply", "electricity", "utilities", "renewable energy", "energy framework", "energy brokering"], subcategories: ["Electricity supply","Gas supply","Energy framework","Flexible purchasing","Renewable energy","Energy brokering","Half-hourly metering","Utility management","Energy data management","Water utilities","Telecoms (utilities)","Fuel supply (estates)"] },
+      { label: "Decarbonisation & Retrofit",     keywords: ["decarbonisation", "retrofit", "solar", "heat pump", "insulation", "net zero", "low carbon", "carbon", "pas 2035"], subcategories: ["Solar PV","Heat pumps","Insulation works","LED upgrades","Voltage optimisation","Battery storage","EPC improvements","PAS 2035 retrofit","Net zero strategy","Carbon offsetting","Biomass heating","Fabric first retrofit"] },
+      { label: "Smart Metering & Monitoring",    keywords: ["smart meter", "metering", "bms", "energy monitoring", "sub-meter", "amc metering", "iso 50001"], subcategories: ["Smart meters","AMR metering","BMS upgrades","Energy monitoring","Sub-metering","ISO 50001 support","Carbon reporting","Tariff optimisation","Real-time dashboards","Automated meter reading","M&T systems","Energy certificates"] },
+      { label: "Public EV Charging Infrastructure", keywords: ["ev charging", "charge point", "public charging", "on-street charging", "rapid charging", "electric vehicle infrastructure", "ev strategy"], subcategories: ["On-street charge points","Public charging network","Rapid charging hubs","E-bike charging","EV strategy","Charge point management software","Grid connections","EV infrastructure design","Parking EV integration","Destination charging","OZEV funding","EV grid balancing"] },
+      { label: "Heat Networks & District Energy", keywords: ["heat network", "district heating", "communal heating", "biomass", "heat interface", "esco"], subcategories: ["Heat network design","District heating","Communal heating","Heat interface units","ESCO contracts","Biomass district","Network metering","Connection agreements","Hydraulic modelling","Heat offtake","Heat pumps (district)","Thermal storage"] },
+      { label: "Energy Consultancy & Strategy",  keywords: ["energy consultancy", "energy management", "carbon strategy", "sustainability", "energy audit", "climate action", "net zero roadmap"], subcategories: ["Energy audits","Carbon strategy","Sustainability reporting","SECR compliance","Energy management","Climate action plans","Scope 3 emissions","Net zero roadmaps","Public sector decarbonisation","BREEAM assessment","Lifecycle carbon","Social value (energy)"] },
     ]
   },
   { slug: "security", label: "Security", standfirst: "Manned guarding, CCTV, access control, event security, and lone worker protection for public sector sites and estates.", live: true,
@@ -4577,15 +4610,25 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Consultation & Engagement", keywords: ["consultation", "engagement", "stakeholder", "co-production", "citizen", "participatory"], subcategories: ["Public consultation","Co-production","Citizen assemblies","Online engagement","Face-to-face events","Accessibility engagement","Community engagement","Hard-to-reach groups","Equalities consultation","Feedback analysis","Deliberative research","Participatory budgeting"] },
     ]
   },
-  { slug: "leisure", label: "Leisure & Culture", standfirst: "Leisure centre management, libraries, arts, parks, sports development, and heritage for councils and public bodies.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "leisure management swimming pool sports centre library arts culture parks museums heritage sports development", idealBuyers: "local authorities district councils county councils leisure trusts", mainGoal: "find leisure and cultural services contracts" }),
+  { slug: "leisure-sport", label: "Leisure, Sport & Recreation", standfirst: "Leisure centre management, swimming, parks, sports development, libraries, and active community programmes for councils and public bodies.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "leisure management swimming pool sports centre gym fitness parks open spaces sports development library active communities physical activity", idealBuyers: "local authorities district councils county councils leisure trusts sport england", mainGoal: "find leisure sport and recreation contracts" }),
     categories: [
-      { label: "Leisure Management", keywords: ["leisure management", "leisure centre", "swimming pool", "sports centre", "gym", "leisure trust"], subcategories: ["Leisure centre management","Swimming pools","Sports halls","Fitness suites","Outdoor athletics","Dual-use facilities","Community sports","Leisure trust transfer","Pricing and tariff","Health referral","Disability sport","Outdoor education"] },
-      { label: "Library Services", keywords: ["library", "lending", "library service", "book purchasing", "reading", "information service"], subcategories: ["Library management","Mobile libraries","Book purchasing","Self-service kiosks","Library IT systems","Reading groups","Rhyme time","Digital inclusion","Home delivery","Archive services","Library buildings","Community library"] },
-      { label: "Arts & Culture", keywords: ["arts", "culture", "theatre", "gallery", "creative arts", "cultural programme", "arts development"], subcategories: ["Theatre management","Art gallery","Museum management","Heritage interpretation","Public art commissioning","Artist residencies","Arts development","Cultural programme","Community arts","Festival support","Arts fundraising","Cultural strategy"] },
-      { label: "Parks & Open Spaces", keywords: ["parks", "open space", "playground", "outdoor recreation", "allotments", "nature reserve"], subcategories: ["Parks management","Play area maintenance","Allotments","Nature reserves","Sports pitches","Outdoor gym","Footpath maintenance","Countryside access","Urban green space","Biodiversity management","Ecology surveys","Green infrastructure"] },
-      { label: "Sports Development", keywords: ["sports development", "sports centre", "walking programme", "healthy active", "physical activity"], subcategories: ["Sports development","Active travel","Cycling programmes","Walking networks","Active communities","Disability sport","School sport","Club development","Workforce development (sport)","National governing bodies","Swim England","Move More"] },
-      { label: "Museums & Heritage", keywords: ["museum", "cultural heritage", "archive", "artefact", "gallery", "arts development"], subcategories: ["Museum collections","Conservation and restoration","Archive digitisation","Heritage consultancy","Listed building work","Archaeological surveys","Heritage at risk","Interpretation design","Loan services","Oral history","War memorial restoration","Historic environment"] },
+      { label: "Leisure Centre Management", keywords: ["leisure management", "leisure centre", "swimming pool", "sports centre", "gym", "fitness", "leisure trust", "aquatics"], subcategories: ["Leisure centre management","Swimming pools & aquatics","Sports halls","Fitness suites","Outdoor athletics","Dual-use facilities","Community sports","Leisure trust transfer","Health referral","Disability sport","Outdoor education","Wellbeing activities"] },
+      { label: "Parks, Play & Open Spaces",  keywords: ["parks", "open space", "playground", "outdoor recreation", "allotments", "nature reserve", "play area", "muga"], subcategories: ["Parks management","Play area maintenance","Allotments","Nature reserves","Sports pitches","Outdoor gym","Footpath maintenance","Countryside access","Urban green space","Biodiversity management","MUGA","Green infrastructure","Community gardens"] },
+      { label: "Sports Development & Active Communities", keywords: ["sports development", "healthy active", "physical activity", "active communities", "sports participation", "school sport", "club development"], subcategories: ["Sports development","Active communities","Disability sport","School sport","Club development","National governing bodies","Swim England","Move More","Holiday activities","Social prescribing (sport)","Workforce development (sport)","Community sport grants"] },
+      { label: "Libraries & Community Hubs", keywords: ["library", "lending", "library service", "book purchasing", "information service", "community hub", "mobile library"], subcategories: ["Library management","Mobile libraries","Book purchasing","Self-service kiosks","Library IT systems","Reading groups","Rhyme time","Digital inclusion","Home delivery","Library buildings","Community library","Archives (library)"] },
+      { label: "Sport Infrastructure & Equipment", keywords: ["sports equipment", "changing facilities", "sports hall equipment", "pitch maintenance", "gym equipment", "pool maintenance"], subcategories: ["Sports hall equipment","Gymnasium equipment","Changing rooms","Swimming pool maintenance","Pitch maintenance","Sports flooring","Scoreboard systems","Spectator facilities","Outdoor sports equipment","Floodlighting (sport)","Sport surfaces","Groundsmanship"] },
+    ]
+  },
+  { slug: "arts-culture-heritage", label: "Arts, Culture & Heritage", standfirst: "Museums, galleries, public art commissioning, heritage conservation, theatre, creative programmes, and cultural strategy for councils and public bodies.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "museum gallery management heritage conservation public art commissioning theatre cultural strategy archive digitisation creative programme artist residency", idealBuyers: "local authorities arts council england national lottery heritage fund museums galleries historic england combined authorities", mainGoal: "find arts culture and heritage contracts" }),
+    categories: [
+      { label: "Museum & Gallery Management",    keywords: ["museum", "gallery", "collection management", "visitor attraction", "curatorial", "exhibition design", "object conservation", "museum management"], subcategories: ["Museum management","Gallery operations","Collection management","Conservation & storage","Visitor experience","Exhibition design","Education programmes (museum)","Collection digitisation","Handling & loans","Museum retail","Interpretation design","Ticketing systems (museum)"] },
+      { label: "Heritage & Conservation",        keywords: ["heritage", "listed building", "historic", "conservation area", "archaeology", "historic environment", "heritage at risk", "scheduled monument"], subcategories: ["Heritage surveys","Conservation area appraisals","Listed building advice","Historic environment","Archaeology","Building recording","Heritage impact assessment","SMR support","Historic landscape","War memorial restoration","Heritage at risk works","Grant-aided conservation"] },
+      { label: "Public Art & Creative Commissioning", keywords: ["public art", "commission", "street art", "sculpture", "mural", "artist residency", "creative commission", "percent for art"], subcategories: ["Public art commissioning","Sculpture & installations","Murals","Artist residencies","Percent for art","Community art","Digital art","Light art","Wayfinding art","Placemaking (art)","Cultural co-production","Creative practitioners"] },
+      { label: "Theatre, Performance & Cultural Venues", keywords: ["theatre", "performance", "arts venue", "concert hall", "cultural venue", "performing arts", "cinema", "arts centre"], subcategories: ["Theatre management","Arts centre operations","Concert hall management","Cinema (cultural)","Performance programming","Technical theatre","Front of house","Stage management","Box office","Venue hire (arts)","Outreach programming","Touring productions"] },
+      { label: "Cultural Strategy & Creative Economy", keywords: ["cultural strategy", "arts development", "cultural programme", "arts council", "creative economy", "culture plan", "cultural investment", "creative industries"], subcategories: ["Cultural strategy","Arts policy","Creative economy development","Cultural impact assessment","Night-time economy","Creative industries support","Cultural tourism","Arts fundraising","Culture plan","Cultural flagship","Cultural quarter planning","Creative skills"] },
+      { label: "Archives & Digitisation",        keywords: ["archive", "digitisation", "records archive", "scanning archive", "oral history", "film archive", "local history"], subcategories: ["Archive management","Records digitisation","Oral history collection","Film & audio archives","Local history collections","Cataloguing","Conservation (paper)","Public access systems","Outreach (archives)","Photographic collections","Digital preservation","Family history services"] },
     ]
   },
   { slug: "planning", label: "Planning & Regeneration", standfirst: "Planning consultancy, urban regeneration, economic development, heritage, transport planning, and land strategy for councils and combined authorities.", live: true,
@@ -4632,17 +4675,39 @@ const DESK_PROFILES: DeskProfile[] = [
       { label: "Market & Economic Research", keywords: ["market research", "economic analysis", "feasibility study", "cost benefit analysis", "economic evaluation"], subcategories: ["Feasibility studies","Cost-benefit analysis","Options appraisal","Market analysis","Demand forecasting","Competition analysis","Socioeconomic impact","ROI modelling","Wellbeing economics","Green Book appraisal","Economic modelling","Sector intelligence"] },
     ]
   },
-  { slug: "consulting", label: "Central Gov Consulting", standfirst: "Management consulting, programme delivery, policy development, and commercial advisory for central government departments.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "management consulting strategy consulting programme delivery policy advisory operating model design organisational transformation commercial advisory spending review", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England", mainGoal: "find central government management consulting and advisory contracts" }),
+  { slug: "consulting", label: "Programme & Policy Consulting", standfirst: "Management consulting, programme delivery, digital transformation, policy development, and commercial advisory for central government and public bodies.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "management consulting strategy consulting programme delivery policy advisory operating model design organisational transformation commercial advisory spending review", idealBuyers: "central government departments Cabinet Office HMRC DVLA DWP Home Office NHS England combined authorities", mainGoal: "find programme management policy and consulting contracts" }),
     categories: [
-      { label: "Digital Government & Strategy", keywords: ["digital government", "digitisation", "gds standards", "service redesign", "gov.uk", "digital leadership"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
-      { label: "Programme & Project Delivery", keywords: ["programme management", "project management", "pmo", "gateway review", "programme delivery", "delivery assurance"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
-      { label: "Organisational Transformation", keywords: ["operating model", "restructuring", "shared services", "change management", "organisational design", "target operating model"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Succession planning","Target operating model","Benchmarking","OD consulting","Arm's-length body reform"] },
-      { label: "Policy & Regulatory", keywords: ["policy development", "regulatory impact", "white paper", "green paper", "ministerial", "policy advisory"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
+      { label: "Digital Government & Strategy",     keywords: ["digital government", "digitisation", "gds standards", "service redesign", "gov.uk", "digital leadership", "digital strategy"], subcategories: ["Digital strategy","Technology assessment","Digital service redesign","Legacy modernisation","API-first design","Cloud migration strategy","Data architecture","AI readiness","Digital leadership","GDS standards","GOV.UK Notify","Service standard assessment"] },
+      { label: "Programme & Project Delivery",      keywords: ["programme management", "project management", "pmo", "gateway review", "programme delivery", "delivery assurance", "agile delivery"], subcategories: ["Programme management","PMO setup","Agile delivery","Portfolio management","Benefits tracking","Schedule management","Risk register","Governance frameworks","Gateway reviews","Delivery assurance","IPA reviews","Major projects authority"] },
+      { label: "Organisational Transformation",     keywords: ["operating model", "restructuring", "shared services", "change management", "organisational design", "target operating model"], subcategories: ["Operating model design","Shared services","Merger and acquisition","Workforce redesign","Culture change","Behavioural change","Leadership development","Target operating model","Benchmarking","OD consulting","Arm's-length body reform","Efficiency review"] },
+      { label: "Policy & Regulatory Advisory",      keywords: ["policy development", "regulatory impact", "white paper", "green paper", "ministerial", "policy advisory", "policy design"], subcategories: ["Policy design","Regulatory impact","Strategy development","White paper support","Consultation design","Ministerial briefings","Evidence synthesis","Parliamentary work","Public inquiry support","Arms-length bodies","Spending review","Policy simulation"] },
       { label: "Commercial & Procurement Advisory", keywords: ["commercial advisory", "procurement advisory", "category management", "sourcing strategy", "contract management"], subcategories: ["Category management","Strategic sourcing","Market engagement","Spend analysis","Commercial strategy","Contract management","Supplier development","Procurement transformation","Crown Commercial","Cabinet Office compliance","Make vs buy","Commercial assurance"] },
-      { label: "Financial & Economic Advisory", keywords: ["financial advisory", "business case", "green book", "spending review", "economic appraisal"], subcategories: ["Business case development","Green Book","Infrastructure financing","Spending review support","Economic appraisal","Value-for-money assessment","Financial modelling","ROAMEF","Cost modelling","Public accounts support","Fiscal analysis","CDEL/RDEL management"] },
+      { label: "Financial & Economic Advisory",     keywords: ["financial advisory", "business case", "green book", "spending review", "economic appraisal", "value for money"], subcategories: ["Business case development","Green Book","Infrastructure financing","Spending review support","Economic appraisal","Value-for-money assessment","Financial modelling","ROAMEF","Cost modelling","Public accounts support","Fiscal analysis","CDEL/RDEL management"] },
     ]
-  }
+  },
+  { slug: "events-venues", label: "Events & Venues", standfirst: "Events management, audio visual production, venue hire, exhibitions, public ceremonies, and conference services for councils, NHS, and public bodies.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "event management conference venue hire audio visual staging live streaming awards ceremony exhibition public event civic ceremony outdoor event", idealBuyers: "local authorities NHS trusts central government combined authorities universities museums", mainGoal: "find events management venue and conference contracts" }),
+    categories: [
+      { label: "Event Management & Planning",     keywords: ["event management", "events coordinator", "event planning", "conference management", "awards ceremony", "public event", "event organiser"], subcategories: ["Event planning","Conference management","Awards ceremonies","Gala dinners","Civic events","Launch events","Outdoor events","Event logistics","Delegate management","Post-event reporting","Event security liaison","Sustainability (events)"] },
+      { label: "Audio Visual & Production",       keywords: ["audio visual", "av production", "staging", "lighting rig", "sound system", "video production events", "live streaming", "event technology", "av hire"], subcategories: ["AV hire","Stage & rigging","Sound systems","Lighting design","LED screens & projection","Live streaming","Broadcast production","Translation (events)","Simultaneous interpretation","Event filming","Photography (events)","Recording & editing"] },
+      { label: "Venue Hire & Conference Facilities", keywords: ["venue hire", "conference venue", "meeting rooms", "hotel conference", "event space", "venue finding", "conference facility"], subcategories: ["Conference centres","Hotel venues","Museum & gallery hire","Civic halls","Sports venue hire","Unique venues","Meeting rooms","Venue finding service","Delegate packages","Catering (venue)","Accessibility (venue)","AV in-house"] },
+      { label: "Exhibitions & Displays",          keywords: ["exhibition", "display", "pop-up", "stand design", "trade show", "exhibition design", "banners", "wayfinding display"], subcategories: ["Exhibition design & build","Display boards","Banner stands","Pop-up displays","Wayfinding systems","Interpretive displays","Interactive displays","Trade show stands","Museum exhibition","Travelling exhibitions","Digital signage","Environmental graphics"] },
+      { label: "Public Ceremonies & Civic Events",keywords: ["civic ceremony", "public event", "remembrance", "parade", "bonfire", "fireworks", "royal visit", "civic occasion", "national celebration"], subcategories: ["Remembrance events","Civic ceremonies","Bonfire & fireworks","Parades & processions","Royal events","National celebrations","War memorials","Charity events","Marathon & mass events","Outdoor festival","Street party","Volunteers co-ordination"] },
+      { label: "Digital Events & Engagement",     keywords: ["virtual event", "hybrid event", "webinar", "online conference", "digital engagement event", "live poll", "event app"], subcategories: ["Webinar platforms","Hybrid event production","Virtual conference","Event apps","Live polling","Online exhibition","Digital registration","Attendee engagement tools","Post-event content","On-demand viewing","Accessibility (digital events)","Analytics (events)"] },
+    ]
+  },
+  { slug: "uniforms-workwear", label: "Uniforms & Workwear", standfirst: "NHS uniforms, emergency service clothing, PPE, prison workwear, school uniforms, and managed laundry services for public sector organisations.", live: true,
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "NHS uniforms scrubs emergency service clothing police uniform fire service uniform PPE protective clothing safety workwear school uniform laundry managed workwear", idealBuyers: "NHS trusts police forces fire services local authorities prison service schools councils", mainGoal: "find uniform workwear and PPE contracts" }),
+    categories: [
+      { label: "NHS & Healthcare Clothing",        keywords: ["nhs uniform", "scrubs", "theatre gown", "clinical uniform", "tunic", "healthcare workwear", "healthcare clothing", "surgical gown", "nurse uniform"], subcategories: ["Scrubs","Tunics & trousers","Theatre gowns","Isolation gowns","Lab coats","Patient gowns","Domestic staff clothing","Porter uniforms","Clinical footwear","ID badges","Uniform sizing service","Inclusive sizing"] },
+      { label: "Emergency Services Uniforms",      keywords: ["police uniform", "fire uniform", "ambulance uniform", "police clothing", "constabulary uniform", "duty wear", "emergency service clothing"], subcategories: ["Police dress uniform","Police operational clothing","Fire service protective clothing","Ambulance service uniform","Prison officer uniform","Border Force uniform","HMCTS clothing","Community support officer kit","Specialist role clothing","Badges & insignia","Epaulettes","Uniform accessories"] },
+      { label: "PPE & Safety Clothing",            keywords: ["ppe", "personal protective equipment", "high visibility", "hi vis", "hard hat", "safety boots", "safety workwear", "gloves", "respiratory protection"], subcategories: ["Hi-visibility jackets & vests","Hard hats & helmets","Safety boots & shoes","Protective gloves","Respiratory protection","Safety glasses","Body armour","Chemical protection suits","Anti-static clothing","Arc flash protection","Cut-resistant clothing","PPE supply & management"] },
+      { label: "School & Education Uniforms",      keywords: ["school uniform", "academy uniform", "pupil clothing", "staff uniform school", "school clothing grant"], subcategories: ["Pupil school uniforms","Sixth form clothing","Sports kits (schools)","Staff polo shirts","Academy branded clothing","Uniform suppliers","School clothing grants","Sustainable uniforms","Inclusive uniform policy","Embroidery & branding","Second-hand uniform schemes","Uniform quality standards"] },
+      { label: "Prison & Custodial Clothing",      keywords: ["prison clothing", "custody uniform", "probation uniform", "prison workwear", "hmps clothing", "custodial workwear"], subcategories: ["Prison officer uniform","Prisoner clothing","Custody suite clothing","Probation service wear","Chaplaincy uniform","Education staff (prison)","Healthcare (prison) clothing","Secure children's home uniforms","YOI clothing","Detainee clothing","Specialist protective (prison)","Uniform distribution (prison)"] },
+      { label: "Laundry & Workwear Management",    keywords: ["laundry", "linen services", "workwear management", "uniform management", "textile rental", "linen hire", "linen supply", "laundry service"], subcategories: ["Hospital laundry","Industrial laundry","Linen hire","Workwear rental","Uniform management system","Collection & delivery","Garment tracking","RFID tagging","Repair service","Garment replacement","Hygienically clean standard","Laundry equipment"] },
+    ]
+  },
 ];
 
 const SIGNAL_CATEGORIES: Array<{ key: string; label: string; input: z.infer<typeof intakeSchema> }> =
@@ -10022,7 +10087,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const signalTagClass = (cat: string): string => {
     if (["social-care", "health", "pharmacy"].some(k => cat.includes(k))) return "bw-tag-health";
     if (["housing", "planning"].some(k => cat.includes(k))) return "bw-tag-housing";
-    if (["education", "leisure", "arts"].some(k => cat.includes(k))) return "bw-tag-edu";
+    if (["education", "leisure-sport", "arts-culture-heritage", "leisure", "arts"].some(k => cat.includes(k))) return "bw-tag-edu";
     return "bw-tag-other";
   };
   const gradeColor = (g: string): string => {
