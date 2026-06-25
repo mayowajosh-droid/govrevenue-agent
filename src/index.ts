@@ -7219,7 +7219,7 @@ function reportPage(scan: ScanRecord) {
     </div>
 
     <section class="cover">
-      <p class="cover-label">UK Public-Sector Revenue Intelligence</p>
+      <p class="cover-label">UK Sector Intelligence</p>
       <h1>${escapeHtml(scan.company_name)}</h1>
       <p class="cover-edp-label">Executive Decision Panel</p>
       <p class="subtitle">${escapeHtml(sectorLens)} &middot; ${escapeHtml(regions)} &middot; ${escapeHtml(formatDate(scan.updated_at))}</p>
@@ -7414,14 +7414,16 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
 
 app.get("/", asyncRoute(async (req, res) => {
   const homepageAuth = getAuthUser(req);
-  const [count24h, samplePdfUrl, deskSignals, chartResult, chaseSignals, chaseStats] = await Promise.all([
+  const [count24h, samplePdfUrl, deskSignals, chartResult, chaseSignals, chaseStats, homeMktSnap] = await Promise.all([
     count24hSignals().catch(() => 0),
     findSamplePdf().catch(() => null as string | null),
     queryDeskSignals(DESK_PROFILES.filter(d => d.live).map(d => d.slug)).catch(() => new Map<string, HomepageSignal>()),
     queryChartData().catch(() => ({ points: [] as ChartDataPoint[], illustrative: true, topDesk: null })),
     queryChaseableSignals(6).catch(() => [] as HomepageSignal[]),
     queryChaseableStats().catch(() => ({ totalOpen: 0, avgValueK: null, closingThisMonth: 0, byDesk: [] }) as ChaseStats),
+    pool ? generateMarketSignals(pool, { limit: 6 }).catch(() => null) : Promise.resolve(null),
   ]);
+  const homeMktSignals: MarketSignal[] = homeMktSnap?.signals ?? [];
 
   // Derive hero and ticker from current desk signals (sorted by most recently published)
   const signals = [...deskSignals.values()]
@@ -7518,13 +7520,34 @@ app.get("/", asyncRoute(async (req, res) => {
   const topDeskLabel = chartResult.topDesk
     ? `Led by <b>${escapeHtml(chartResult.topDesk)}</b> this period`
     : `Across all ${DESK_PROFILES.filter(d => d.live).length} active desks`;
+  // Build bullets: lead with market signals, tail with procurement
+  const mktBullets = homeMktSignals.slice(0, 3).map(s => {
+    const chgStr = s.changePercent != null ? ` &middot; ${s.changePercent >= 0 ? "+" : ""}${s.changePercent.toFixed(1)}%` : "";
+    return `<li><b>${escapeHtml(s.source)}</b> &middot; ${escapeHtml(s.stat)}${chgStr}</li>`;
+  }).join("");
+
   const chartBullets = chartResult.illustrative
-    ? `<li><b>Housing maintenance</b> &middot; illustrative trend +34% / 24mo</li>
-        <li><b>Re-let signal</b> &middot; illustrative framework expiry cluster</li>
-        <li><b>Entry window</b> &middot; illustrative 18-month renewal window</li>`
-    : `<li><b>Awarded spend</b> &middot; ${trendLabel}</li>
-        <li>${topDeskLabel}</li>
-        <li><b>Re-let signal</b> &middot; framework expiry clusters tracked</li>`;
+    ? `<li><b>DVLA</b> &middot; vehicle registration data — sector fleet demand signal</li>
+        <li><b>Land Registry</b> &middot; residential &amp; commercial completions — construction demand</li>
+        <li><b>Companies House</b> &middot; new incorporations by sector — market formation signal</li>
+        <li><b>Procurement</b> &middot; awarded spend across 28 sectors — illustrative trend +34%</li>`
+    : (mktBullets || "") + `<li><b>Procurement</b> &middot; ${trendLabel}${chartResult.topDesk ? ` &middot; led by ${escapeHtml(chartResult.topDesk)}` : ""}</li>`;
+
+  // Signal cards to render below the homepage chart
+  const homeMktCardsHtml = homeMktSignals.length > 0
+    ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px">
+        ${homeMktSignals.slice(0, 3).map(s => {
+          const chgBadge = s.changePercent != null
+            ? `<span style="font-family:var(--mono);font-size:9px;font-weight:600;padding:1px 5px;border-radius:2px;${s.changePercent >= 0 ? "color:#2F8A52;background:rgba(47,138,82,.1)" : "color:#9b2d20;background:rgba(155,45,32,.1)"}">${s.changePercent >= 0 ? "▲" : "▼"} ${Math.abs(s.changePercent).toFixed(1)}%</span>`
+            : "";
+          return `<div style="background:rgba(27,30,25,.04);border:1px solid rgba(27,30,25,.1);padding:12px 14px">
+            <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">${escapeHtml(s.source)}${chgBadge}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:4px">${escapeHtml(s.stat)}</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">${escapeHtml(s.geography)} &middot; ${escapeHtml(s.period)}</div>
+          </div>`;
+        }).join("")}
+      </div>`
+    : "";
 
   const sampleLink = `<a class="btn-ghost" href="/scan/sample">See a sample report &rarr;</a>`;
 
@@ -7533,8 +7556,8 @@ app.get("/", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="UK public-sector revenue intelligence. Turn Contracts Finder and Find a Tender data into a commercial decision for your firm — in minutes.">
-<title>AtlasRevenue — Public-Sector Revenue Intelligence</title>
+<meta name="description" content="UK sector intelligence. Market signals from DVLA, Land Registry, Companies House, ONS and UKRI — alongside procurement data from Contracts Finder and Find a Tender. Detect demand before it surfaces as a tender.">
+<title>AtlasRevenue — UK Sector Intelligence</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -7792,9 +7815,9 @@ ${pageShellHeader(null, homepageAuth)}
         ${sampleLink}
       </div>
       <div class="chips">
-        <div class="chip"><b>Verified</b> contacts &amp; decision-makers</div>
-        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> pre-tender signals</div>
-        <div class="chip">Geographic opportunity mapping</div>
+        <div class="chip"><b>DVLA · Land Reg · ONS · UKRI</b> market signals</div>
+        <div class="chip"><b id="liveNotices">${noticesDisplay}</b> live procurement signals</div>
+        <div class="chip">Regional demand mapping · 28 sectors</div>
       </div>
     </div>
     <div class="hero-card-wrap">
@@ -7816,24 +7839,25 @@ ${pageShellHeader(null, homepageAuth)}
 <section class="chartband" id="chart">
   <div class="wrap">
     <div class="reveal">
-      <div class="eyebrow">All-desk spend signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
+      <div class="eyebrow">Sector intelligence signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
       <h2>Detect demand before it surfaces as a tender.</h2>
-      <p>Recurring spend in a category is the leading indicator. A competitor can replicate a feature. They cannot replicate a dataset verified by hand and refined by use over years. We map the curve so your firm enters on the upswing &mdash; not after the award.</p>
+      <p>Recurring spend in a category is the leading indicator of where buyers are going next. We track it across five independent sources — DVLA vehicle flows, Land Registry completions, Companies House formations, ONS economic indicators, and government procurement records. The full picture, not just the contract notice.</p>
       <ul>
         ${chartBullets}
       </ul>
-      ${!chartResult.illustrative ? `<a href="/desks" style="display:inline-block;margin-top:18px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:2px">Browse all desks &rarr;</a>` : ''}
+      <a href="/desks" style="display:inline-block;margin-top:18px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:2px">Explore sector intelligence &rarr;</a>
     </div>
     <div class="chartwrap">
       <div class="ch-head">
         <div>
-          <span class="lab">UK public-sector awarded${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
+          <span class="lab">Procurement spend${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
           <span class="lab" style="display:block;font-size:10px;opacity:.6;margin-top:2px">Monthly totals &middot; rolling 12 months</span>
         </div>
         <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart" style="cursor:pointer" onclick="location.href='/charts'"></canvas>
-      <a href="/charts" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">View intelligence &rarr;</a>
+      ${homeMktCardsHtml}
+      <a href="/atlas" style="display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border-bottom:1px solid currentColor;padding-bottom:1px;width:fit-content;margin:10px 0 0 auto">Explore Atlas intelligence &rarr;</a>
     </div>
   </div>
 </section>
@@ -7872,13 +7896,13 @@ ${chaseNowHtml}
     <div>
       <div class="eyebrow">The product underneath</div>
       <h2>One profile in.<br>A <em>sourced verdict</em> out.</h2>
-      <p>Submit your firm&rsquo;s services, region and contract range. The intelligence engine scans the public record, scores route-to-revenue fit, and returns a professional brief &mdash; every claim timestamped, sourced, and caveated.</p>
+      <p>Submit your firm&rsquo;s services, region and contract range. The intelligence engine reads market signals across five independent sources, scores route-to-revenue fit, and returns a professional brief &mdash; every claim timestamped, sourced, and caveated.</p>
       <a class="btn-primary" href="/scan">Run your first scan</a>
     </div>
     <div class="steps">
       <div class="step"><span class="n">01</span><span class="x"><b>Profile</b><small>Services &middot; region &middot; contract range &middot; evidence</small></span></div>
-      <div class="step"><span class="n">02</span><span class="x"><b>Scan</b><small>Contracts Finder &middot; Find a Tender &middot; LA spend &middot; awards</small></span></div>
-      <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Buyer fit &middot; evidence grade &middot; route-to-revenue</small></span></div>
+      <div class="step"><span class="n">02</span><span class="x"><b>Scan</b><small>DVLA &middot; Land Registry &middot; ONS &middot; UKRI &middot; Contracts Finder</small></span></div>
+      <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Market demand &middot; buyer fit &middot; evidence grade &middot; route-to-revenue</small></span></div>
       <div class="step"><span class="n">04</span><span class="x"><b>Verdict</b><small>Bid &middot; partner &middot; monitor &middot; prepare &middot; ignore</small></span></div>
     </div>
   </div>
@@ -7888,8 +7912,8 @@ ${chaseNowHtml}
     ${sampleCtaBlock("full")}
     <div>
       <div class="eyebrow">Join the briefing</div>
-      <h2>Intelligence before the tender.</h2>
-      <p>One short note when new public money moves in your category. No daily emails. No discount codes &mdash; those are not on offer.</p>
+      <h2>Intelligence before the market moves.</h2>
+      <p>One short note when a signal fires in your sector &mdash; DVLA fleet data, Land Registry completions, new framework clusters, or a procurement spike. No daily emails. No discount codes.</p>
       <form class="subform" id="briefing-form">
         <input type="email" id="briefing-email" placeholder="you@firm.co.uk" aria-label="Email address" required>
         <button type="submit">Reserve</button>
