@@ -3206,6 +3206,108 @@ function buildIncumbentMap(data: ProcurementData): IncumbentEntry[] {
   return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 8);
 }
 
+function renderRegionHeatMap(data: ProcurementData, scan: ScanRecord): string {
+  // Map buyer names to UK regions
+  const regionPatterns: [string, string][] = [
+    ["GREATER LONDON|CITY OF LONDON|LONDON BOROUGH|GLA |MAYOR OF LONDON", "London"],
+    ["KENT|SURREY|SUSSEX|HAMPSHIRE|BERKSHIRE|OXFORDSHIRE|BUCKINGHAMSHIRE|ESSEX|HERTFORDSHIRE|ISLE OF WIGHT", "South East"],
+    ["CORNWALL|DEVON|DORSET|SOMERSET|WILTSHIRE|GLOUCESTERSHIRE|BRISTOL|BATH", "South West"],
+    ["NORFOLK|SUFFOLK|CAMBRIDGESHIRE|BEDFORDSHIRE|HERTFORDSHIRE|ESSEX|PETERBOROUGH|LUTON", "East England"],
+    ["LEICESTERSHIRE|NORTHAMPTONSHIRE|NOTTINGHAMSHIRE|DERBYSHIRE|LINCOLNSHIRE", "East Midlands"],
+    ["BIRMINGHAM|COVENTRY|WOLVERHAMPTON|SANDWELL|DUDLEY|WALSALL|SOLIHULL|STAFFORDSHIRE|WARWICKSHIRE|WORCESTERSHIRE|HEREFORDSHIRE|SHROPSHIRE", "West Midlands"],
+    ["YORKSHIRE|LEEDS|SHEFFIELD|BRADFORD|HULL|KIRKLEES|WAKEFIELD|CALDERDALE|BARNSLEY|DONCASTER|ROTHERHAM|NORTH LINCOLNSHIRE", "Yorkshire"],
+    ["MANCHESTER|SALFORD|STOCKPORT|TRAFFORD|OLDHAM|BURY|ROCHDALE|BOLTON|WIGAN|CHESHIRE|LANCASHIRE|CUMBRIA|MERSEYSIDE|LIVERPOOL|SEFTON|KNOWSLEY|WIRRAL|ST HELENS|HALTON|WARRINGTON|BLACKPOOL|BLACKBURN", "North West"],
+    ["NEWCASTLE|SUNDERLAND|GATESHEAD|MIDDLESBROUGH|DURHAM|NORTHUMBERLAND|HARTLEPOOL|STOCKTON|DARLINGTON|SOUTH TYNESIDE|NORTH TYNESIDE", "North East"],
+    ["WALES|CARDIFF|SWANSEA|NEWPORT|WREXHAM|RHONDDA|BRIDGEND|CAERPHILLY|NEATH|PEMBROKESHIRE|CEREDIGION|GWYNEDD", "Wales"],
+    ["SCOTLAND|EDINBURGH|GLASGOW|HIGHLAND|ABERDEENSHIRE|DUNDEE|PERTH|STIRLING|FIFE|FALKIRK|RENFREWSHIRE|NORTH LANARKSHIRE|SOUTH LANARKSHIRE|EAST RENFREWSHIRE|INVERCLYDE", "Scotland"],
+    ["NORTHERN IRELAND|BELFAST|DERRY|LONDONDERRY|ANTRIM|DOWN|ARMAGH|FERMANAGH|TYRONE", "N. Ireland"],
+  ];
+
+  const regionCounts: Record<string, { open: number; awarded: number; value: number }> = {};
+  for (const [, name] of regionPatterns) regionCounts[name] = { open: 0, awarded: 0, value: 0 };
+
+  const allNotices = [
+    ...(data.contractsFinder.open || []),
+    ...(data.contractsFinder.awarded || []),
+    ...(data.findTender?.notices || []),
+  ];
+
+  for (const n of allNotices) {
+    const buyerUp = (n.buyer || "").toUpperCase();
+    const titleUp = (n.title || "").toUpperCase();
+    const combined = `${buyerUp} ${titleUp}`;
+    for (const [pattern, name] of regionPatterns) {
+      if (new RegExp(pattern).test(combined)) {
+        regionCounts[name].value += n.awardedValue ?? 0;
+        if (n.status === "awarded") regionCounts[name].awarded++;
+        else regionCounts[name].open++;
+        break;
+      }
+    }
+  }
+
+  const regionList = Object.entries(regionCounts)
+    .map(([name, c]) => ({ name, total: c.open + c.awarded, open: c.open, awarded: c.awarded, value: c.value }))
+    .sort((a, b) => b.total - a.total);
+
+  const maxTotal = Math.max(...regionList.map(r => r.total), 1);
+  const hasData = regionList.some(r => r.total > 0);
+  if (!hasData) return "";
+
+  const intake = scan.input_json as any;
+  const companyRegion = String(intake?.areasServed || data.regions || "").toLowerCase();
+
+  const tiles = regionList.map(r => {
+    const pct = r.total / maxTotal;
+    const isHome = companyRegion.toLowerCase().includes(r.name.toLowerCase().split(" ")[0]);
+    const bg = pct === 0 ? "rgba(255,255,255,.04)"
+      : pct < 0.2 ? "rgba(180,146,78,.08)"
+      : pct < 0.4 ? "rgba(180,146,78,.16)"
+      : pct < 0.6 ? "rgba(180,146,78,.28)"
+      : pct < 0.8 ? "rgba(180,146,78,.44)"
+      : "rgba(180,146,78,.65)";
+    const border = isHome ? "border:1px solid #B4924E;" : "border:1px solid rgba(255,255,255,.07);";
+    const valStr = r.value > 0 ? (r.value >= 1_000_000 ? `£${(r.value / 1_000_000).toFixed(1)}m` : `£${Math.round(r.value / 1000)}k`) : "";
+    return `<div style="background:${bg};${border}padding:10px 12px;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;position:relative">
+      ${isHome ? `<div style="position:absolute;top:5px;right:6px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:#B4924E">HOME</div>` : ""}
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;color:${pct > 0.4 ? "#ECE6D6" : "var(--text-mid)"};line-height:1.2">${r.name}</div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px">
+        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:${pct === 0 ? "var(--faint)" : "#ECE6D6"}">${r.total > 0 ? r.total : "—"}</div>
+        ${valStr ? `<div style="font-family:var(--mono);font-size:9px;color:var(--brand);text-align:right">${valStr}</div>` : ""}
+      </div>
+      ${r.total > 0 ? `<div style="font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--faint);margin-top:2px">${r.open > 0 ? `${r.open} open` : ""}${r.open > 0 && r.awarded > 0 ? " · " : ""}${r.awarded > 0 ? `${r.awarded} awarded` : ""}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  const topRegion = regionList.find(r => r.total > 0);
+  const topName = topRegion?.name ?? "";
+  const totalNotices = regionList.reduce((s, r) => s + r.total, 0);
+
+  return `<div style="background:var(--surface);border:1px solid var(--border-2);border-top:2px solid var(--brand);margin-top:16px;padding:28px 32px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:7px">BUYER DEMAND — REGIONAL HEAT MAP</div>
+        <div style="font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text);line-height:1.2">${totalNotices} notices across UK regions${topName ? ` — ${topName} leads` : ""}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--faint)">
+        <div style="display:flex;gap:3px;align-items:center">
+          <div style="width:10px;height:10px;background:rgba(180,146,78,.08)"></div><span>Low</span>
+        </div>
+        <div style="display:flex;gap:3px;align-items:center;margin-left:4px">
+          <div style="width:10px;height:10px;background:rgba(180,146,78,.4)"></div><span>High</span>
+        </div>
+        <div style="display:flex;gap:3px;align-items:center;margin-left:4px">
+          <div style="width:10px;height:10px;border:1px solid #B4924E"></div><span>Your area</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      ${tiles}
+    </div>
+    <p style="font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--faint);margin:14px 0 0">Derived from buyer name and notice geography in pulled records. Some notices may be national or unclassified.</p>
+  </div>`;
+}
+
 function renderIncumbentSection(data: ProcurementData): string {
   const incumbents = buildIncumbentMap(data);
   if (incumbents.length === 0) return "";
@@ -3739,6 +3841,39 @@ Write as if briefing the client on their market position, not summarising a tool
 - Where they sit relative to the identified incumbents
 Use compact value notation (£k / £m / £bn). No sentence may start with "The data shows..." or "This section..." — start every sentence with a commercial insight.
 
+## 3a. Market Intelligence & Demand Signals
+This section is required and must contain a minimum of 14 specific data signals.
+
+You have access to web search. Use it to find current UK statistics from authoritative sources for the company's specific sector before writing this section. Pull real numbers.
+
+For each signal, use this exact format:
+**[SOURCE]** · [specific statistic with number] · [geography] · [date/period] · [direct commercial implication for this company]
+
+Sources to draw from (use what is relevant to this company's sector):
+- DVLA / SMMT — vehicle registrations, fleet data, EV transition data
+- ONS — consumer spending, employment data, regional economic output, sector output indices
+- Land Registry / HM Land Registry — property transactions, completions, new builds
+- Companies House — incorporations, dissolved companies, sector formation trends
+- HMRC — VAT registrations, payroll data, sector tax receipts
+- Construction Output (DLUHC / ONS) — new orders, output by sector, pipeline
+- NHS Digital / NHS England — procurement spend, digital transformation budgets
+- Crown Commercial Service — framework spend data, procurement volumes
+- Trade associations relevant to this sector (e.g. FMB, BUILD UK, CIPS, BIFA, CIPD, techUK, FSB, REC)
+- Market research: Mintel, Euromonitor, IBISWorld, GlobalData — size, CAGR, demand trends
+- Platform data: Amazon UK category trends, Google Trends UK, LinkedIn job posting volumes
+- Public sector spend data: Contracts Finder total value, Find a Tender volumes, G-Cloud spend
+
+Structure:
+1. Open with a short paragraph (3-4 sentences) framing the macro market backdrop for this company's sector.
+2. List 14-18 demand signals in the SOURCE format above — mix of macro indicators, sector-specific stats, and buyer behaviour signals.
+3. Close with a SHORT "What this means for [Company]" paragraph: pull the 2-3 most commercially actionable signals and state exactly what the company should do with them this quarter.
+
+Rules:
+- Every signal must have a specific number (not "market is growing" — give the growth %).
+- Signals must be relevant to this specific company's sector and geography.
+- Use web search to find 2026 or 2025 data where available. If only older data exists, state the year.
+- Do not use generic signals that could apply to any company.
+
 ## 4. Source-Backed Evidence
 Only use pulled source records or clearly labelled client-provided evidence.
 For each top record:
@@ -3837,24 +3972,85 @@ Give honest negative guidance. Include unsuitable or premature routes such as:
 - generic low-margin work
 - tenders demanding proof the company does not yet have
 
-## 9. 30-Day Activation Pack
-Write this section as direct instructions addressed to the company: "Week 1, you need to..." — not "The company should...".
+## 9. Revenue Activation Plan — 90 Days
+This is the most important section. Write it as a direct operational briefing to the MD. Every item must be specific to this company, these buyers, these routes.
 
-Weekly actions:
-- Week 1: specific evidence-gathering and access actions tied to the named buyers and routes in sections 4-6
-- Week 2: capability statement drafting and bid pack — with specific section headings drawn from this company's actual services and evidence
-- Week 3: buyer outreach — name specific buyers from the watchlist, with timing and opening angle
-- Week 4: bid / partner activation — specify which route, which buyer, and what the entry point looks like
+### 9.1 Week-by-Week Action Plan (Days 1–30)
 
-Then include:
-- Documents needed before bidding (sector-specific — list exact certifications, insurances, case study formats)
-- Capability statement bullets (pull from the company's stated services and the verified/inferred evidence)
-- Buyer outreach email (named buyer from watchlist; open with a specific hook from the pulled records, not a generic intro)
-- Partner outreach email (named sector; reference the route identified in the Money Map)
-- LinkedIn message (short; reference a specific notice or buyer activity)
-- Bid/no-bid checklist (specific to the top-scoring route in section 5)
+**Week 1 — Intelligence & Foundation (Days 1–7)**
+Write 6-8 specific daily actions. Not "research buyers" — name the specific buyer, the specific action, and the specific output.
+Example format: "Day 1: Download the awarded notice for [BUYER] from Contracts Finder (ref [ID if available]) — map the contract end date, the incumbent supplier, and the named contact if present. This is your intelligence anchor for the outreach in Week 3."
+Cover: framework access, Companies House checks on named buyers, Contracts Finder alerts setup, capability gap identification, compliance document audit.
 
-Every item must be specific to this company's actual situation. No sentence that could apply to any other company is allowed.
+**Week 2 — Capability Statement & Bid Pack (Days 8–14)**
+Write the actual capability statement structure for this company. Not generic — use their specific services, certifications, and regions.
+Include:
+- The 5 specific section headings for their capability statement (tailored to this sector and buyer type)
+- The 3 case study formats they need (what to capture, what word count, what evidence to attach)
+- The 2 accreditation gaps to close and how to close them this week
+- The specific tender alert search strings to set up on Contracts Finder and Find a Tender
+
+**Week 3 — Buyer Outreach (Days 15–21)**
+Name the top 3 buyers to contact this week (from the Buyer Watchlist). For each:
+- Who to contact (job title, not name — they can find the name from the org chart)
+- The specific opening line that references something real (a notice, an award, a framework)
+- The ask (not "introduce ourselves" — a specific, small ask: a 20-minute call, a framework expression of interest, a pre-market engagement response)
+- The channel (email, LinkedIn, phone — state which and why)
+
+**Week 4 — Bid & Partner Activation (Days 22–30)**
+State which specific tender to bid or framework lot to apply for this month. Give:
+- The specific portal and submission deadline
+- The 3 win themes to lead with
+- The subcontractor or partner to approach if capacity is the gap (named sector, not generic)
+- The one thing that would make this bid lose, and how to prevent it
+
+### 9.2 Outreach Templates (copy-ready, sector-specific)
+
+**Buyer Outreach Email — [Name of top buyer from watchlist]**
+Write the full email. Subject line included. Reference a specific piece of intelligence from sections 4-6. Keep to 150 words. End with a specific ask, not a vague "get in touch."
+
+**Framework / DPS Expression of Interest**
+Write 3 short paragraphs (150 words total) for an expression of interest submission for the top framework route identified in Section 5. Lead with the most relevant evidence from this company's intake.
+
+**Partner Outreach Email — [Named sector partner type from Money Map]**
+Write the full email. Subject line included. Reference the specific commercial opportunity and why a joint approach wins. 120 words max.
+
+**LinkedIn Connection Request**
+Write 2 versions (one for a buyer procurement lead, one for a potential partner). 300 characters max each. Reference something specific from the data.
+
+### 9.3 Documents Checklist — What You Need Before Bidding
+Create a table:
+Document | Currently held? (based on intake) | How to obtain / what to prepare | Priority | Time needed
+
+Cover all sector-relevant documents including:
+- Public liability insurance (amount required for this sector)
+- Employer's liability insurance
+- Relevant ISO certifications (ISO 9001, 14001, 45001 — which are mandatory vs preferred for this sector)
+- Sector-specific accreditations (e.g. SafeContractor, CHAS, Constructionline, Cyber Essentials, DBS checks, CQC registration — only list what's relevant)
+- Case studies (number required, word count, format for the top framework)
+- Financial accounts and turnover threshold (state what buyers in this sector typically require)
+- Public sector experience evidence
+
+### 9.4 Bid/No-Bid Decision Framework
+Create a checklist specific to the top-scoring route from Section 5.
+For each criterion: describe what "yes" looks like for this company and this route. Not generic pass/fail — give the actual threshold.
+
+### 9.5 90-Day Revenue Pipeline Forecast
+Create a table:
+Route | Target buyer | Action needed | Expected value | Probability | Expected revenue contribution | Timeline
+
+Then write a 3-sentence paragraph: what realistic revenue looks like in 90 days if the company executes sections 9.1-9.3, what the key risk is, and the single decision that most determines the outcome.
+
+### 9.6 Framework & Accreditation Roadmap
+List the 3-5 most relevant frameworks or DPS schemes for this company's sector.
+For each:
+- Framework name and managing authority
+- Lot(s) most relevant to this company
+- Current status (open / closed / next opening window — use web search to check)
+- Application requirements (turnover threshold, accreditations, case studies)
+- Time to join (weeks from application to approval)
+- Commercial upside (annual spend through this framework, typical lot value)
+- First action this week to progress it
 
 ## 10. QA Notes / Integrity Checks
 Create a final table:
@@ -7272,6 +7468,8 @@ function reportPage(scan: ScanRecord) {
     </section>
 
     ${premiumDashboardHtml(scan)}
+
+    ${data && scan.status === "completed" ? renderRegionHeatMap(data, scan) : ""}
 
     <section class="report">
       ${content}
