@@ -80,6 +80,8 @@ import {
   exportOpportunitiesCsv, exportSuppliersCsv, exportBuyersCsv,
   exportSignalsCsv, exportIngestCsv, exportCatalogCsv, exportPlanningCsv,
 } from "./integrations/csv-export.js";
+import { generateMarketSignals, getSignalsForSector } from "./signals/market-intel.js";
+import type { MarketSignalSector } from "./signals/market-intel.js";
 
 type ScanStatus = "pending" | "pending_payment" | "running" | "completed" | "failed";
 type UserTier = "free" | "payg" | "pro" | "agency";
@@ -8243,6 +8245,18 @@ app.get("/api/signals/aggregated", asyncRoute(async (req, res) => {
 app.post("/api/signals/derive-from-ingest", requireAdmin, asyncRoute(async (_req, res) => {
   const n = await deriveSignalsFromIngest();
   res.json({ derived: n });
+}));
+
+// ── Market Intelligence Signals API ──────────────────────────────────────────
+app.get("/api/signals/market", asyncRoute(async (req, res) => {
+  if (!pool) { res.json({ signals: [], totalSignals: 0, sourcesCovered: [], generatedAt: new Date().toISOString() }); return; }
+  const sectorParam = String(req.query.sector || "").trim() as MarketSignalSector | "";
+  const limit = Math.min(Number(req.query.limit) || 50, 100);
+  const snap = await generateMarketSignals(pool, {
+    sectors: sectorParam ? [sectorParam] : undefined,
+    limit,
+  });
+  res.json(snap);
 }));
 
 // ── Relationship Graph API ────────────────────────────────────────────────────
@@ -17367,6 +17381,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     aliasCountRes, ownershipCountRes, directorCountRes, sharedDirectorsRes,
     govSummaryRes, govCatalogRes, govQualityRes, govRetentionRes,
     webhookListRes,
+    mktIntelRes,
   ] = await Promise.all([
     safePool(`SELECT id, created_at, status, company_name, progress_stage, error_message, user_id, pdf_storage_url,
       input_json->>'clientEmail' AS email,
@@ -17550,6 +17565,8 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
     pool ? getRetentionSchedule(pool).then(r => ({ rows: r })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     // Webhooks
     pool ? listWebhooks(pool).then(w => ({ rows: w })).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    // Market Intelligence
+    pool ? generateMarketSignals(pool, { limit: 50 }).catch(() => ({ generatedAt: "", signals: [], sourcesCovered: [], totalSignals: 0 })) : Promise.resolve({ generatedAt: "", signals: [], sourcesCovered: [], totalSignals: 0 }),
   ]);
 
   const ss   = (scanStatsRes.rows[0]  as any) || {};
@@ -17627,6 +17644,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const warnSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "warn").length;
   const failSourcesCount = govCatalog.filter((r: any) => (r.qualityStatus || r.quality_status) === "fail").length;
   const neverFetchedCount = DATA_SOURCES.length - govCatalog.length;
+  const mktIntel = mktIntelRes as { generatedAt: string; signals: any[]; sourcesCovered: string[]; totalSignals: number };
 
   const gradeCount: Record<string, number> = {};
   gradeDistDb.forEach((r: any) => {
@@ -18089,6 +18107,7 @@ input[type=checkbox]{accent-color:var(--brand);width:13px;height:13px;cursor:poi
     <a href="#early-signals" class="sb-link">Early Signals <span class="sb-count">${Number(earlySignalStats.total||0).toLocaleString()}</span></a>
     <a href="#lifecycle" class="sb-link">Lifecycle <span class="sb-count">${Number(lifecycleStats.total||0).toLocaleString()}</span></a>
     <div class="sb-group">Data Platform</div>
+    <a href="#market-intel" class="sb-link">Market Signals <span class="sb-count" style="color:var(--green)">${mktIntel.totalSignals}</span></a>
     <a href="#ingest" class="sb-link">Ingest Pipeline <span class="sb-count">${Number(ingestTotals.total||0).toLocaleString()}</span></a>
     <a href="#geospatial" class="sb-link">Geospatial <span class="sb-count">${(geoLocationCount+geoPlanningCount).toLocaleString()}</span></a>
     <a href="#relationships" class="sb-link">Relationships <span class="sb-count">${(aliasCount+ownershipCount+directorCount).toLocaleString()}</span></a>
@@ -18888,6 +18907,39 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
       </table></div>`}
 </section>
 <div class="gap"></div>
+
+<!-- §MARKET INTELLIGENCE SIGNALS -->
+<section class="section" id="market-intel">
+  <div class="s-head">
+    <div>
+      <div class="s-eyebrow">Live Intelligence</div>
+      <div class="s-title">Market Signals</div>
+      <div class="s-sub">${mktIntel.totalSignals} signals · ${mktIntel.sourcesCovered.join(", ") || "—"} · generated ${mktIntel.generatedAt ? new Date(mktIntel.generatedAt).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "—"}</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a href="/api/signals/market" target="_blank" class="btn btn-sm btn-outline">JSON ↗</a>
+      <a href="/api/signals/market?sector=automotive" target="_blank" class="btn btn-sm btn-outline">Automotive</a>
+      <a href="/api/signals/market?sector=property" target="_blank" class="btn btn-sm btn-outline">Property</a>
+      <a href="/api/signals/market?sector=finance" target="_blank" class="btn btn-sm btn-outline">Finance</a>
+    </div>
+  </div>
+  ${mktIntel.signals.length === 0 ? `<div style="padding:24px;color:var(--muted);font-size:13px">No signals yet — run a full ingest to populate market data</div>` : `
+  <div style="overflow:auto;max-height:600px">
+    <table class="a-tbl">
+      <thead><tr><th>Source</th><th>Signal</th><th>Geography</th><th>Period</th><th>Implication</th><th>Sectors</th></tr></thead>
+      <tbody>${mktIntel.signals.map((s: any) => `
+        <tr>
+          <td><span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--brand)">${escapeHtml(s.source)}</span></td>
+          <td style="max-width:260px;font-size:12px;font-weight:500">${escapeHtml(s.stat)}</td>
+          <td style="font-size:12px;color:var(--muted)">${escapeHtml(s.geography)}</td>
+          <td style="font-size:12px;color:var(--muted);white-space:nowrap">${escapeHtml(s.period)}</td>
+          <td style="max-width:320px;font-size:11px;color:var(--text-2)">${escapeHtml(s.implication)}${s.sourceUrl ? ` <a href="${escapeHtml(s.sourceUrl)}" target="_blank" style="color:var(--brand);margin-left:4px">↗</a>` : ""}</td>
+          <td style="font-size:11px;color:var(--muted)">${(s.sectors as string[]).join(", ")}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`}
+</section>
 
 <!-- §INGEST PIPELINE -->
 <section class="section" id="ingest">
