@@ -9649,37 +9649,40 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
   };
   const queryTerms = synonyms[qLower] ?? [q];
 
-  const cfCtrl = new AbortController();
-  const cfTimer = setTimeout(() => cfCtrl.abort(), 9000);
-  try {
-    const results = await Promise.allSettled(
-      queryTerms.slice(0, 5).map(term =>
-        contractsFinderPage({ keywords: term }, term, 0, 100, cfCtrl.signal)
-      )
-    );
-    const seenNotice = new Set<string>();
-    for (const r of results) {
-      if (r.status !== "fulfilled") continue;
-      for (const notice of r.value.notices) {
-        if (notice.id && seenNotice.has(notice.id)) continue;
-        if (notice.id) seenNotice.add(notice.id);
-        // Match a district from the buyer name first, then the notice region.
-        const district = matchDistrict(notice.buyer) ?? matchDistrict(notice.region || "");
-        if (!district) continue;
-        const val = notice.awardedValue ?? notice.valueHigh ?? notice.valueLow ?? 0;
-        const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
-        e.contracts++;
-        e.value += val || 0;
-        merged.set(district, e);
-      }
-    }
-  } catch {} finally { clearTimeout(cfTimer); }
-
   // SQL LIKE clauses for the query + its synonyms, so DB sources broaden too.
   const likeTerms = [qLower, ...queryTerms.map(t => t.toLowerCase())]
     .filter((v, i, a) => a.indexOf(v) === i)
     .map(t => `%${t}%`);
   const likeOr = (col: string) => likeTerms.map((_, i) => `LOWER(${col}) LIKE $${i + 1}`).join(" OR ");
+
+  // ── 1. Live Contracts Finder — slow external call, so run it CONCURRENTLY with
+  // the DB queries below and await it at the end. Capped at 5s. ────────────────
+  const cfCtrl = new AbortController();
+  const cfTimer = setTimeout(() => cfCtrl.abort(), 5000);
+  const cfPromise = (async () => {
+    try {
+      const results = await Promise.allSettled(
+        queryTerms.slice(0, 5).map(term =>
+          contractsFinderPage({ keywords: term }, term, 0, 100, cfCtrl.signal)
+        )
+      );
+      const seenNotice = new Set<string>();
+      for (const r of results) {
+        if (r.status !== "fulfilled") continue;
+        for (const notice of r.value.notices) {
+          if (notice.id && seenNotice.has(notice.id)) continue;
+          if (notice.id) seenNotice.add(notice.id);
+          const district = matchDistrict(notice.buyer) ?? matchDistrict(notice.region || "");
+          if (!district) continue;
+          const val = notice.awardedValue ?? notice.valueHigh ?? notice.valueLow ?? 0;
+          const e = merged.get(district) ?? { contracts: 0, planning: 0, value: 0 };
+          e.contracts++;
+          e.value += val || 0;
+          merged.set(district, e);
+        }
+      }
+    } catch {} finally { clearTimeout(cfTimer); }
+  })();
 
   // ── 2. Planning applications (DB) ────────────────────────────────────────────
   if (pool) {
@@ -9789,6 +9792,9 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
       console.warn("[map] demand layer failed:", String(err).slice(0, 120));
     }
   }
+
+  // The DB work above ran while Contracts Finder was in flight — now fold it in.
+  await cfPromise;
 
   // Procurement/contract points (attach centroids server-side).
   const contractPoints = [...merged.entries()]
