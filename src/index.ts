@@ -8555,18 +8555,18 @@ ${chaseNowHtml}
       <div class="subnote" id="briefing-note">By subscribing you agree to our privacy notice. Unsubscribe anytime.</div>
     </div>
     <script>
-    document.getElementById(‘briefing-form’).addEventListener(‘submit’,function(e){
+    document.getElementById('briefing-form').addEventListener('submit',function(e){
       e.preventDefault();
-      const email=document.getElementById(‘briefing-email’).value;
-      const note=document.getElementById(‘briefing-note’);
-      fetch(‘/api/briefing’,{method:’POST’,headers:{‘Content-Type’:’application/json’},body:JSON.stringify({email})})
+      const email=document.getElementById('briefing-email').value;
+      const note=document.getElementById('briefing-note');
+      fetch('/api/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
         .then(function(r){return r.json();})
         .then(function(d){
-          document.getElementById(‘briefing-form’).style.display=’none’;
-          note.textContent=d.alreadySubscribed?’You’re already on the list.’:’Done. We’ll write when the money moves.’;
-          note.style.color=’#1d6b4f’;note.style.fontWeight=’600’;
+          document.getElementById('briefing-form').style.display='none';
+          note.textContent=d.alreadySubscribed?"You're already on the list.":"Done. We'll write when the money moves.";
+          note.style.color='#1d6b4f';note.style.fontWeight='600';
         })
-        .catch(function(){note.textContent=’Something went wrong — try again.’;note.style.color=’#9b2d20’;});
+        .catch(function(){note.textContent='Something went wrong — try again.';note.style.color='#9b2d20';});
     });
     </script>
   </div>
