@@ -9187,19 +9187,31 @@ app.get("/api/signals/for-keyword", asyncRoute(async (req, res) => {
   }
   // Fallback: if no explicit keyword matched, derive sectors from the demand router
   // so the signals stay RELEVANT to the keyword (e.g. coffee → retail/food, not DVLA).
+  const demandSrc = detectDemandSource(q);
   if (!sectors.length) {
-    const src = detectDemandSource(q);
     const SOURCE_SECTORS: Record<string, MarketSignalSector[]> = {
       property: ["property", "construction"],
       vehicle: ["automotive", "transport"],
       business: ["professional_services", "finance", "tech"],
       consumer: ["retail", "food_beverage"],
     };
-    sectors.push(...SOURCE_SECTORS[src]);
+    sectors.push(...SOURCE_SECTORS[demandSrc]);
   }
+  // Source allow-list per demand type — sector tags alone leak (e.g. DVLA new-car
+  // signals are tagged "retail", so they'd show for "coffee"). Restrict to the data
+  // sources that genuinely indicate demand for this kind of keyword.
+  const ALLOWED_SOURCES: Record<string, string[]> = {
+    property: ["LAND REG", "COMPANIES HOUSE", "ONS"],
+    vehicle: ["DVLA"],
+    business: ["COMPANIES HOUSE", "ONS", "UKRI"],
+    consumer: ["ONS", "COMPANIES HOUSE"],
+  };
+  const allow = ALLOWED_SOURCES[demandSrc];
+
   // Always pass concrete sectors — never undefined (which would return every signal).
-  const snap = await generateMarketSignals(pool, { sectors, limit: 12 });
-  res.json({ signals: snap.signals, totalSignals: snap.totalSignals, sectors, sourcesCovered: snap.sourcesCovered });
+  const snap = await generateMarketSignals(pool, { sectors, limit: 24 });
+  const filtered = allow ? snap.signals.filter(s => allow.includes(s.source)) : snap.signals;
+  res.json({ signals: filtered.slice(0, 12), totalSignals: filtered.length, sectors, sourcesCovered: [...new Set(filtered.map(s => s.source))] });
 }));
 
 // ── Relationship Graph API ────────────────────────────────────────────────────
