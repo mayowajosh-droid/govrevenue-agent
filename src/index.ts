@@ -9220,7 +9220,14 @@ app.get("/api/signals/for-keyword", asyncRoute(async (req, res) => {
     business: ["COMPANIES HOUSE", "ONS", "UKRI"],
     consumer: ["ONS", "COMPANIES HOUSE"],
   };
-  const allow = ALLOWED_SOURCES[demandSrc];
+  let allow = ALLOWED_SOURCES[demandSrc];
+  // Consumer car accessories (car diffuser, air freshener…): car ownership is the base
+  // but the buyer is a consumer — show DVLA (market size) AND ONS consumer spend, and
+  // add the retail sector so it isn't framed purely as fleet B2B.
+  if (demandSrc === "vehicle" && isConsumerAutomotive(q)) {
+    if (!sectors.includes("retail")) sectors.push("retail");
+    allow = ["DVLA", "ONS"];
+  }
 
   // Always pass concrete sectors — never undefined (which would return every signal).
   const snap = await generateMarketSignals(pool, { sectors, limit: 24 });
@@ -9743,13 +9750,26 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
           demandPoints.push({ name: titleCaseCounty(p.place), lat: ll[0], lon: ll[1], demand: magnitude, detail: p.detail, value: 0 });
         }
       } else if (src === "vehicle") {
+        const consumerAuto = isConsumerAutomotive(q);
+        // For a consumer accessory (car diffuser etc.), affluent regions matter more
+        // than raw car count — tilt by ONS discretionary spend, like consumer goods.
+        let regionTilt: Record<string, number> = {};
+        if (consumerAuto) {
+          // Lightweight affluence tilt by region (relative disposable income index).
+          regionTilt = { "London": 1.25, "South East": 1.20, "East of England": 1.05, "South West": 1.0, "Scotland": 0.95, "West Midlands": 0.92, "East Midlands": 0.92, "Yorkshire": 0.9, "North West": 0.9, "Wales": 0.85, "North East": 0.85, "Northern Ireland": 0.85 };
+        }
         for (const p of await getRegionalVehicleDemand(pool)) {
           const ll = REGION_CENTROIDS[p.place] ?? REGION_CENTROIDS[p.place.replace(/ and The Humber/i, "")];
           if (!ll) continue;
-          // EV/charging intent leans on fleet/company share as the sharper proxy.
           const evIntent = /\bev\b|electric|charg|zero emission\b/i.test(q);
-          const magnitude = evIntent && p.secondary ? p.secondary : p.value;
-          demandPoints.push({ name: p.place, lat: ll[0], lon: ll[1], demand: magnitude, detail: p.detail, value: 0 });
+          let magnitude = evIntent && p.secondary ? p.secondary : p.value;
+          let detail = p.detail;
+          if (consumerAuto) {
+            // Car-owning consumer market, weighted by regional disposable income.
+            magnitude = Math.round(p.value * (regionTilt[p.place] ?? 0.9));
+            detail = `${p.value.toLocaleString("en-GB")} cars on the road — your addressable car-owning consumer market`;
+          }
+          demandPoints.push({ name: p.place, lat: ll[0], lon: ll[1], demand: magnitude, detail, value: 0 });
         }
       } else if (src === "business") {
         for (const p of await getCountyBusinessDemand(pool)) {
@@ -10037,6 +10057,16 @@ function detectDemandSource(q: string): DemandSource {
   // Anything else (perfume, fashion, food, electronics, services…) is treated as a
   // consumer good — demand is mapped to population & disposable-income concentration.
   return "consumer";
+}
+
+// Consumer automotive ACCESSORIES (car diffuser, air freshener, mats, car care…) are
+// sold to individual car owners, not fleets. They route to "vehicle" (car ownership is
+// the right base) but get a CONSUMER framing + disposable-income tilt — not the fleet
+// B2B language a fleet supplier would see.
+const CONSUMER_AUTO_TERMS = ["diffuser", "air freshener", "freshener", "car scent", "car fragrance", "car perfume", "car air", "accessor", "car care", "car mat", "seat cover", "car cover", "valet", "car wax", "car polish", "car cleaning", "car charger", "phone holder", "phone mount", "dash cam", "car gadget", "car kit", "car interior", "car styling", "car detailing"];
+function isConsumerAutomotive(q: string): boolean {
+  const ql = q.toLowerCase();
+  return CONSUMER_AUTO_TERMS.some(t => ql.includes(t));
 }
 
 // ── Atlas (geo intelligence command centre) ───────────────────────────────────

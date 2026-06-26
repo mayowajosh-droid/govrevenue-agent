@@ -178,13 +178,14 @@ async function dvlaRegionalSignals(pool: Pool): Promise<MarketSignal[]> {
 
   for (const r of regions) {
     const companyShare = r.totalCars ? Math.round((r.companyCars / r.totalCars) * 100) : 0;
+    const retailShare = 100 - companyShare;
     signals.push(signal(
       `dvla-region-${r.onsCode}`, "DVLA",
-      `${fmt(r.totalCars)} licensed vehicles — ${companyShare}% fleet/company`,
+      `${fmt(r.totalCars)} cars on the road — ${retailShare}% private/retail`,
       r.region, quarter,
-      `Fleet concentration signals B2B aftermarket opportunity — company car drivers are serviced separately from retail`,
-      ["automotive", "transport"],
-      { value: r.totalCars, sourceUrl: "https://www.gov.uk/government/statistical-data-sets/vehicle-licensing-statistics-data-files", fetchedAt: rows[0].fetchedAt },
+      `One of the UK's largest car-owning markets — the addressable base for any vehicle product, accessory or service. ${retailShare}% are privately owned (retail/consumer); ${companyShare}% fleet/company (B2B)`,
+      ["automotive", "transport", "retail"],
+      { value: r.totalCars, changePercent: undefined, sourceUrl: "https://www.gov.uk/government/statistical-data-sets/vehicle-licensing-statistics-data-files", fetchedAt: rows[0].fetchedAt },
     ));
   }
 
