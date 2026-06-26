@@ -82,38 +82,50 @@ export async function fetchNewBusinessRegistrations(
   if (!apiKey) return empty;
 
   try {
-    const ac = makeAbort();
-    const params = new URLSearchParams({
-      incorporated_from: periodFrom,
-      incorporated_to: periodTo,
-      size: "100",
-      ...(sicCodePrefix ? { sic_codes: sicCodePrefix } : {}),
-    });
-    const res = await fetch(`${CH_BASE}/advanced-search/companies?${params}`, {
-      headers: { Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}` },
-      signal: ac.signal,
-    });
-    if (!res.ok) return empty;
-    const data = await res.json() as {
-      hits?: number;
-      items?: {
-        company_name?: string;
-        company_number?: string;
-        date_of_creation?: string;
-        sic_codes?: string[];
-        registered_office_address?: {
-          address_line_1?: string;
-          locality?: string;
-          region?: string;
-          country?: string;
-        };
-      }[];
+    const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`;
+    type ChItem = {
+      company_name?: string;
+      company_number?: string;
+      date_of_creation?: string;
+      sic_codes?: string[];
+      registered_office_address?: {
+        address_line_1?: string;
+        locality?: string;
+        region?: string;
+        country?: string;
+      };
     };
 
-    const items = data.items ?? [];
+    const allItems: ChItem[] = [];
+    let totalHits = 0;
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 5;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const ac = makeAbort();
+      const params = new URLSearchParams({
+        incorporated_from: periodFrom,
+        incorporated_to: periodTo,
+        size: String(PAGE_SIZE),
+        start_index: String(page * PAGE_SIZE),
+        ...(sicCodePrefix ? { sic_codes: sicCodePrefix } : {}),
+      });
+      const res = await fetch(`${CH_BASE}/advanced-search/companies?${params}`, {
+        headers: { Authorization: authHeader },
+        signal: ac.signal,
+      });
+      if (!res.ok) break;
+      const data = await res.json() as { hits?: number; items?: ChItem[] };
+      if (page === 0) totalHits = data.hits ?? 0;
+      const items = data.items ?? [];
+      allItems.push(...items);
+      if (items.length < PAGE_SIZE) break;
+    }
+
+    if (!allItems.length) return empty;
     const countyCounts: Record<string, number> = {};
 
-    const businesses: NewBusiness[] = items.map(c => {
+    const businesses: NewBusiness[] = allItems.map(c => {
       const addr = c.registered_office_address ?? {};
       const county = addr.region ?? addr.locality ?? addr.country ?? "Unknown";
       countyCounts[county] = (countyCounts[county] ?? 0) + 1;
@@ -131,12 +143,12 @@ export async function fetchNewBusinessRegistrations(
 
     const topCounties = Object.entries(countyCounts)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 10)
+      .slice(0, 30)
       .map(([county, count]) => ({ county, count }));
 
     return {
       fetchedAt: new Date().toISOString(),
-      totalFound: data.hits ?? items.length,
+      totalFound: totalHits || allItems.length,
       periodFrom,
       periodTo,
       businesses,
