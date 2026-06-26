@@ -7,3 +7,5 @@ export {
   findPlanningApplicationsInDistrict,
   getGeospatialStats,
 } from "./db.js";
+export { ingestPlanningApplications } from "./planit-fetcher.js";
+export type { PlanItIngestResult } from "./planit-fetcher.js";

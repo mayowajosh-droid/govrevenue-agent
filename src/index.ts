@@ -59,7 +59,7 @@ import { initCanonicalTables } from "./core/entities/db.js";
 import { runFullIngest, runSourceIngest } from "./core/ingest/orchestrator.js";
 import { DATA_SOURCES, getLiveSources } from "./core/ingest/source-registry.js";
 import { startIngestScheduler } from "./core/ingest/scheduler.js";
-import { initGeospatialTables, findLocationsNear, findPlanningApplicationsInDistrict, getGeospatialStats } from "./intelligence/geospatial/index.js";
+import { initGeospatialTables, findLocationsNear, findPlanningApplicationsInDistrict, getGeospatialStats, ingestPlanningApplications } from "./intelligence/geospatial/index.js";
 import { initRelationshipTables, findSharedDirectors, getOrganisationRelationships } from "./core/entities/relationships.js";
 import { scoreAndDeduplicate, aggregateSignalsForDesk, getAggregatedSignals, deriveSignalsFromIngest } from "./intelligence/early-signals/aggregation-engine.js";
 import {
@@ -9103,6 +9103,15 @@ app.get("/api/geo/planning/:district", asyncRoute(async (req, res) => {
 app.get("/api/geo/stats", asyncRoute(async (_req, res) => {
   const stats = await getGeospatialStats();
   res.json(stats);
+}));
+
+// Pull recent UK planning applications (PlanIt) into planning_applications so the
+// Atlas demand map's planning layer + the construction-demand signal become real.
+app.post("/api/geo/planning/ingest", requireAdmin, asyncRoute(async (req, res) => {
+  const recentDays = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+  const maxRecords = Math.min(Math.max(Number(req.query.max) || 4000, 100), 12000);
+  const result = await ingestPlanningApplications({ recentDays, maxRecords });
+  res.json(result);
 }));
 
 // ── Signal Aggregation Engine API ─────────────────────────────────────────────
