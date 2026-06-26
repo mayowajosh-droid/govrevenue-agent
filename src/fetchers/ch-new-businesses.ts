@@ -73,21 +73,22 @@ function sectorFromSic(sicCodes: string[]): string {
   return "Other";
 }
 
-// Key SIC prefixes to fetch sector-specific data for.
-// Each gets its own API call → 100 businesses per sector → rich county distributions.
-const SECTOR_SIC_PREFIXES = [
-  "47",  // Retail
-  "56",  // Food & Beverage
-  "86",  // Health
-  "93",  // Sports & Fitness
-  "62",  // Software & Tech
-  "74",  // Creative & Design
-  "41",  // Construction
-  "45",  // Automotive
-  "69",  // Legal & Accounting
-  "85",  // Education
-  "96",  // Personal Services
-  "73",  // Advertising & Marketing
+// Full 5-digit SIC codes per sector — the CH API requires exact codes, not prefixes.
+// Each sector gets its own API call with comma-separated codes → 100 businesses
+// per sector → rich county distributions for the Atlas competitive-landscape layer.
+const SECTOR_SIC_CODES: { sector: string; codes: string }[] = [
+  { sector: "Retail",               codes: "47110,47190,47210,47290,47710,47720,47750,47760,47770,47780,47790,47910,47990" },
+  { sector: "Food & Beverage",      codes: "56101,56102,56103,56210,56301,56302" },
+  { sector: "Health",               codes: "86101,86210,86220,86230,86900" },
+  { sector: "Sports & Fitness",     codes: "93110,93120,93130,93199" },
+  { sector: "Software & Tech",      codes: "62011,62012,62020,62030,62090" },
+  { sector: "Creative & Design",    codes: "74100,74200,74900" },
+  { sector: "Construction",         codes: "41100,41201,41202,43110,43210,43220,43290,43310,43320,43330,43341,43390,43999" },
+  { sector: "Automotive",           codes: "45111,45112,45190,45200,45310,45320,45400" },
+  { sector: "Legal & Accounting",   codes: "69101,69102,69109,69201,69202,69203" },
+  { sector: "Education",            codes: "85100,85200,85310,85510,85520,85590,85600" },
+  { sector: "Personal Services",    codes: "96010,96020,96040,96090" },
+  { sector: "Advertising & Marketing", codes: "73110,73120,73200" },
 ];
 
 type ChItem = {
@@ -163,19 +164,19 @@ export async function fetchNewBusinessRegistrations(
     } else {
       // Multi-sector mode: fetch 100 businesses per key sector in parallel batches.
       // CH rate limit is 600/5min — 12 concurrent requests is safe.
-      const batches: string[][] = [];
-      for (let i = 0; i < SECTOR_SIC_PREFIXES.length; i += 4) {
-        batches.push(SECTOR_SIC_PREFIXES.slice(i, i + 4));
+      const batches: typeof SECTOR_SIC_CODES[] = [];
+      for (let i = 0; i < SECTOR_SIC_CODES.length; i += 4) {
+        batches.push(SECTOR_SIC_CODES.slice(i, i + 4));
       }
 
       for (const batch of batches) {
         const results = await Promise.allSettled(
-          batch.map(sic => {
+          batch.map(entry => {
             const params = new URLSearchParams({
               incorporated_from: periodFrom,
               incorporated_to: periodTo,
               size: "100",
-              sic_codes: sic,
+              sic_codes: entry.codes,
             });
             return fetchPage(authHeader, params);
           }),
