@@ -3870,11 +3870,12 @@ SOURCE  ·  [specific statistic with number]  ·  [geography]  ·  [date/period]
 
 Rules: Real numbers only. Model/brand/category level, not just totals. No generic signals.
 
-## 4. Verified Demand Evidence
-Present the 5–8 strongest demand signals as full evidence entries. For each:
+## 4. Source-Labelled Demand Evidence
+Present the 5–8 strongest demand signals as full evidence entries. Do NOT use the word "Verified" unless a direct source link is given. For each:
 - **Signal**: The specific data point
-- **Source**: Where it came from
+- **Source**: Where it came from (official statistical body, regulator, company filing, industry analyst, retail/category tracker, etc.)
 - **Geography**: Where this demand exists
+- **Confidence**: One of — High (official/public/statistical source or multiple aligned independent sources) · Medium (reputable market report or directional estimate) · Low (weak signal, indirect inference, no current source link)
 - **Commercial meaning**: What this means for this company specifically
 - **Best use**: The specific action this signal supports
 
@@ -4112,12 +4113,13 @@ Structure:
 2. List 16–20 signals in SOURCE format above.
 3. Close with "What this means for [Company Name]" — 2-3 sentences naming the 2-3 most actionable signals and exactly what the company should do this quarter.
 
-## 4. Source-Backed Evidence
-Only use pulled source records or clearly labelled client-provided evidence.
+## 4. Source-Linked Evidence & Market Signals
+Use pulled source records, clearly labelled client-provided evidence, and source-labelled market signals. Do NOT use the word "Verified" unless a direct source link is present.
 For each top record:
 - Record name
-- Buyer
-- Evidence status
+- Buyer (or sector/geography for market signals)
+- Evidence type — one of: Source-linked public record · Source-labelled market signal · Directional market estimate · Buyer-channel inference · Needs named-buyer validation
+- Confidence — High / Medium / Low (High = direct source link or multiple aligned independent sources; Medium = reputable directional estimate; Low = weak signal or inference)
 - Confidence
 - Value shown
 - Source reference
@@ -4431,6 +4433,80 @@ async function callLlmReport(prompt: string): Promise<string> {
 }
 
 const SCAN_FETCH_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Scan-type-aware copy. Drives the cover header, evidence-section name, closing
+// summary, footer positioning and route-fallback wording so private/B2B scans
+// (e.g. Viano Auto's premium in-car fragrance brief) no longer carry the old
+// "UK Sector Intelligence" / "public-sector noise" wording, and public
+// procurement scans keep proper procurement language.
+// ──────────────────────────────────────────────────────────────────────────────
+type ScanTypeKey = "public" | "private" | "hybrid";
+type ScanTypeMeta = {
+  key: ScanTypeKey;
+  scanTypeLine: string;
+  coverLabel: string;
+  evidenceGradeFooter: string;
+  canWinFooter: string;
+  evidenceSectionTitle: string;
+  closingHeading: string;
+  closingBody: (company: string) => string;
+  positioning: string;
+  fallbackRoute: string;
+};
+
+function scanTypeMeta(scanMode: string | undefined | null): ScanTypeMeta {
+  const mode = (scanMode || "both").toLowerCase();
+  if (mode === "intelligence") {
+    return {
+      key: "private",
+      scanTypeLine: "Private/B2B market-demand scan",
+      coverLabel: "UK Market Demand Intelligence",
+      evidenceGradeFooter: "Source-labelled evidence basis",
+      canWinFooter: "Based on source-labelled evidence",
+      evidenceSectionTitle: "Source-Labelled Demand Evidence",
+      closingHeading: "From scattered market signals to a route-to-revenue system.",
+      closingBody: (company: string) =>
+        `For <strong>${company}</strong>, this scan translates public records, company data, category growth, geographic demand, buyer-channel signals, and commercial-readiness gaps into a practical revenue map: where demand exists, which buyer channels matter, what evidence is missing, and which route should be pursued first.`,
+      positioning: "AtlasRevenue turns public records, procurement data, company data, geography, sector movement, and market-demand signals into practical route-to-revenue intelligence.",
+      fallbackRoute: "Channel partner first",
+    };
+  }
+  if (mode === "contracts") {
+    return {
+      key: "public",
+      scanTypeLine: "Public procurement scan",
+      coverLabel: "UK Public Procurement Intelligence",
+      evidenceGradeFooter: "Source-linked procurement evidence",
+      canWinFooter: "Based on procurement evidence",
+      evidenceSectionTitle: "Source-Linked Procurement Evidence",
+      closingHeading: "From public-sector noise to a route-to-revenue system.",
+      closingBody: (company: string) =>
+        `For <strong>${company}</strong>, this scan translates procurement records, public buyer activity, contract evidence, framework routes, and readiness gaps into a practical revenue map: where demand exists, which buyers matter, what evidence is missing, and which route should be pursued first.`,
+      positioning: "AtlasRevenue turns public records, procurement data, company data, geography, sector movement, and market-demand signals into practical route-to-revenue intelligence.",
+      fallbackRoute: "Partner/subcontract first",
+    };
+  }
+  // both / hybrid
+  return {
+    key: "hybrid",
+    scanTypeLine: "Hybrid demand scan",
+    coverLabel: "UK Revenue Intelligence",
+    evidenceGradeFooter: "Source-labelled evidence basis",
+    canWinFooter: "Based on source-labelled evidence",
+    evidenceSectionTitle: "Source-Linked Evidence & Market Signals",
+    closingHeading: "From buyer signals to a route-to-revenue system.",
+    closingBody: (company: string) =>
+      `For <strong>${company}</strong>, this scan combines procurement records, market-demand signals, company data, geographic evidence, and readiness gaps into a practical revenue map: where demand exists, which buyers or channels matter, what evidence is missing, and which route should be pursued first.`,
+    positioning: "AtlasRevenue turns public records, procurement data, company data, geography, sector movement, and market-demand signals into practical route-to-revenue intelligence.",
+    fallbackRoute: "Public + private route, sequenced",
+  };
+}
+
+function scanTypeFromScan(scan: ScanRecord): ScanTypeMeta {
+  const mode = (scan.input_json as any)?.scanMode;
+  return scanTypeMeta(mode);
+}
 
 // Deterministic named-prospect list for demand/intelligence scans. Queries the
 // CH named-business layer on the client's ideal-buyer profile (falling back to
@@ -5551,12 +5627,16 @@ function calcPremiumScores(scan: ScanRecord) {
       (hasSectorFocus ? 12 : 0)
   );
 
+  // Route-fallback wording is scan-type-aware: a private/B2B intelligence scan
+  // should never default to "Partner/subcontract first" (procurement-shaped),
+  // and a public procurement scan should never get "Channel partner first".
+  const _meta = scanTypeFromScan(scan);
   const route =
     procurementReadiness >= 72 && evidenceStrength >= 70
-      ? "Bid + framework activation"
+      ? (_meta.key === "private" ? "Direct buyer-channel activation" : "Bid + framework activation")
       : procurementReadiness >= 55
-        ? "Targeted bid + partner route"
-        : "Partner/subcontract first";
+        ? (_meta.key === "private" ? "Targeted buyer-channel + partner route" : "Targeted bid + partner route")
+        : _meta.fallbackRoute;
 
   const sector = escapeHtml(resolvedSector.label);
 
@@ -5592,19 +5672,24 @@ function premiumClosingHtml(scan: ScanRecord, parsedEdp?: ParsedEdp | null) {
   const company = scan.company_name;
   const finalRoute = parsedEdp?.recommendedRoute || scores.route;
   const finalSector = scores.sector;
+  const meta = scanTypeFromScan(scan);
+  const sectorLensLabel = meta.key === "private" ? "Category lens" : "Sector lens";
+  const advisoryLine = meta.key === "private"
+    ? "No outcome is guaranteed. This scan is commercial intelligence, not legal, financial, or sales advice. Validate buyer-channel claims with named-buyer outreach before contracting."
+    : "No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.";
 
   return `
     <section class="marketing-close">
       <div class="close-kicker">Revenue intelligence</div>
-      <h2>From public-sector noise to a route-to-revenue system.</h2>
-      <p>For <strong>${escapeHtml(company)}</strong>, this scan translates public procurement data into a practical commercial map: where demand exists, which buyers matter, what evidence is missing, and which route should be pursued first.</p>
+      <h2>${escapeHtml(meta.closingHeading)}</h2>
+      <p>${meta.closingBody(escapeHtml(company))}</p>
       <div class="close-grid">
         <div>
           <b>Recommended route</b>
           <span>${escapeHtml(finalRoute)}</span>
         </div>
         <div>
-          <b>Sector lens</b>
+          <b>${escapeHtml(sectorLensLabel)}</b>
           <span>${escapeHtml(finalSector)}</span>
         </div>
         <div>
@@ -5612,8 +5697,8 @@ function premiumClosingHtml(scan: ScanRecord, parsedEdp?: ParsedEdp | null) {
           <span>Turn this scan into a 30-day buyer action campaign.</span>
         </div>
       </div>
-      <p class="close-note">AtlasRevenue helps businesses stop guessing at public-sector opportunities. The product turns buyer signals, contract records and readiness gaps into a focused revenue plan that teams can act on immediately.</p>
-      <p class="close-note" style="margin-top:8px;font-size:12px;color:var(--muted)">No outcome is guaranteed. This scan is commercial intelligence, not legal, procurement or financial advice. Human verification is required before bid decisions.</p>
+      <p class="close-note">${escapeHtml(meta.positioning)}</p>
+      <p class="close-note" style="margin-top:8px;font-size:12px;color:var(--muted)">${escapeHtml(advisoryLine)}</p>
     </section>
   `;
 }
@@ -7779,16 +7864,31 @@ function reportPage(scan: ScanRecord) {
       </div>` : ""}
     </div>
 
-    <section class="cover">
-      <p class="cover-label">UK Sector Intelligence</p>
+    ${(() => {
+      const meta = scanTypeFromScan(scan);
+      const isPrivate = meta.key === "private";
+      const isPublic = meta.key === "public";
+      // Headline counters / signal strip line — adapts to scan type so a private/B2B
+      // scan does not present "Open: 0 · Awarded: 0" as its primary metric.
+      const buyerFitLabel = scoreLabel(scores.buyerFit);
+      const evidenceLabel = scoreLabel(scores.evidenceStrength);
+      const readyLabel = scoreLabel(scores.procurementReadiness);
+      const headlineStrip = isPrivate
+        ? `<p><strong style="color:var(--muted)">Category lens:</strong> ${escapeHtml(scores.sector)} &middot; <strong style="color:var(--muted)">Market signals:</strong> ${evidenceLabel} &middot; <strong style="color:var(--muted)">Buyer-channel fit:</strong> ${buyerFitLabel}${awardedCount + openCount > 0 ? ` &middot; <strong style="color:var(--muted)">Contract evidence:</strong> ${openCount + awardedCount} records` : ""}</p>`
+        : isPublic
+        ? `<p><strong style="color:var(--muted)">Sector:</strong> ${escapeHtml(scores.sector)} &middot; <strong style="color:var(--muted)">Open tenders:</strong> ${openCount} &middot; <strong style="color:var(--muted)">Awarded contracts:</strong> ${awardedCount} &middot; <strong style="color:var(--muted)">Buyer-fit:</strong> ${buyerFitLabel}</p>`
+        : `<p><strong style="color:var(--muted)">Sector:</strong> ${escapeHtml(scores.sector)} &middot; <strong style="color:var(--muted)">Procurement records:</strong> ${openCount + awardedCount} &middot; <strong style="color:var(--muted)">Market signals:</strong> ${evidenceLabel} &middot; <strong style="color:var(--muted)">Buyer-channel fit:</strong> ${buyerFitLabel} &middot; <strong style="color:var(--muted)">Readiness:</strong> ${readyLabel}</p>`;
+      return `<section class="cover">
+      <p class="cover-label">${escapeHtml(meta.coverLabel)}</p>
+      <p class="cover-scan-type" style="font-family:var(--mono,monospace);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin:6px 0 18px">Scan type: ${escapeHtml(meta.scanTypeLine)}</p>
       <h1>${escapeHtml(scan.company_name)}</h1>
       <p class="cover-edp-label">Executive Decision Panel</p>
       <p class="subtitle">${escapeHtml(sectorLens)} &middot; ${escapeHtml(regions)} &middot; ${escapeHtml(formatDate(scan.updated_at))}</p>
 
       <div class="meta">
         <div class="metric"><b>Verdict</b><span style="font-size:${(edpVerdict || "").length > 40 ? "14px" : "18px"};line-height:1.3">${escapeHtml(edpVerdict || "Pending")}</span><small>Commercial recommendation</small></div>
-        <div class="metric"><b>Evidence Grade</b><span style="font-size:32px">${escapeHtml(edpGrade || "—")}</span><small>Source-backed evidence basis</small></div>
-        <div class="metric"><b>Can they win now?</b><span style="font-size:${(edpCanWin || "").length > 30 ? "14px" : "18px"};line-height:1.3">${escapeHtml(edpCanWin || "Pending")}</span><small>Based on verified evidence</small></div>
+        <div class="metric"><b>Evidence Grade</b><span style="font-size:32px">${escapeHtml(edpGrade || "—")}</span><small>${escapeHtml(meta.evidenceGradeFooter)}</small></div>
+        <div class="metric"><b>Can they win now?</b><span style="font-size:${(edpCanWin || "").length > 30 ? "14px" : "18px"};line-height:1.3">${escapeHtml(edpCanWin || "Pending")}</span><small>${escapeHtml(meta.canWinFooter)}</small></div>
         <div class="metric"><b>Recommended route</b><span style="font-size:${(edpRoute || "").length > 30 ? "13px" : "16px"};line-height:1.35">${escapeHtml(edpRoute || "Pending")}</span><small>Best first money route</small></div>
       </div>
 
@@ -7796,9 +7896,10 @@ function reportPage(scan: ScanRecord) {
         ${edpBestRoute ? `<p><strong style="color:var(--brand)">First route:</strong> ${escapeHtml(edpBestRoute)}</p>` : ""}
         ${edpFastestAction ? `<p><strong style="color:var(--brand)">This week:</strong> ${escapeHtml(edpFastestAction)}</p>` : ""}
         ${edpMainBlocker ? `<p><strong style="color:var(--red)">Blocker:</strong> ${escapeHtml(edpMainBlocker)}</p>` : ""}
-        <p><strong style="color:var(--muted)">Sector:</strong> ${escapeHtml(scores.sector)} &middot; <strong style="color:var(--muted)">Open:</strong> ${openCount} &middot; <strong style="color:var(--muted)">Awarded:</strong> ${awardedCount}</p>
+        ${headlineStrip}
       </div>
-    </section>
+    </section>`;
+    })()}
 
     ${((scan.input_json as any)?.scanMode ?? "both") === "intelligence" ? "" : premiumDashboardHtml(scan)}
 
