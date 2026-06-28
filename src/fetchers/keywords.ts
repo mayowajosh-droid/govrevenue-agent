@@ -37,7 +37,7 @@ Last public contract: ${input.lastPublicContract || "none stated"}`;
 
   const response = await withOpenAiTimeout(signal =>
     openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: OPENAI_MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.1,

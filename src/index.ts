@@ -248,7 +248,7 @@ app.use((req, _res, next) => {
 });
 
 const PORT = Number(process.env.PORT || 3000);
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-mini";
 // Report generation uses Claude when ANTHROPIC_API_KEY is set (the report is the product —
 // a frontier model writes materially better ones), falling back to OpenAI otherwise.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
@@ -2517,7 +2517,7 @@ Last public contract: ${input.lastPublicContract || "none stated"}`;
 
   const response = await withOpenAiTimeout(signal =>
     openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: OPENAI_MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.1,
@@ -19843,7 +19843,7 @@ app.get("/admin/scans", requireAdmin, asyncRoute(async (req, res) => {
   const configRows: [string, string][] = [
     ["Report provider",  process.env.ANTHROPIC_API_KEY ? "Claude (primary) + OpenAI fallback" : "OpenAI only"],
     ["Claude model",     process.env.ANTHROPIC_MODEL   || "claude-opus-4-8 (default)"],
-    ["OpenAI model",     process.env.OPENAI_MODEL      || "gpt-4.1-mini (default)"],
+    ["OpenAI model",     process.env.OPENAI_MODEL      || "gpt-5-mini (default)"],
     ["DB backend",       pool ? "PostgreSQL (connected)" : "In-memory (no DATABASE_URL)"],
     ["Queue backend",    process.env.REDIS_URL ? "BullMQ + Redis" : "In-process queue"],
     ["Node version",     process.version],

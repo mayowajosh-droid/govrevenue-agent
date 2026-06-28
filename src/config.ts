@@ -11,7 +11,7 @@ import { Redis } from "ioredis";
 import type { ScanRecord, SubscriptionRecord, HomepageSignal, ProcurementData } from "./types.js";
 
 export const PORT = Number(process.env.PORT || 3000);
-export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-mini";
 export const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 export const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-now";
 export const JWT_SECRET = process.env.JWT_SECRET || "atlasrevenue-jwt-secret-change-in-prod";
