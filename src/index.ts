@@ -9899,19 +9899,20 @@ async function fetchLeadsForQuery(
 ): Promise<LeadsPayload> {
   const empty: LeadsPayload = { businesses: [], sampleSize: 0, estimatedTotal: 0, label: "" };
   if (!pool || !q.trim()) return empty;
-  // Vehicle/property markets are sold to individuals or fleets, not B2B prospects
-  // a service business could DM. Returning empty lets the frontend auto-hide the
-  // "Who to contact" panel rather than show wrong leads.
-  const ds = detectDemandSource(q);
-  if (ds === "vehicle" || ds === "property") return empty;
   try {
     const { getNamedBusinessesBySector } = await import("./signals/market-intel.js");
-    // Try the tight SIC-specific filter first — returns only businesses whose own
-    // CH SIC codes match the keyword (perfumes → 47750, photography → 74201).
+    // Tight SIC-specific filter wins first — even when the demand router would
+    // call this "property" (e.g. "solar panels", "roofing", "electrician"), if
+    // we have an explicit SIC match for the trade we want THOSE businesses.
     const sicMatch = matchSicFilter(q);
     if (sicMatch) {
       return await getNamedBusinessesBySector(pool, [], sicMatch.label, { ...opts, sicFilter: sicMatch.sics });
     }
+    // No SIC match → check the broad demand source. Vehicle/property fall-throughs
+    // are sold to individuals or fleets — no B2B prospects to list, so return
+    // empty and let the frontend auto-hide the "Who to contact" panel.
+    const ds = detectDemandSource(q);
+    if (ds === "vehicle" || ds === "property") return empty;
     // Fallback: broad sector bucket (matches whatever's freshest in Retail/Health/etc).
     const m = matchChSectors(q);
     return await getNamedBusinessesBySector(pool, m.sectors, m.label, opts);
@@ -10485,7 +10486,7 @@ const KEYWORD_SIC_FILTER: { terms: string[]; sics: string[]; label: string }[] =
     sics: ["74201", "74202", "74203", "74209"], label: "photography studios" },
   { terms: ["perfume", "fragrance", "cosmetic shop", "skincare brand", "makeup brand", "beauty product"],
     sics: ["47750"], label: "cosmetics & perfumes retail" },
-  { terms: ["coffee shop", "coffee roaster", "espresso bar", "specialty coffee"],
+  { terms: ["coffee shop", "coffee roaster", "espresso bar", "specialty coffee", "coffee"],
     sics: ["56301", "56302"], label: "coffee shops & cafés" },
   { terms: ["café", "cafe ", "tea room"],
     sics: ["56302", "56301"], label: "cafés & tea rooms" },
@@ -10545,6 +10546,18 @@ const KEYWORD_SIC_FILTER: { terms: string[]; sics: string[]; label: string }[] =
     sics: ["47762", "75000"], label: "pet & veterinary businesses" },
   { terms: ["nursery school", "childcare", "kids' wear", "baby brand", "toy shop"],
     sics: ["85100", "47650"], label: "children & family businesses" },
+  { terms: ["solar panel", "solar pv", "solar install", "solar company"],
+    sics: ["43210", "43221", "35113"], label: "solar installers" },
+  { terms: ["ev charger", "ev charging", "vehicle charge point", "charging install"],
+    sics: ["43210", "27110"], label: "EV charging installers" },
+  { terms: ["electrician", "electrical contractor", "electrical install"],
+    sics: ["43210"], label: "electricians & electrical contractors" },
+  { terms: ["plumber", "plumbing", "heating engineer", "boiler install"],
+    sics: ["43221", "43222"], label: "plumbing & heating businesses" },
+  { terms: ["roofer", "roofing"],
+    sics: ["43910"], label: "roofers" },
+  { terms: ["scaffold", "scaffolding"],
+    sics: ["43991"], label: "scaffolding companies" },
 ];
 
 function matchSicFilter(q: string): { sics: string[]; label: string } | null {
