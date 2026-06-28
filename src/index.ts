@@ -13330,14 +13330,82 @@ header{background:rgba(11,16,24,.92);backdrop-filter:blur(10px);border-bottom:1p
 
 // ── Sample report (Ticket 1 — placeholder until Bulloughs PDF is supplied) ────
 
-app.get("/scan/sample", (req, res) => {
+app.get("/scan/sample", asyncRoute(async (req, res) => {
   const authCtx = getAuthUser(req);
+
+  // TIER 1 — Live Evidence Preview: real recent public contract notices with named buyers
+  // and real award values, pulled straight from homepage_signals (refreshed hourly from
+  // Contracts Finder + Find a Tender). Sits ABOVE the fictional Brightwell sample so the
+  // viewer sees concrete proof the machine ingests live data before they see the fabricated
+  // illustration of what a personalised report looks like.
+  let liveEvidence: HomepageSignal[] = [];
+  try {
+    if (pool) {
+      const r = await pool.query<HomepageSignal>(
+        `SELECT id, category, title, buyer, source, source_url, notice_date, deadline_date, value_amount, status, fetched_at
+         FROM homepage_signals
+         WHERE buyer IS NOT NULL AND TRIM(buyer) <> ''
+           AND value_amount IS NOT NULL AND value_amount > 50000 AND value_amount < 2e9
+           AND notice_date IS NOT NULL AND notice_date > NOW() - INTERVAL '90 days' AND notice_date <= NOW()
+         ORDER BY notice_date DESC NULLS LAST
+         LIMIT 8`
+      );
+      liveEvidence = r.rows;
+    }
+  } catch (err) {
+    console.warn("[sample] live evidence query failed:", String(err).slice(0, 120));
+  }
+
+  const liveEvidenceHtml = liveEvidence.length ? `
+    <div class="sr-tier-banner sr-tier-1-banner">
+      <div class="sr-tier-tag">Tier 1 of 3 &middot; Live Evidence</div>
+      <div class="sr-tier-h">Real UK public-sector notices the engine ingests today</div>
+      <div class="sr-tier-p">Each card below is an actual notice pulled from Contracts Finder or Find a Tender within the last 90 days &mdash; real buyer, real value, real source link. This is the live evidence layer that drives every paid scan.</div>
+    </div>
+    <div class="sr-section sr-tier-1">
+      <div class="sr-label">Live evidence &middot; refreshed hourly</div>
+      <div class="sr-title">Recent awarded contracts &mdash; click any to verify</div>
+      <div class="sr-live-grid">
+        ${liveEvidence.map(s => {
+          const value = s.value_amount && s.value_amount > 0 ? fmtMoney(s.value_amount) : "&mdash;";
+          const date = s.notice_date ? new Date(s.notice_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+          const titleClean = (s.title || "Untitled notice").slice(0, 110);
+          const buyerClean = (s.buyer || "Unknown buyer").slice(0, 70);
+          const sourceLabel = s.source === "FTS" ? "Find a Tender" : "Contracts Finder";
+          const cat = (s.category || "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          return `<a class="sr-live-card" href="${escapeHtml(s.source_url)}" target="_blank" rel="noopener">
+            <div class="sr-live-cat">${escapeHtml(cat)}</div>
+            <div class="sr-live-buyer">${escapeHtml(buyerClean)}</div>
+            <div class="sr-live-title">${escapeHtml(titleClean)}</div>
+            <div class="sr-live-meta">
+              <span class="sr-live-val">${value}</span>
+              <span class="sr-live-date">${escapeHtml(date)}</span>
+            </div>
+            <div class="sr-live-src">View on ${sourceLabel} &rarr;</div>
+          </a>`;
+        }).join("")}
+      </div>
+      <div class="sr-live-foot">
+        Pulled live from <b>homepage_signals</b> (Contracts Finder + Find a Tender, refreshed hourly). No fabrication. Every link opens the original notice on the government source.
+      </div>
+    </div>
+    <div class="sr-tier-banner sr-tier-2-banner">
+      <div class="sr-tier-tag">Tier 2 of 3 &middot; Illustrative Sample</div>
+      <div class="sr-tier-h">What a personalised report looks like &mdash; using a fictional company</div>
+      <div class="sr-tier-p">The 10 sections below show the structure, depth, and tone of a paid scan. The data is fabricated for "Brightwell FM Ltd" to protect real customer reports &mdash; but the layout, evidence grading, and recommendation logic are exactly what you get.</div>
+    </div>` : `
+    <div class="sr-tier-banner sr-tier-2-banner">
+      <div class="sr-tier-tag">Illustrative Sample</div>
+      <div class="sr-tier-h">What a personalised report looks like &mdash; using a fictional company</div>
+      <div class="sr-tier-p">The 10 sections below show the structure, depth, and tone of a paid scan. The data is fabricated for "Brightwell FM Ltd" to protect real customer reports.</div>
+    </div>`;
+
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sample Report: Brightwell FM Ltd &mdash; AtlasRevenue</title>
+<title>Sample Report &mdash; Live Evidence + Illustrative Sample &mdash; AtlasRevenue</title>
 <style>
 ${pageShellCss()}
 .sr-ribbon{background:rgba(180,146,78,.06);border-bottom:2px solid var(--brand);padding:10px 32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -13389,7 +13457,27 @@ ${pageShellCss()}
 .sr-tbl tbody tr{border-bottom:1px solid var(--border)}
 .sr-tbl tbody tr:last-child{border-bottom:none}
 .sr-callout{padding:16px;background:var(--surface-2);border-left:3px solid var(--green)}
-@media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}}
+.sr-tier-banner{position:relative;z-index:1;margin-bottom:24px;padding:24px 28px;border-left:3px solid var(--brand);background:var(--surface-2)}
+.sr-tier-1-banner{border-left-color:var(--green,#15803d);background:rgba(21,128,61,.04)}
+.sr-tier-2-banner{border-left-color:var(--brand);background:rgba(180,146,78,.04)}
+.sr-tier-tag{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:700}
+.sr-tier-1-banner .sr-tier-tag{color:var(--green,#15803d)}
+.sr-tier-2-banner .sr-tier-tag{color:var(--brand)}
+.sr-tier-h{font-family:var(--serif);font-size:20px;font-weight:500;line-height:1.25;color:var(--text);margin-bottom:8px}
+.sr-tier-p{font-size:13.5px;line-height:1.6;color:var(--text-mid);max-width:62em}
+.sr-live-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.sr-live-card{display:block;background:var(--surface-2);border:1px solid var(--border-2);padding:16px 18px;text-decoration:none;transition:border-color .15s,transform .15s}
+.sr-live-card:hover{border-color:var(--brand);transform:translateY(-1px)}
+.sr-live-cat{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:8px;font-weight:700}
+.sr-live-buyer{font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);line-height:1.25;margin-bottom:6px}
+.sr-live-title{font-size:13px;color:var(--text-mid);line-height:1.45;margin-bottom:12px}
+.sr-live-meta{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;border-top:1px solid var(--border);margin-bottom:8px}
+.sr-live-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--brand)}
+.sr-live-date{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
+.sr-live-src{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sr-live-card:hover .sr-live-src{color:var(--brand)}
+.sr-live-foot{font-size:12px;color:var(--muted);line-height:1.5;padding:12px 14px;background:var(--surface-2);border:1px dashed var(--border);font-style:italic}
+@media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}.sr-live-grid{grid-template-columns:1fr}}
 @media(max-width:480px){
   .sr-ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
   .sr-wrap{padding:16px 12px 48px}
@@ -13402,17 +13490,21 @@ ${pageShellCss()}
   .sr-mm{flex-direction:column;align-items:flex-start;gap:4px}
   .sr-cta{padding:20px 16px}
   .sr-stat-grid{grid-template-columns:1fr}
+  .sr-tier-banner{padding:18px 16px}
+  .sr-tier-h{font-size:17px}
 }
 </style>
 </head>
 <body>
 ${pageShellHeader(null, authCtx)}
 <div class="sr-ribbon">
-  <span>ILLUSTRATIVE SAMPLE &mdash; Brightwell FM Ltd is a fictional company &mdash; all data is fabricated for demonstration</span>
+  <span>Live evidence + illustrative sample &mdash; real recent contracts above, fictional Brightwell FM Ltd report below</span>
   <span class="sr-ribbon-cta"><a href="/scan">Run your scan &rarr;</a></span>
 </div>
 <div class="sr-watermark">SAMPLE</div>
 <div class="sr-wrap">
+
+  ${liveEvidenceHtml}
 
   <div class="sr-section">
     <div class="sr-label">Section 1 of 10</div>
@@ -13562,7 +13654,7 @@ ${pageShellHeader(null, authCtx)}
 ${pageShellFoot()}
 </body>
 </html>`);
-});
+}));
 
 app.get("/scan", (req, res) => {
   const auth = getAuthUser(req);
