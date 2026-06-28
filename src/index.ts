@@ -13390,14 +13390,14 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
       </div>
     </div>
     <div class="sr-tier-banner sr-tier-2-banner">
-      <div class="sr-tier-tag">Tier 2 of 3 &middot; Illustrative Sample</div>
-      <div class="sr-tier-h">What a personalised report looks like &mdash; using a fictional company</div>
-      <div class="sr-tier-p">The 10 sections below show the structure, depth, and tone of a paid scan. The data is fabricated for "Brightwell FM Ltd" to protect real customer reports &mdash; but the layout, evidence grading, and recommendation logic are exactly what you get.</div>
+      <div class="sr-tier-tag">Tier 2 of 3 &middot; Demo Report</div>
+      <div class="sr-tier-h">Demo report: fictional company, fictional opportunities</div>
+      <div class="sr-tier-p">This page shows the report format. Live AtlasRevenue scans use source-linked public records and market-demand signals where available. Every buyer name, value, deadline and award status in the section below is illustrative &mdash; designed to show what the structure delivers, not to represent a real opportunity.</div>
     </div>` : `
     <div class="sr-tier-banner sr-tier-2-banner">
-      <div class="sr-tier-tag">Illustrative Sample</div>
-      <div class="sr-tier-h">What a personalised report looks like &mdash; using a fictional company</div>
-      <div class="sr-tier-p">The 10 sections below show the structure, depth, and tone of a paid scan. The data is fabricated for "Brightwell FM Ltd" to protect real customer reports.</div>
+      <div class="sr-tier-tag">Demo Report</div>
+      <div class="sr-tier-h">Demo report: fictional company, fictional opportunities</div>
+      <div class="sr-tier-p">This page shows the report format. Live AtlasRevenue scans use source-linked public records and market-demand signals where available. Every buyer name, value, deadline and award status in the section below is illustrative &mdash; designed to show what the structure delivers, not to represent a real opportunity.</div>
     </div>`;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -13477,6 +13477,7 @@ ${pageShellCss()}
 .sr-live-src{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .sr-live-card:hover .sr-live-src{color:var(--brand)}
 .sr-live-foot{font-size:12px;color:var(--muted);line-height:1.5;padding:12px 14px;background:var(--surface-2);border:1px dashed var(--border);font-style:italic}
+.sr-demo-tag{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.25);padding:1px 5px;margin-left:4px;vertical-align:middle;font-weight:700;line-height:1.6}
 @media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}.sr-live-grid{grid-template-columns:1fr}}
 @media(max-width:480px){
   .sr-ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
@@ -13507,41 +13508,41 @@ ${pageShellHeader(null, authCtx)}
   ${liveEvidenceHtml}
 
   <div class="sr-section">
-    <div class="sr-label">Section 1 of 10</div>
+    <div class="sr-label">Section 1 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Executive Decision Panel</div>
     <div class="sr-edp-grid">
-      <div class="sr-edp-card"><div class="sr-edp-lbl">Verdict</div><div class="sr-edp-val" style="color:var(--green)">Strong</div></div>
-      <div class="sr-edp-card"><div class="sr-edp-lbl">Evidence grade</div><div class="sr-edp-val">B+</div></div>
-      <div class="sr-edp-card"><div class="sr-edp-lbl">Can they win now?</div><div class="sr-edp-val" style="color:var(--green)">Yes</div></div>
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Verdict <span class="sr-demo-tag">Demo</span></div><div class="sr-edp-val" style="color:var(--green)">Strong</div></div>
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Evidence grade <span class="sr-demo-tag">Demo</span></div><div class="sr-edp-val">B+</div></div>
+      <div class="sr-edp-card"><div class="sr-edp-lbl">Can they win now? <span class="sr-demo-tag">Demo</span></div><div class="sr-edp-val" style="color:var(--green)">Yes</div></div>
     </div>
     <div class="sr-ev"><span class="sr-ev-lbl">Recommended route</span><span class="sr-ev-val">Direct award via Facilities frameworks (Pagabo, Procure Partnerships)</span></div>
-    <div class="sr-ev"><span class="sr-ev-lbl">Contracts found</span><span class="sr-ev-val">38 awarded &middot; 9 open</span></div>
-    <div class="sr-ev"><span class="sr-ev-lbl">Est. addressable market</span><span class="sr-ev-val">&pound;142m (next 12 months, reactive maintenance + planned works)</span></div>
-    <div class="sr-ev"><span class="sr-ev-lbl">Top buyer concentration</span><span class="sr-ev-val">3 buyers account for 41% of awarded spend</span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Contracts found</span><span class="sr-ev-val">38 awarded &middot; 9 open <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Est. addressable market</span><span class="sr-ev-val">&pound;142m (next 12 months, reactive maintenance + planned works) <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-ev"><span class="sr-ev-lbl">Top buyer concentration</span><span class="sr-ev-val">3 buyers account for 41% of awarded spend <span class="sr-demo-tag">illustrative</span></span></div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 2 of 10</div>
+    <div class="sr-label">Section 2 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Evidence Grade &amp; Scan Basis</div>
-    <p class="sr-p">Grade <strong>B+</strong> &mdash; solid public-record evidence with minor gaps. 38 matching awarded contracts found across Contracts Finder and Find a Tender. CPV codes 50700000 (Repair and maintenance of building installations), 50710000 (Repair and maintenance of electrical and mechanical installations), and 45210000 (Building construction work) all confirmed active. 9 open opportunities currently accepting submissions. Buyer concentration assessed across 22 unique contracting authorities. Evidence gap: Find a Tender returned limited historical data for sub-&pound;120k awards in this category; some local authority micro-lots may be underrepresented.</p>
+    <p class="sr-p"><span class="sr-demo-tag">Demo grade</span> Grade <strong>B+</strong> &mdash; in a live scan this paragraph explains the depth of public-record evidence behind the verdict. It states how many awarded and open contracts were matched, which CPV codes were confirmed active, how many unique buyers were assessed, and where the evidence is thin (e.g. limited Find a Tender history for sub-&pound;120k awards, missing local authority micro-lots). All counts shown here are illustrative; in a paid scan they come from live Contracts Finder and Find a Tender pulls completed for your specific service mix.</p>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 3 of 10</div>
+    <div class="sr-label">Section 3 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Intelligence Dashboard Summary</div>
     <div class="sr-stat-grid">
-      <div class="sr-stat"><div class="sr-stat-lbl">Total awarded (18 months)</div><div class="sr-stat-val">&pound;87.4m</div></div>
-      <div class="sr-stat"><div class="sr-stat-lbl">Open contract value</div><div class="sr-stat-val">&pound;23.1m</div></div>
-      <div class="sr-stat"><div class="sr-stat-lbl">Avg contract size</div><div class="sr-stat-val">&pound;2.3m</div></div>
-      <div class="sr-stat"><div class="sr-stat-lbl">Unique buyers</div><div class="sr-stat-val">22</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Total awarded (18 months) <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;87.4m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Open contract value <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;23.1m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Avg contract size <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;2.3m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Unique buyers <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">22</div></div>
     </div>
-    <p class="sr-p">Facilities management spend is concentrated in Q1 and Q3 (financial year), with peak procurement activity in October and March. Reactive maintenance lots are the most frequently tendered, followed by planned maintenance and compliance-driven M&amp;E renewals.</p>
+    <p class="sr-p">Example sector commentary: facilities management spend is concentrated in Q1 and Q3 (financial year), with peak procurement activity in October and March. Reactive maintenance lots are typically the most frequently tendered, followed by planned maintenance and compliance-driven M&amp;E renewals. Live reports replace this with the actual quarterly and category patterns extracted from your sector&rsquo;s real data.</p>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 4 of 10</div>
-    <div class="sr-title">Source-Backed Evidence</div>
-    <p class="sr-p" style="margin-bottom:16px">Every contract below links to a live public notice. Brightwell FM&rsquo;s service mix (reactive repairs, planned maintenance, M&amp;E) aligns with the following awarded and open contracts:</p>
+    <div class="sr-label">Section 4 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
+    <div class="sr-title">Illustrative Evidence Table</div>
+    <p class="sr-p" style="margin-bottom:16px">The examples below are fictional and show how AtlasRevenue structures evidence in a live report. In a paid scan, this section contains real buyer names, real values, real notice dates, source links to Contracts Finder or Find a Tender, and confidence labels where available. <em>For the demo, buyer names are anonymised (&ldquo;London Borough Council A&rdquo;, etc.) so no real organisation is attached to a fabricated contract.</em></p>
     <div style="overflow-x:auto">
     <table class="sr-tbl">
       <thead><tr>
@@ -13551,44 +13552,45 @@ ${pageShellHeader(null, authCtx)}
         <th>Status</th>
       </tr></thead>
       <tbody>
-        <tr><td>Responsive Repairs &amp; Voids Programme 2026&#8211;30</td><td>Southwark Council</td><td>&pound;18.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
-        <tr><td>Planned Maintenance and Cyclical Decorations</td><td>Peabody Trust</td><td>&pound;12.6m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
-        <tr><td>M&amp;E Servicing and Compliance</td><td>L&amp;Q Housing</td><td>&pound;8.9m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Awarded</span></td></tr>
-        <tr><td>Void Property Turnaround &amp; Minor Works</td><td>Lewisham Homes</td><td>&pound;4.1m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Open</span></td></tr>
-        <tr><td>Fire Door Replacement and Compartmentalisation</td><td>Hackney Council</td><td>&pound;3.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Open</span></td></tr>
+        <tr><td>Responsive Repairs &amp; Voids Programme 2026&#8211;30</td><td>London Borough Council A <span class="sr-demo-tag">illustrative</span></td><td>&pound;18.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Example: Awarded</span></td></tr>
+        <tr><td>Planned Maintenance and Cyclical Decorations</td><td>Housing Trust B <span class="sr-demo-tag">illustrative</span></td><td>&pound;12.6m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Example: Awarded</span></td></tr>
+        <tr><td>M&amp;E Servicing and Compliance</td><td>Housing Association C <span class="sr-demo-tag">illustrative</span></td><td>&pound;8.9m</td><td><span style="font-family:var(--mono);font-size:10px;color:var(--green)">&#9679; Example: Awarded</span></td></tr>
+        <tr><td>Void Property Turnaround &amp; Minor Works</td><td>London Borough Council D &mdash; Homes Service <span class="sr-demo-tag">illustrative</span></td><td>&pound;4.1m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Example: Open</span></td></tr>
+        <tr><td>Fire Door Replacement and Compartmentalisation</td><td>London Borough Council E <span class="sr-demo-tag">illustrative</span></td><td>&pound;3.2m</td><td><span style="font-family:var(--mono);font-size:10px;color:#b45309">&#9679; Example: Open</span></td></tr>
       </tbody>
     </table>
     </div>
-    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ 42 more contracts in the full evidence table</div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">Source link: included in live scans where available &middot; Confidence label: shown per row in live scans</div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 5 of 10</div>
+    <div class="sr-label">Section 5 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Best Routes to Revenue</div>
-    <div class="sr-mm"><span style="color:var(--text-mid)">1. Direct award via Pagabo Repairs &amp; Maintenance framework</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">&pound;8&#8211;12m/yr</span></div>
-    <div class="sr-mm"><span style="color:var(--text-mid)">2. Open tender &mdash; Reactive repairs (housing associations)</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;4&#8211;8m/yr</span></div>
-    <div class="sr-mm"><span style="color:var(--text-mid)">3. Procure Partnerships framework &mdash; Planned maintenance lots</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;3&#8211;6m/yr</span></div>
-    <div class="sr-mm"><span style="color:var(--text-mid)">4. Sub-contract route via Tier 1 (Wates, Morgan Sindall)</span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;1&#8211;3m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">1. Direct award via a relevant facilities framework <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">&pound;8&#8211;12m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">2. Open tender &mdash; Reactive repairs (housing associations) <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;4&#8211;8m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">3. Multi-supplier framework &mdash; Planned maintenance lots <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;3&#8211;6m/yr</span></div>
+    <div class="sr-mm"><span style="color:var(--text-mid)">4. Sub-contract route via Tier-1 main contractors <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">&pound;1&#8211;3m/yr</span></div>
     <div class="sr-callout" style="margin-top:16px">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:6px">Recommended first move</div>
-      <div style="font-size:14px;color:var(--text-mid);line-height:1.6">Apply to Pagabo Repairs &amp; Maintenance framework (Lot 2: &pound;1m&#8211;&pound;5m). The next intake window opens in September. With Brightwell&rsquo;s track record and geographic coverage, this is the highest-probability route.</div>
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:6px">Recommended first move &middot; example format</div>
+      <div style="font-size:14px;color:var(--text-mid);line-height:1.6">Example output: &ldquo;Apply to a relevant repairs &amp; maintenance framework, Lot 2 (&pound;1m&#8211;&pound;5m). Next intake window: shown where source-confirmed in live scans. With your track record and geographic coverage, this is the highest-probability route.&rdquo; In a live report this paragraph is built from real framework intake calendars and the named frameworks your firm is closest to qualifying for.</div>
     </div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 6 of 10</div>
+    <div class="sr-label">Section 6 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Buyer Watchlist</div>
+    <p class="sr-p" style="margin-bottom:12px;font-size:13px">In a live report, this table lists the named buyers spending most on your service area, with real award totals from public records and a click-through to each buyer&rsquo;s profile. Names below are anonymised for the demo.</p>
     <div class="sr-buyer" style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em"><span>Buyer</span><span>Total awarded</span><span>Contracts</span></div>
-    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Southwark Council</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;18.2m</span><span style="font-family:var(--mono)">4</span></div>
-    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Peabody Trust</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;14.8m</span><span style="font-family:var(--mono)">3</span></div>
-    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">L&amp;Q Housing</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;12.1m</span><span style="font-family:var(--mono)">5</span></div>
-    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Lewisham Homes</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;9.7m</span><span style="font-family:var(--mono)">3</span></div>
-    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Hackney Council</span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;7.4m</span><span style="font-family:var(--mono)">2</span></div>
-    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">+ 17 more buyers in the full report</div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">London Borough Council A <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;18.2m</span><span style="font-family:var(--mono)">4</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Housing Trust B <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;14.8m</span><span style="font-family:var(--mono)">3</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">Housing Association C <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;12.1m</span><span style="font-family:var(--mono)">5</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">London Borough Council D &mdash; Homes <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;9.7m</span><span style="font-family:var(--mono)">3</span></div>
+    <div class="sr-buyer"><span style="font-weight:600;color:var(--text)">London Borough Council E <span class="sr-demo-tag">illustrative</span></span><span style="font-family:var(--mono);color:var(--brand);font-weight:600">&pound;7.4m</span><span style="font-family:var(--mono)">2</span></div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--faint)">Live scans add: buyer click-through profile &middot; recent award timeline &middot; incumbent supplier(s) where source-confirmed</div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 7 of 10</div>
+    <div class="sr-label">Section 7 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Bid Readiness Score</div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-family:var(--serif);font-size:32px;font-weight:500;color:var(--green)">72%</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Ready to bid &mdash; minor gaps</span></div>
     <div class="sr-bar"><div class="sr-bar-fill" style="width:72%;background:var(--green)"></div></div>
@@ -13605,48 +13607,54 @@ ${pageShellHeader(null, authCtx)}
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 8 of 10</div>
+    <div class="sr-label">Section 8 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">Do Not Chase These Yet</div>
-    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">National Housing Federation &mdash; Major Refurbishment Framework</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid.</strong> Requires &pound;20m+ annual turnover and 3 completed framework references. Brightwell&rsquo;s &pound;8m turnover is below threshold. Apply after scaling to &pound;15m+.</div></div>
-    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">Ministry of Justice &mdash; Prison Maintenance Programme</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid.</strong> SC security clearance required for all operatives. Lead time for clearance is 4&#8211;6 months. No evidence of existing clearance in profile.</div></div>
-    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">TfL &mdash; Station Deep Clean and Maintenance</div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:#b45309">Not yet.</strong> Requires Transport for London contractor accreditation (CIRAS membership + Sentinel card). Achievable within 3 months but not in place today.</div></div>
+    <p class="sr-p" style="margin-bottom:12px;font-size:13px">In a live report, this section names the specific frameworks and contracts where your firm is below threshold today &mdash; with the precise gap and what it would take to close it. Examples below are illustrative.</p>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">National major-refurbishment framework <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid pattern:</strong> requires &pound;20m+ annual turnover and 3 completed framework references. A firm at &pound;8m turnover is below threshold. Re-evaluate after scaling to &pound;15m+. Live reports name the exact framework and current threshold.</div></div>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">Central-government secure-estate maintenance <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:var(--red)">Avoid pattern:</strong> SC security clearance required for all operatives. Typical clearance lead time 4&ndash;6 months. No evidence of existing clearance in the profile would defer this route.</div></div>
+    <div class="sr-avoid"><div style="font-weight:600;margin-bottom:4px">Transport-authority station maintenance <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5"><strong style="color:#b45309">Not yet pattern:</strong> requires authority-specific contractor accreditation (e.g. industry safety scheme + competency card). Often achievable within ~3 months once initiated.</div></div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 9 of 10</div>
+    <div class="sr-label">Section 9 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
     <div class="sr-title">30-Day Activation Plan</div>
-    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Register on Pagabo supplier portal</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Submit Brightwell&rsquo;s accreditations, insurance documents, and last 3 years&rsquo; audited accounts. Confirm eligibility for Lot 2 (&pound;1m&#8211;&pound;5m).</div></div></div>
-    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Set up Contracts Finder alerts</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Keywords: &ldquo;responsive repairs&rdquo;, &ldquo;planned maintenance&rdquo;, &ldquo;void property&rdquo;, &ldquo;M&amp;E servicing&rdquo;. Filter by London and South East.</div></div></div>
-    <div class="sr-act"><span class="sr-act-num">Week 2</span><div><div style="font-weight:600;margin-bottom:3px">Submit PQQ for Lewisham Homes &mdash; Void Turnaround</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Deadline: 15 August 2026. Requires 2 relevant case studies (void turnaround, &pound;500k+ each) and employer&rsquo;s liability certificate.</div></div></div>
-    <div class="sr-act"><span class="sr-act-num">Week 3</span><div><div style="font-weight:600;margin-bottom:3px">Apply for Constructionline Gold</div><div style="font-size:13px;color:var(--muted);line-height:1.5">This is a gateway accreditation for 60%+ of housing maintenance frameworks. Processing takes 2&#8211;4 weeks. Cost: &pound;499/year.</div></div></div>
-    <div class="sr-act"><span class="sr-act-num">Week 4</span><div><div style="font-weight:600;margin-bottom:3px">Draft social value policy and upload to supplier portals</div><div style="font-size:13px;color:var(--muted);line-height:1.5">Social value weighting is now 10&#8211;20% on most housing tenders. Template available from National TOMS framework. Include local employment, apprenticeships, and carbon reduction commitments.</div></div></div>
+    <p class="sr-p" style="margin-bottom:12px;font-size:13px">Live reports replace the items below with specific portal names, contract IDs, and source-confirmed deadlines drawn from the buyers we found for your firm. The example weeks below illustrate the level of action-detail you can expect.</p>
+    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Register on the relevant framework supplier portal <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5">Submit accreditations, insurance documents, and last 3 years&rsquo; audited accounts. Confirm eligibility for the lot that matches your contract-size profile.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 1</span><div><div style="font-weight:600;margin-bottom:3px">Set up Contracts Finder alerts <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5">Example keyword set: &ldquo;responsive repairs&rdquo;, &ldquo;planned maintenance&rdquo;, &ldquo;void property&rdquo;, &ldquo;M&amp;E servicing&rdquo;. Live scans deliver the exact keyword + geographic filter set for your service mix.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 2</span><div><div style="font-weight:600;margin-bottom:3px">Submit PQQ for the highest-fit open opportunity <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5">Deadline: shown in live report where source-confirmed. Example requirements: 2 relevant case studies (&pound;500k+ each) and employer&rsquo;s liability certificate. Live scans pull the actual buyer-specific PQQ checklist.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 3</span><div><div style="font-weight:600;margin-bottom:3px">Apply for Constructionline Gold <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5">A gateway accreditation for many housing-maintenance frameworks. Processing typically 2&ndash;4 weeks. Current cost: published on the Constructionline site.</div></div></div>
+    <div class="sr-act"><span class="sr-act-num">Week 4</span><div><div style="font-weight:600;margin-bottom:3px">Draft social-value policy and upload to supplier portals <span class="sr-demo-tag">illustrative</span></div><div style="font-size:13px;color:var(--muted);line-height:1.5">Social-value weighting is typically 10&ndash;20% on housing tenders. Templates available via the National TOMS framework. Include local employment, apprenticeships, and carbon-reduction commitments.</div></div></div>
   </div>
 
   <div class="sr-section">
-    <div class="sr-label">Section 10 of 10</div>
-    <div class="sr-title">QA Notes &amp; Integrity Checks</div>
-    <div class="sr-qa"><span style="color:var(--muted)">Contracts Finder records checked</span><span style="font-family:var(--mono);font-weight:600">847</span></div>
-    <div class="sr-qa"><span style="color:var(--muted)">Find a Tender records checked</span><span style="font-family:var(--mono);font-weight:600">312</span></div>
-    <div class="sr-qa"><span style="color:var(--muted)">Matching contracts identified</span><span style="font-family:var(--mono);font-weight:600">47</span></div>
-    <div class="sr-qa"><span style="color:var(--muted)">CPV codes verified</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; 3 codes confirmed</span></div>
-    <div class="sr-qa"><span style="color:var(--muted)">Outlier notices excluded</span><span style="font-family:var(--mono);font-weight:600">2 (&gt;&pound;500m threshold)</span></div>
+    <div class="sr-label">Section 10 of 10 &middot; <span style="color:var(--brand)">Illustrative</span></div>
+    <div class="sr-title">QA Notes &amp; Source Confidence</div>
+    <p class="sr-p" style="margin-bottom:12px;font-size:13px">In a live report, every count below is the real number of records examined for your scan. The figures here are illustrative and show the integrity checks the engine runs on every paid scan.</p>
+    <div class="sr-qa"><span style="color:var(--muted)">Contracts Finder records checked</span><span style="font-family:var(--mono);font-weight:600">847 <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Find a Tender records checked</span><span style="font-family:var(--mono);font-weight:600">312 <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Matching contracts identified</span><span style="font-family:var(--mono);font-weight:600">47 <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">CPV codes verified</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; 3 codes confirmed <span class="sr-demo-tag">illustrative</span></span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Outlier notices excluded</span><span style="font-family:var(--mono);font-weight:600">2 (&gt;&pound;500m threshold) <span class="sr-demo-tag">illustrative</span></span></div>
     <div class="sr-qa"><span style="color:var(--muted)">Aggregator buyers filtered</span><span style="font-family:var(--mono);font-weight:600;color:var(--green)">&#10004; Active</span></div>
-    <div class="sr-qa"><span style="color:var(--muted)">Data freshness</span><span style="font-family:var(--mono);font-weight:600">Contracts Finder: &lt;24h &middot; FTS: &lt;48h</span></div>
+    <div class="sr-qa"><span style="color:var(--muted)">Data freshness (target SLA on live scans)</span><span style="font-family:var(--mono);font-weight:600">Contracts Finder: &lt;24h &middot; FTS: &lt;48h</span></div>
     <div style="margin-top:16px;padding:14px;background:var(--surface-2);border:1px solid var(--border-2);font-size:12px;color:var(--muted);line-height:1.6">
-      <strong style="color:var(--text-mid)">Caveat:</strong> This report is based on publicly available procurement data. Award values are as published by the contracting authority and may differ from final contract values. AtlasRevenue provides intelligence, not certainty.
+      <strong style="color:var(--text-mid)">Caveat:</strong> Live AtlasRevenue reports are based on publicly available procurement data plus company, geographic and market-demand signals. Award values are as published by the contracting authority and may differ from final contract values. AtlasRevenue provides intelligence, not certainty.
     </div>
   </div>
 
   <div class="sr-cta">
-    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">This was Brightwell FM&rsquo;s report. Now get yours.</div>
-    <div style="font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4">Enter your company details and get your own 10-section intelligence report in under 5 minutes.</div>
-    <a href="/scan">Run your scan &rarr;</a>
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px">Want this built from real evidence for your company?</div>
+    <div style="font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text);line-height:1.4">Run a live AtlasRevenue scan to see matched buyers, demand signals, source-linked opportunities, readiness gaps, and the next best route to revenue.</div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center">
+      <a href="/scan">Run a live scan &rarr;</a>
+      <a href="/pricing" style="display:inline-block;background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--border-3);text-decoration:none">View pricing</a>
+    </div>
   </div>
 
   <div style="text-align:center;padding:20px 0">
     <div style="font-family:var(--mono);font-size:10px;color:var(--faint);line-height:1.7">
-      PUBLIC RECORD ONLY &middot; INTELLIGENCE, NOT CERTAINTY<br>
-      Brightwell FM Ltd is entirely fictional. All buyers, values, and contracts shown above are fabricated for illustration.
+      DEMO REPORT &middot; INTELLIGENCE, NOT CERTAINTY<br>
+      Brightwell FM Ltd is fictional. All buyer names in the demo above are anonymised placeholders; all values, deadlines, framework intake windows and award statuses are illustrative. Live scans use source-linked public records and market-demand signals where available.
     </div>
   </div>
 
