@@ -10405,12 +10405,26 @@ const STAPLE_TERMS = ["food", "grocery", "groceries", "bread", "milk", "househol
 // the ch_new_businesses payload). This gives REAL competitive-landscape data
 // per search keyword instead of generic population numbers.
 const KEYWORD_CH_SECTORS: { terms: string[]; sectors: string[]; label: string }[] = [
+  // Specific service/local-business queries (first-match wins, so these take precedence).
+  { terms: ["beauty salon", "hair salon", "nail salon", "aesthetics clinic", "aesthetic clinic", "barber", "hairdress", "spa ", "facial", "lash", "brow bar"],
+    sectors: ["Personal Services", "Health"], label: "beauty & wellness" },
+  { terms: ["personal trainer", "pt studio", "fitness studio", "yoga studio", "pilates", "crossfit", "boxing gym", "martial arts", "coach"],
+    sectors: ["Sports & Fitness", "Health"], label: "fitness & coaching" },
+  { terms: ["therapist", "therapy", "counsell", "psycholog", "wellbeing", "mental health", "wellness clinic"],
+    sectors: ["Health"], label: "therapy & wellbeing" },
+  { terms: ["software development", "saas", "app development", "tech startup", "it services", "it support", "cloud services", "data analytics", "software company"],
+    sectors: ["Software & Tech"], label: "software & tech" },
+  { terms: ["marketing agency", "advertising agency", "media agency", "pr agency", "public relations", "branding agency", "seo agency", "digital agency"],
+    sectors: ["Advertising & Marketing"], label: "marketing & advertising" },
+  { terms: ["consultancy", "consulting", "advisor", "advisory", "accountant", "accountancy", "bookkeep", "law firm", "solicitor", "legal services"],
+    sectors: ["Legal & Accounting"], label: "professional services" },
+  // Consumer-density layer keywords (broader, used by the Atlas map demand layer).
   { terms: ["perfume", "fragrance", "cosmetic", "beauty", "skincare", "makeup", "make-up"],
-    sectors: ["Retail", "Creative"], label: "beauty & retail" },
+    sectors: ["Personal Services", "Retail"], label: "beauty & retail" },
   { terms: ["coffee", "cafe", "restaurant", "catering", "bakery", "pizza", "takeaway", "pub", "bar"],
     sectors: ["Food & Beverage"], label: "food & beverage" },
-  { terms: ["gym", "fitness", "physiotherapy", "wellness", "yoga", "sport", "personal trainer"],
-    sectors: ["Health"], label: "health & fitness" },
+  { terms: ["gym", "fitness", "physiotherapy", "wellness", "yoga", "sport"],
+    sectors: ["Sports & Fitness", "Health"], label: "health & fitness" },
   { terms: ["fashion", "clothing", "apparel", "shoes", "footwear", "jewel", "accessori"],
     sectors: ["Retail", "Creative"], label: "fashion & retail" },
   { terms: ["furniture", "homeware", "interior", "kitchen", "bathroom", "home decor"],
