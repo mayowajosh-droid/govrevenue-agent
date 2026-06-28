@@ -11009,7 +11009,7 @@ function renderLeads(data){
   grid.innerHTML=biz.map(function(b){
     var when=b.incorporatedOn?('Registered '+b.incorporatedOn):'';
     var loc=b.county?leadEsc(b.county):'';
-    return '<a href="'+leadEsc(b.chUrl)+'" target="_blank" rel="noopener" style="display:block;background:var(--surface);border:1px solid var(--border);padding:14px 16px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--brand)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+    return '<a href="'+leadEsc(b.chUrl)+'" target="_blank" rel="noopener" style="display:block;background:var(--surface);border:1px solid var(--border);padding:14px 16px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor=&#39;var(--brand)&#39;" onmouseout="this.style.borderColor=&#39;var(--border)&#39;">'
       +'<div style="font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);line-height:1.25;margin-bottom:5px">'+leadEsc(b.name)+'</div>'
       +'<div style="display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.02em">'
         +'<span>'+(loc||'UK')+'</span><span>'+leadEsc(when)+'</span></div>'
