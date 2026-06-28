@@ -673,6 +673,7 @@ export type NamedBusiness = {
   county: string;
   address: string;
   sector: string;
+  sicCodes?: string[];   // raw 5-digit SIC codes from CH, used by the SIC-filtered leads path
 };
 
 export type NamedBusinessResult = {
@@ -686,7 +687,7 @@ export async function getNamedBusinessesBySector(
   pool: Pool,
   sectorFilter: string[],
   label: string,
-  opts: { county?: string; limit?: number } = {},
+  opts: { county?: string; limit?: number; sicFilter?: string[] } = {},
 ): Promise<NamedBusinessResult> {
   type ChSnapshot = {
     businesses: NamedBusiness[];
@@ -696,18 +697,30 @@ export async function getNamedBusinessesBySector(
   const data = await getLatestPayload<ChSnapshot>(pool, "ch_new_businesses");
   if (!data?.businesses?.length) return empty;
 
-  const filterLc = sectorFilter.map(s => s.toLowerCase());
-  let filtered = data.businesses.filter(b =>
-    b.sector && filterLc.some(sf => b.sector.toLowerCase().includes(sf)),
-  );
+  // SIC-code filtering is tighter than sector-bucket filtering: it returns only
+  // businesses whose own CH SIC codes match the keyword (e.g. perfumes → 47750,
+  // not all of Retail). Falls back to sector matching when no SIC filter given.
+  const sicSet = opts.sicFilter && opts.sicFilter.length
+    ? new Set(opts.sicFilter)
+    : null;
+  let filtered: NamedBusiness[];
+  if (sicSet) {
+    filtered = data.businesses.filter(b => b.sicCodes && b.sicCodes.some(c => sicSet.has(c)));
+  } else {
+    const filterLc = sectorFilter.map(s => s.toLowerCase());
+    filtered = data.businesses.filter(b =>
+      b.sector && filterLc.some(sf => b.sector.toLowerCase().includes(sf)),
+    );
+  }
   if (!filtered.length) return empty;
 
   const sampleSize = filtered.length;
 
   // Scale the sample up to the real market size using sectorTotals (the CH API's
-  // total `hits`), same approach as getCountySectorDensity.
+  // total `hits`), same approach as getCountySectorDensity. SIC-filtered queries
+  // skip scaling — the sample IS the estimate, not a slice of a larger bucket.
   let scaleFactor = 1;
-  if (data.sectorTotals) {
+  if (!sicSet && data.sectorTotals) {
     let totalHits = 0;
     for (const sf of sectorFilter) {
       const sfLc = sf.toLowerCase();

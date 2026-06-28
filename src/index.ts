@@ -9899,8 +9899,20 @@ async function fetchLeadsForQuery(
 ): Promise<LeadsPayload> {
   const empty: LeadsPayload = { businesses: [], sampleSize: 0, estimatedTotal: 0, label: "" };
   if (!pool || !q.trim()) return empty;
+  // Vehicle/property markets are sold to individuals or fleets, not B2B prospects
+  // a service business could DM. Returning empty lets the frontend auto-hide the
+  // "Who to contact" panel rather than show wrong leads.
+  const ds = detectDemandSource(q);
+  if (ds === "vehicle" || ds === "property") return empty;
   try {
     const { getNamedBusinessesBySector } = await import("./signals/market-intel.js");
+    // Try the tight SIC-specific filter first — returns only businesses whose own
+    // CH SIC codes match the keyword (perfumes → 47750, photography → 74201).
+    const sicMatch = matchSicFilter(q);
+    if (sicMatch) {
+      return await getNamedBusinessesBySector(pool, [], sicMatch.label, { ...opts, sicFilter: sicMatch.sics });
+    }
+    // Fallback: broad sector bucket (matches whatever's freshest in Retail/Health/etc).
     const m = matchChSectors(q);
     return await getNamedBusinessesBySector(pool, m.sectors, m.label, opts);
   } catch (err) {
@@ -10451,7 +10463,7 @@ const KEYWORD_CH_SECTORS: { terms: string[]; sectors: string[]; label: string }[
     sectors: ["Retail"], label: "cleaning & services" },
   { terms: ["wine", "spirits", "beer", "alcohol", "drink", "beverage"],
     sectors: ["Food & Beverage", "Retail"], label: "drinks & hospitality" },
-  { terms: ["solar", "energy", "renewabl", "electric", "green"],
+  { terms: ["solar panel", "solar pv", "solar install", "renewable energy", "energy efficiency", "energy services", "green tech", "green energy", "ev charger", "ev charging", "charge point"],
     sectors: ["Construction", "Architecture"], label: "energy & green tech" },
   { terms: ["food", "snack", "grocery", "meal", "health food", "organic"],
     sectors: ["Food & Beverage", "Retail"], label: "food & grocery" },
@@ -10463,6 +10475,84 @@ function matchChSectors(q: string): { sectors: string[]; label: string } {
     if (entry.terms.some(t => ql.includes(t))) return { sectors: entry.sectors, label: entry.label };
   }
   return { sectors: ["Retail"], label: "retail" };
+}
+
+// Keyword → SPECIFIC 5-digit SIC codes. This is the tight filter used by
+// /api/leads so a query for "perfumes" returns only perfume retailers (SIC 47750),
+// not the freshest 5 businesses across all of Retail. First-match wins.
+const KEYWORD_SIC_FILTER: { terms: string[]; sics: string[]; label: string }[] = [
+  { terms: ["wedding photographer", "studio photographer", "photographer", "photography"],
+    sics: ["74201", "74202", "74203", "74209"], label: "photography studios" },
+  { terms: ["perfume", "fragrance", "cosmetic shop", "skincare brand", "makeup brand", "beauty product"],
+    sics: ["47750"], label: "cosmetics & perfumes retail" },
+  { terms: ["coffee shop", "coffee roaster", "espresso bar", "specialty coffee"],
+    sics: ["56301", "56302"], label: "coffee shops & cafés" },
+  { terms: ["café", "cafe ", "tea room"],
+    sics: ["56302", "56301"], label: "cafés & tea rooms" },
+  { terms: ["bistro", "fine dining", "restaurant"],
+    sics: ["56101", "56102"], label: "restaurants" },
+  { terms: ["takeaway", "take away", "pizza", "kebab", "fish and chip", "chip shop"],
+    sics: ["56103"], label: "takeaways" },
+  { terms: ["pub ", "wine bar", "cocktail bar", "nightclub"],
+    sics: ["56301", "56302"], label: "pubs & bars" },
+  { terms: ["catering", "caterer", "event catering"],
+    sics: ["56210", "56290"], label: "catering businesses" },
+  { terms: ["bakery", "patisserie", "artisan bread"],
+    sics: ["10711", "10712"], label: "bakeries" },
+  { terms: ["beauty salon", "nail salon", "lash bar", "brow bar", "facial"],
+    sics: ["96020", "96021", "96022"], label: "beauty salons" },
+  { terms: ["hair salon", "barber", "hairdress"],
+    sics: ["96020", "96021"], label: "hairdressers & barbers" },
+  { terms: ["aesthetics clinic", "aesthetic clinic", "cosmetic clinic", "skin clinic", "med spa"],
+    sics: ["86900", "96020"], label: "aesthetics clinics" },
+  { terms: ["personal trainer", "pt studio", "fitness studio", "fitness coach", "boot camp"],
+    sics: ["96040", "93130"], label: "personal trainers & coaches" },
+  { terms: ["gym", "crossfit", "boxing gym", "martial arts"],
+    sics: ["93130"], label: "gyms & fitness facilities" },
+  { terms: ["yoga", "pilates"],
+    sics: ["93199", "96040"], label: "yoga & pilates studios" },
+  { terms: ["therapist", "therapy", "counsell", "psycholog", "wellbeing", "mental health"],
+    sics: ["86900", "88990"], label: "therapy & counselling" },
+  { terms: ["physio", "osteopath", "chiropract"],
+    sics: ["86230", "86900"], label: "physio & osteopathy" },
+  { terms: ["software development", "software company", "software house", "saas"],
+    sics: ["62011", "62012"], label: "software companies" },
+  { terms: ["it services", "it support", "managed it", "msp"],
+    sics: ["62020", "62090"], label: "IT services & support" },
+  { terms: ["web design", "web agency", "digital agency", "web studio"],
+    sics: ["62012", "74100"], label: "web & digital agencies" },
+  { terms: ["marketing agency", "advertising agency", "pr agency", "branding agency", "seo agency", "media agency"],
+    sics: ["73110", "73120"], label: "marketing & advertising agencies" },
+  { terms: ["accountant", "accountancy", "bookkeep", "tax adviser", "chartered accountant"],
+    sics: ["69201", "69202", "69203"], label: "accountants & bookkeepers" },
+  { terms: ["solicitor", "law firm", "barrister", "legal services", "law practice"],
+    sics: ["69101", "69102", "69109"], label: "solicitors & law firms" },
+  { terms: ["management consultancy", "business consultancy", "strategy consult", "consultancy"],
+    sics: ["70210", "70220"], label: "management consultancies" },
+  { terms: ["fashion boutique", "clothing store", "clothing brand", "boutique", "menswear", "womenswear", "streetwear"],
+    sics: ["47710"], label: "fashion & clothing retail" },
+  { terms: ["shoe shop", "footwear", "trainer shop"],
+    sics: ["47721", "47722"], label: "footwear retail" },
+  { terms: ["jewel", "watchmaker"],
+    sics: ["47770"], label: "jewellery retail" },
+  { terms: ["furniture", "homeware", "interior shop", "home decor"],
+    sics: ["47591", "47599"], label: "furniture & homeware retail" },
+  { terms: ["interior design", "interior designer"],
+    sics: ["74100"], label: "interior design studios" },
+  { terms: ["florist", "flower shop", "flower delivery"],
+    sics: ["47761"], label: "florists" },
+  { terms: ["pet shop", "veterinary", "vet practice", "dog groom"],
+    sics: ["47762", "75000"], label: "pet & veterinary businesses" },
+  { terms: ["nursery school", "childcare", "kids' wear", "baby brand", "toy shop"],
+    sics: ["85100", "47650"], label: "children & family businesses" },
+];
+
+function matchSicFilter(q: string): { sics: string[]; label: string } | null {
+  const ql = q.toLowerCase();
+  for (const entry of KEYWORD_SIC_FILTER) {
+    if (entry.terms.some(t => ql.includes(t))) return { sics: entry.sics, label: entry.label };
+  }
+  return null;
 }
 
 // Keyword → which demand-signal source(s) light up the map.
