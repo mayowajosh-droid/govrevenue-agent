@@ -659,6 +659,89 @@ export async function getCountySectorDensity(
     .sort((a, b) => b.value - a.value);
 }
 
+// ── Named businesses (the WHO behind the WHERE) ─────────────────────────────────
+// getCountySectorDensity collapses the ch_new_businesses payload to county counts.
+// This returns the actual NAMED companies behind those counts so the map/scan can
+// say "here are 25 newly-registered businesses in your sector you could pitch",
+// not just "Manchester is dense". These are NEW INCORPORATIONS — warm prospects
+// (new businesses need suppliers), not confirmed buyers. Frame them that way.
+
+export type NamedBusiness = {
+  name: string;
+  number: string;        // Companies House company number → companieshouse.gov.uk link
+  incorporatedOn: string;
+  county: string;
+  address: string;
+  sector: string;
+};
+
+export type NamedBusinessResult = {
+  businesses: NamedBusiness[];
+  sampleSize: number;     // how many we actually hold in the sample
+  estimatedTotal: number; // sample scaled by sectorTotals (the real market size)
+  label: string;
+};
+
+export async function getNamedBusinessesBySector(
+  pool: Pool,
+  sectorFilter: string[],
+  label: string,
+  opts: { county?: string; limit?: number } = {},
+): Promise<NamedBusinessResult> {
+  type ChSnapshot = {
+    businesses: NamedBusiness[];
+    sectorTotals?: Record<string, number>;
+  };
+  const empty: NamedBusinessResult = { businesses: [], sampleSize: 0, estimatedTotal: 0, label };
+  const data = await getLatestPayload<ChSnapshot>(pool, "ch_new_businesses");
+  if (!data?.businesses?.length) return empty;
+
+  const filterLc = sectorFilter.map(s => s.toLowerCase());
+  let filtered = data.businesses.filter(b =>
+    b.sector && filterLc.some(sf => b.sector.toLowerCase().includes(sf)),
+  );
+  if (!filtered.length) return empty;
+
+  const sampleSize = filtered.length;
+
+  // Scale the sample up to the real market size using sectorTotals (the CH API's
+  // total `hits`), same approach as getCountySectorDensity.
+  let scaleFactor = 1;
+  if (data.sectorTotals) {
+    let totalHits = 0;
+    for (const sf of sectorFilter) {
+      const sfLc = sf.toLowerCase();
+      for (const [sector, hits] of Object.entries(data.sectorTotals)) {
+        if (sector.toLowerCase().includes(sfLc)) totalHits += hits;
+      }
+    }
+    if (totalHits > sampleSize) scaleFactor = totalHits / sampleSize;
+  }
+
+  if (opts.county) {
+    const cty = opts.county.toLowerCase();
+    filtered = filtered.filter(b => (b.county || "").toLowerCase() === cty);
+  }
+
+  // Newest incorporations first — the freshest prospects (just formed, buying now).
+  filtered.sort((a, b) => (b.incorporatedOn || "").localeCompare(a.incorporatedOn || ""));
+
+  const limit = Math.max(1, Math.min(opts.limit ?? 25, 200));
+  return {
+    businesses: filtered.slice(0, limit).map(b => ({
+      name: b.name,
+      number: b.number,
+      incorporatedOn: b.incorporatedOn,
+      county: b.county,
+      address: b.address,
+      sector: b.sector,
+    })),
+    sampleSize,
+    estimatedTotal: Math.round(sampleSize * scaleFactor),
+    label,
+  };
+}
+
 // ── Regional Intelligence ──────────────────────────────────────────────────────
 
 export type RegionIntel = {

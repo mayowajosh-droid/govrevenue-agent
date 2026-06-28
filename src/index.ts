@@ -4410,6 +4410,29 @@ async function callLlmReport(prompt: string): Promise<string> {
 
 const SCAN_FETCH_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes
 
+// Deterministic named-prospect list for demand/intelligence scans. Queries the
+// CH named-business layer on the client's ideal-buyer profile (falling back to
+// what they sell), and renders a markdown section appended after the LLM report.
+async function buildNamedProspectsSection(input: z.infer<typeof intakeSchema>): Promise<string> {
+  const query = (input.idealBuyers && input.idealBuyers.trim().length > 3)
+    ? input.idealBuyers
+    : input.mainServices;
+  const result = await fetchLeadsForQuery(query, { limit: 20 });
+  if (!result.businesses.length) return "";
+  const rows = result.businesses.map(b => {
+    const loc = b.county ? titleCaseCounty(b.county) : "UK";
+    const when = b.incorporatedOn ? `registered ${b.incorporatedOn}` : "";
+    return `- **${b.name}** · ${loc}${when ? ` · ${when}` : ""} · [Companies House record](${chProfileUrl(b.number)})`;
+  }).join("\n");
+  return `## Named Prospects — Live Register
+
+Newly registered UK businesses that match your ideal-buyer profile (~${result.estimatedTotal.toLocaleString("en-GB")} in this market). These companies are setting up suppliers right now — the warmest prospects you can approach. Source: Companies House, public register.
+
+${rows}
+
+*Pair this list with the 90-day outreach plan above. Each name links to its full Companies House record for the registered office and officers.*`;
+}
+
 async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
   await updateScan(id, { status: "running", error_message: null });
   await emitScanStage(id, "fetching");
@@ -4457,7 +4480,20 @@ async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
     const prompt = buildPrompt(input, data, preloadedSignals);
     await emitScanStage(id, "report");
 
-    const report = await callLlmReport(prompt);
+    let report = await callLlmReport(prompt);
+
+    // Demand/intelligence scans get a deterministic, real-data prospect list
+    // appended after the LLM report — named UK businesses from the live register
+    // that match the client's ideal-buyer profile. Built from Companies House,
+    // not the LLM, so the names are real and never hallucinated.
+    if ((input.scanMode ?? "both") !== "contracts") {
+      try {
+        const prospects = await buildNamedProspectsSection(input);
+        if (prospects) report += "\n\n" + prospects;
+      } catch (err) {
+        console.warn("[runScan] prospect list failed, continuing:", String(err).slice(0, 100));
+      }
+    }
 
     await updateScan(id, {
       status: "completed",
@@ -7904,17 +7940,18 @@ app.post("/api/briefing", asyncRoute(async (req, res) => {
     return;
   }
   const email = raw;
+  const source = (["homepage", "preview", "sector"].includes(String(req.body?.source || "")) ? String(req.body.source) : "homepage");
   if (pool) {
     const r = await pool.query(
       `INSERT INTO briefing_subscribers (id, email, category, source, created_at)
-       VALUES ($1, $2, NULL, 'homepage', NOW()) ON CONFLICT (email) DO NOTHING`,
-      [makeId(), email]
+       VALUES ($1, $2, NULL, $3, NOW()) ON CONFLICT (email) DO NOTHING`,
+      [makeId(), email, source]
     );
     res.json({ ok: true, alreadySubscribed: (r.rowCount ?? 0) === 0 });
     return;
   }
   const alreadySubscribed = briefMemStore.has(email);
-  if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, source: "homepage", created_at: nowIso() });
+  if (!alreadySubscribed) briefMemStore.set(email, { id: makeId(), email, category: null, source, created_at: nowIso() });
   res.json({ ok: true, alreadySubscribed });
 }));
 
@@ -8018,6 +8055,12 @@ app.get("/", asyncRoute(async (req, res) => {
     ? Math.round(((last3Avg - first3Avg) / first3Avg) * 100)
     : 34;
   const chartStep = parseFloat((Math.max(chartFinalVal / 35, 0.01)).toFixed(3));
+  // Server-rendered so the figure is correct even before (or without) the count-up
+  // animation — the £0.0m initial value was leaking to users when the observer
+  // didn't fire, which read as broken/empty data.
+  const chartFinalValDisplay = chartFinalVal >= 1000
+    ? `&pound;${(chartFinalVal / 1000).toFixed(2)}bn`
+    : `&pound;${chartFinalVal.toFixed(1)}m`;
   const chartTick1 = parseFloat((chartMinVal + (chartMaxVal - chartMinVal) / 3).toFixed(1));
   const chartTick2 = parseFloat((chartMinVal + 2 * (chartMaxVal - chartMinVal) / 3).toFixed(1));
   const trendLabel = chartResult.illustrative
@@ -8390,11 +8433,12 @@ ${pageShellHeader(null, homepageAuth)}
       <h1>Know exactly who wants<br>what you sell <em>before your<br>competitors do.</em></h1>
       <p class="lede">AtlasRevenue turns real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — into a demand map for your products and services, plus live public-sector contracts you can win. One scan. No guesses.</p>
       <div class="hero-actions">
-        <a class="btn-primary" href="/scan">Run a scan &rarr;</a>
+        <a class="btn-primary" href="/preview">See who's buying &mdash; free &rarr;</a>
+        <a href="/scan" style="display:inline-flex;align-items:center;padding:0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:#ECE6D6;text-decoration:none;border-bottom:1px solid rgba(180,146,78,.5)">Run a full scan</a>
         ${sampleLink}
       </div>
       <div class="chips">
-        <div class="chip"><b>Market demand</b> for what you sell</div>
+        <div class="chip"><b>Named prospects</b> for what you sell</div>
         <div class="chip"><b id="liveNotices">${noticesDisplay}</b> live public contracts</div>
         <div class="chip">Real data &middot; <b>zero guesses</b></div>
       </div>
@@ -8432,7 +8476,7 @@ ${pageShellHeader(null, homepageAuth)}
           <span class="lab">Procurement spend${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
           <span class="lab" style="display:block;font-size:10px;opacity:.6;margin-top:2px">Monthly totals &middot; rolling 12 months</span>
         </div>
-        <span class="big" id="chartTotal"><span id="chartTotalVal">&pound;0.0m</span><span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span></span>
+        <span class="big" id="chartTotal"><span id="chartTotalVal">${chartFinalValDisplay}</span><span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span></span>
       </div>
       <canvas id="growthChart" style="cursor:pointer" onclick="location.href='/charts'"></canvas>
       ${homeMktCardsHtml}
@@ -8709,6 +8753,9 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting) startAnim();}),{threshold:.4});
   io.observe(cv);
+  // Fallback: the observer's initial callback can miss a chart that's already
+  // on-screen at load (the cause of the stuck £0.0m). Kick it directly too.
+  setTimeout(function(){var rc=cv.getBoundingClientRect();if(rc.top<innerHeight&&rc.bottom>0)startAnim();},350);
 })();
 (function(){
   const s=document.getElementById('spark'); if(!s) return;
@@ -9841,6 +9888,333 @@ app.get("/api/map/data", asyncRoute(async (req, res) => {
   res.json({ query: q, districts, totalDistricts: districts.length, demandSource, hasDemand: demandPoints.length > 0 });
 }));
 
+// ── Named leads (the WHO behind the WHERE) ────────────────────────────────────
+// Shared by /api/leads, /preview, and the sector pages. Turns a free-text query
+// ("design services", "IT support") into a list of named, newly-registered UK
+// companies in the matching sector(s) — warm prospects, not confirmed buyers.
+type LeadsPayload = import("./signals/market-intel.js").NamedBusinessResult;
+async function fetchLeadsForQuery(
+  q: string,
+  opts: { county?: string; limit?: number } = {},
+): Promise<LeadsPayload> {
+  const empty: LeadsPayload = { businesses: [], sampleSize: 0, estimatedTotal: 0, label: "" };
+  if (!pool || !q.trim()) return empty;
+  try {
+    const { getNamedBusinessesBySector } = await import("./signals/market-intel.js");
+    const m = matchChSectors(q);
+    return await getNamedBusinessesBySector(pool, m.sectors, m.label, opts);
+  } catch (err) {
+    console.warn("[leads] failed:", String(err).slice(0, 120));
+    return empty;
+  }
+}
+
+// Companies House public profile link for a company number.
+function chProfileUrl(num: string): string {
+  return `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(num)}`;
+}
+
+app.get("/api/leads", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const county = String(req.query.county || "").trim() || undefined;
+  const limit = Math.min(parseInt(String(req.query.limit || "25"), 10) || 25, 200);
+  if (!q) { res.json({ query: "", businesses: [], sampleSize: 0, estimatedTotal: 0, label: "" }); return; }
+  const result = await fetchLeadsForQuery(q, { county, limit });
+  res.json({
+    query: q,
+    county: county ?? null,
+    ...result,
+    businesses: result.businesses.map(b => ({ ...b, chUrl: chProfileUrl(b.number) })),
+  });
+}));
+
+// ── Service-business surfaces: free preview + sector demand pages ─────────────
+// Broaden AtlasRevenue beyond procurement bidders to ANY UK business finding
+// customers (creative studios, software shops, agencies, consultancies). Built
+// on the CH named-business layer (the WHO) + sector density (the WHERE).
+
+const SERVICE_SECTORS: { slug: string; label: string; sectors: string[]; query: string; blurb: string; example: string }[] = [
+  { slug: "creative-design", label: "Creative & Design", sectors: ["Creative & Design"], query: "design studio",
+    blurb: "Branding, graphic and product design, photography and specialist design studios.",
+    example: "branding · web design · product design · photography" },
+  { slug: "software-tech", label: "Software & Tech", sectors: ["Software & Tech"], query: "software development",
+    blurb: "Software development, SaaS, IT services, data and cloud businesses.",
+    example: "software dev · SaaS · IT support · data · cloud" },
+  { slug: "marketing", label: "Marketing & Advertising", sectors: ["Advertising & Marketing"], query: "marketing agency",
+    blurb: "Agencies, advertising, PR, media buying and market research.",
+    example: "agency · advertising · PR · SEO · content" },
+  { slug: "professional", label: "Professional Services", sectors: ["Legal & Accounting"], query: "consultancy",
+    blurb: "Legal, accounting, advisory and business consultancy.",
+    example: "accounting · legal · advisory · bookkeeping" },
+];
+function findServiceSector(slug: string) { return SERVICE_SECTORS.find(s => s.slug === slug); }
+
+// Group named businesses by county → top regions (for the preview teaser).
+function topCountiesFromLeads(biz: { county: string }[], n = 4): { county: string; count: number }[] {
+  const m: Record<string, number> = {};
+  for (const b of biz) { const c = (b.county || "").trim(); if (c) m[c] = (m[c] ?? 0) + 1; }
+  return Object.entries(m).map(([county, count]) => ({ county: titleCaseCounty(county), count }))
+    .sort((a, b) => b.count - a.count).slice(0, n);
+}
+
+function leadCardHtml(b: { name: string; number: string; county: string; address: string; incorporatedOn: string }): string {
+  const when = b.incorporatedOn ? `Registered ${escapeHtml(b.incorporatedOn)}` : "";
+  const loc = b.county ? escapeHtml(titleCaseCounty(b.county)) : "UK";
+  return `<a href="${chProfileUrl(b.number)}" target="_blank" rel="noopener" class="lead-card">
+    <div class="lead-name">${escapeHtml(b.name)}</div>
+    <div class="lead-meta"><span>${loc}</span><span>${when}</span></div>
+    ${b.address ? `<div class="lead-addr">${escapeHtml(b.address)}</div>` : ""}
+  </a>`;
+}
+
+const SERVICE_PAGE_CSS = `
+.lead-card{display:block;background:var(--surface);border:1px solid var(--border);padding:14px 16px;text-decoration:none;transition:border-color .15s,transform .15s}
+.lead-card:hover{border-color:var(--brand);transform:translateY(-1px)}
+.lead-name{font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);line-height:1.25;margin-bottom:5px}
+.lead-meta{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.02em}
+.lead-addr{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4}
+.leads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.svc-hero{background:var(--hero-2,#0f1a14);border-bottom:1px solid rgba(236,230,214,.1);padding:56px 0 48px}
+.svc-hero-inner{padding:0 32px;max-width:1100px;margin:0 auto}
+.svc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
+.svc-hero h1{font-family:var(--serif);font-size:38px;font-weight:500;letter-spacing:-.025em;line-height:1.08;color:#ECE6D6;margin-bottom:14px;max-width:680px}
+.svc-hero p{font-size:15px;color:rgba(236,230,214,.6);max-width:560px;line-height:1.6}
+.svc-search{display:flex;gap:0;max-width:560px;margin-top:28px}
+.svc-search input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(236,230,214,.15);border-right:none;color:#ECE6D6;font-family:var(--sans);font-size:14px;padding:14px 18px;outline:none;min-width:0}
+.svc-search input::placeholder{color:rgba(236,230,214,.3)}
+.svc-search input:focus{border-color:rgba(180,146,78,.6)}
+.svc-search button{background:var(--brand);color:#fff;border:none;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;padding:14px 26px;cursor:pointer;text-transform:uppercase;white-space:nowrap}
+.svc-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.svc-pill{background:rgba(255,255,255,.05);border:1px solid rgba(236,230,214,.12);color:rgba(236,230,214,.55);font-family:var(--mono);font-size:10px;padding:6px 13px;text-decoration:none;transition:all .15s}
+.svc-pill:hover{border-color:rgba(180,146,78,.5);color:#ECE6D6}
+.svc-body{max-width:1100px;margin:0 auto;padding:44px 32px}
+.svc-statband{display:flex;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:34px;flex-wrap:wrap}
+.svc-stat{flex:1;min-width:160px;background:var(--surface);padding:20px 24px}
+.svc-stat-val{font-family:var(--serif);font-size:30px;font-weight:500;color:var(--text);letter-spacing:-.01em;line-height:1}
+.svc-stat-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.svc-sec-hd{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin:34px 0 4px}
+.svc-sec-title{font-family:var(--serif);font-size:23px;font-weight:500;color:var(--text);margin-bottom:18px}
+.svc-region{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.svc-region-name{font-size:14px;color:var(--text);min-width:170px}
+.svc-region-bar{flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.svc-region-fill{height:100%;background:var(--brand)}
+.svc-region-val{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:80px;text-align:right}
+.svc-gate{background:var(--surface-2);border:1px solid var(--border);padding:26px 28px;margin-top:24px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.svc-gate-title{font-family:var(--serif);font-size:19px;color:var(--text);margin-bottom:5px}
+.svc-gate-sub{font-size:13px;color:var(--muted);max-width:46ch;line-height:1.5}
+.svc-gate-actions{display:flex;gap:10px;flex-wrap:wrap}
+.svc-btn{background:var(--brand);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:13px 22px;text-decoration:none;text-transform:uppercase;white-space:nowrap;border:none;cursor:pointer}
+.svc-btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border-2)}
+.svc-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.svc-card{background:var(--surface);border:1px solid var(--border);padding:22px 24px;text-decoration:none;display:block;transition:border-color .15s}
+.svc-card:hover{border-color:var(--brand)}
+.svc-card-label{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--text);margin-bottom:8px}
+.svc-card-blurb{font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+.svc-card-ex{font-family:var(--mono);font-size:10px;color:var(--brand);letter-spacing:.03em}
+.svc-empty{padding:50px 0;text-align:center;color:var(--muted);font-size:14px}
+@media(max-width:640px){.svc-hero h1{font-size:29px}.svc-region-name{min-width:110px}}
+`;
+
+// ── Free instant demand preview ───────────────────────────────────────────────
+app.get("/preview", asyncRoute(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const auth = getAuthUser(req);
+  let result: import("./signals/market-intel.js").NamedBusinessResult | null = null;
+  if (q) result = await fetchLeadsForQuery(q, { limit: 60 });
+  res.type("html").send(previewPage(q, result, auth));
+}));
+
+function previewPage(q: string, result: import("./signals/market-intel.js").NamedBusinessResult | null, auth: { email: string; tier: UserTier } | null): string {
+  const examplePills = ["design studio", "software development", "marketing agency", "accountants", "architects", "recruitment"]
+    .map(t => `<a class="svc-pill" href="/preview?q=${encodeURIComponent(t)}">${escapeHtml(t)}</a>`).join("");
+
+  let body = "";
+  if (q && result && result.businesses.length) {
+    const regions = topCountiesFromLeads(result.businesses, 5);
+    const maxR = regions[0]?.count || 1;
+    const free = result.businesses.slice(0, 3);
+    const moreCount = Math.max(0, result.estimatedTotal - free.length);
+    body = `
+    <div class="svc-statband">
+      <div class="svc-stat"><div class="svc-stat-val">${result.estimatedTotal.toLocaleString("en-GB")}</div><div class="svc-stat-lbl">Businesses in this market</div></div>
+      <div class="svc-stat"><div class="svc-stat-val">${regions.length}</div><div class="svc-stat-lbl">Regions with live demand</div></div>
+      <div class="svc-stat"><div class="svc-stat-val">${escapeHtml(result.label || q)}</div><div class="svc-stat-lbl">Matched sector</div></div>
+    </div>
+    <div class="svc-sec-hd">Where they are</div>
+    <div class="svc-sec-title">Top regions for ${escapeHtml(q)}</div>
+    <div>${regions.map(r => `<div class="svc-region"><div class="svc-region-name">${escapeHtml(r.county)}</div><div class="svc-region-bar"><div class="svc-region-fill" style="width:${Math.round((r.count / maxR) * 100)}%"></div></div><div class="svc-region-val">${r.count} sampled</div></div>`).join("")}</div>
+    <div class="svc-sec-hd">Who to contact</div>
+    <div class="svc-sec-title">Your first 3 prospects — free</div>
+    <div class="leads-grid">${free.map(leadCardHtml).join("")}</div>
+    <div class="svc-gate">
+      <div>
+        <div class="svc-gate-title">Get all ${moreCount.toLocaleString("en-GB")}+ named businesses</div>
+        <div class="svc-gate-sub">A full intelligence scan returns the complete named list for your sector, the regions where demand is densest, and a ready-to-send 90-day outreach plan built around your offer.</div>
+      </div>
+      <div class="svc-gate-actions">
+        <a class="svc-btn" href="/scan?services=${encodeURIComponent(q)}">Run a full scan &rarr;</a>
+        <a class="svc-btn svc-btn-ghost" href="/atlas?q=${encodeURIComponent(q)}">See on the map</a>
+      </div>
+    </div>
+    <form id="pv-mail" class="svc-gate" style="margin-top:12px" onsubmit="return pvSub(event)">
+      <div>
+        <div class="svc-gate-title">Or get a weekly drop of new ${escapeHtml(result.label || q)} businesses</div>
+        <div class="svc-gate-sub">We email you newly registered companies in this sector as they appear on the public register. Free. Unsubscribe anytime.</div>
+      </div>
+      <div class="svc-gate-actions">
+        <input name="email" type="email" required placeholder="you@studio.com" style="background:var(--surface);border:1px solid var(--border-2);color:var(--text);font-family:var(--sans);font-size:14px;padding:13px 16px;min-width:220px">
+        <button class="svc-btn" type="submit">Notify me</button>
+      </div>
+    </form>
+    <div id="pv-msg" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--brand);display:none"></div>`;
+  } else if (q && result) {
+    body = `<div class="svc-empty">No registered businesses matched “${escapeHtml(q)}” in our current sample.<br>Try a broader term like “design”, “software”, “marketing” or “consultancy”.</div>`;
+  } else {
+    body = `
+    <div class="svc-sec-hd">How it works</div>
+    <div class="svc-sec-title">From “what you sell” to a named prospect list</div>
+    <div class="svc-cards">
+      <a class="svc-card" href="/preview?q=design%20studio"><div class="svc-card-label">1 · Type what you sell</div><div class="svc-card-blurb">Tell us your product or service — “web design”, “IT support”, “accountancy”. No account needed.</div><div class="svc-card-ex">free · instant</div></a>
+      <a class="svc-card" href="/sectors"><div class="svc-card-label">2 · See the market</div><div class="svc-card-blurb">We show how many UK businesses are in your sector, the regions with the most demand, and three named prospects.</div><div class="svc-card-ex">real Companies House data</div></a>
+      <a class="svc-card" href="/scan"><div class="svc-card-label">3 · Get the full list</div><div class="svc-card-blurb">Run a scan for the complete named list, contact routes, and a 90-day outreach plan around your offer.</div><div class="svc-card-ex">from £29</div></a>
+    </div>`;
+  }
+
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free demand preview — see who's buying what you sell | AtlasRevenue</title>
+<meta name="description" content="Type what you sell and instantly see how many UK businesses are in your market, where demand is densest, and three named prospects — free, from real Companies House data.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/preview">
+<style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
+${pageShellHeader(null, auth)}
+<section class="svc-hero"><div class="svc-hero-inner">
+  <div class="svc-eyebrow">● Free demand preview</div>
+  <h1>See who's buying what you sell — before you spend a penny.</h1>
+  <p>Type your product or service. We read the live UK business register and show you the size of your market, where it's concentrated, and real named prospects.</p>
+  <form class="svc-search" action="/preview" method="get">
+    <input name="q" value="${escapeHtml(q)}" placeholder="e.g. web design, IT support, marketing, accountancy…" autocomplete="off">
+    <button type="submit">Show me</button>
+  </form>
+  <div class="svc-pills">${examplePills}</div>
+</div></section>
+<div class="svc-body">${body}</div>
+${pageShellFoot()}
+<script>
+function pvSub(e){e.preventDefault();var f=document.getElementById('pv-mail');var email=f.email.value.trim();var msg=document.getElementById('pv-msg');
+fetch('/api/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,source:'preview'})})
+.then(function(r){return r.json();}).then(function(d){msg.style.display='';msg.textContent=d.ok?'Done — you\\'ll get new businesses in this sector by email.':'Could not subscribe, try again.';f.querySelector('input').value='';}).catch(function(){msg.style.display='';msg.textContent='Could not subscribe, try again.';});
+return false;}
+</script>
+</body></html>`;
+}
+
+// ── Service-sector index + detail pages ───────────────────────────────────────
+app.get("/sectors", asyncRoute(async (req, res) => {
+  res.type("html").send(sectorsIndexPage(getAuthUser(req)));
+}));
+
+function sectorsIndexPage(auth: { email: string; tier: UserTier } | null): string {
+  const cards = SERVICE_SECTORS.map(s => `<a class="svc-card" href="/sector/${s.slug}">
+    <div class="svc-card-label">${escapeHtml(s.label)}</div>
+    <div class="svc-card-blurb">${escapeHtml(s.blurb)}</div>
+    <div class="svc-card-ex">${escapeHtml(s.example)}</div></a>`).join("");
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Service-sector demand — find clients for your business | AtlasRevenue</title>
+<meta name="description" content="Where the UK's design, software, marketing and professional-services businesses cluster — and who just launched. Real Companies House demand data for service businesses.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/sectors">
+<style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
+${pageShellHeader(null, auth)}
+<section class="svc-hero"><div class="svc-hero-inner">
+  <div class="svc-eyebrow">● For service businesses</div>
+  <h1>Find your next clients in the live business register.</h1>
+  <p>AtlasRevenue isn't just for government bidders. If you sell a service — design, software, marketing, advisory — these pages show where your market is concentrated and who just launched.</p>
+</div></section>
+<div class="svc-body">
+  <div class="svc-sec-hd">Pick your sector</div>
+  <div class="svc-sec-title">Live demand for service businesses</div>
+  <div class="svc-cards">${cards}</div>
+  <div class="svc-gate" style="margin-top:30px">
+    <div><div class="svc-gate-title">Not listed? Search any product or service.</div>
+    <div class="svc-gate-sub">The free preview works for anything you sell — type it in and see your market instantly.</div></div>
+    <div class="svc-gate-actions"><a class="svc-btn" href="/preview">Open free preview &rarr;</a></div>
+  </div>
+</div>
+${pageShellFoot()}
+</body></html>`;
+}
+
+app.get("/sector/:slug", asyncRoute(async (req, res) => {
+  const sector = findServiceSector(req.params.slug);
+  const auth = getAuthUser(req);
+  if (!sector) { res.status(404).type("html").send(notFoundHtml("Sector not found", auth)); return; }
+  let density: import("./signals/market-intel.js").GeoDemandPoint[] = [];
+  let leads: import("./signals/market-intel.js").NamedBusinessResult = { businesses: [], sampleSize: 0, estimatedTotal: 0, label: sector.label };
+  if (pool) {
+    try {
+      const mi = await import("./signals/market-intel.js");
+      [density, leads] = await Promise.all([
+        mi.getCountySectorDensity(pool, sector.sectors, sector.label),
+        mi.getNamedBusinessesBySector(pool, sector.sectors, sector.label, { limit: 18 }),
+      ]);
+    } catch (err) { console.warn("[sector] data failed:", String(err).slice(0, 120)); }
+  }
+  res.type("html").send(sectorPage(sector, density, leads, auth));
+}));
+
+function sectorPage(
+  sector: { slug: string; label: string; query: string; blurb: string; example: string },
+  density: import("./signals/market-intel.js").GeoDemandPoint[],
+  leads: import("./signals/market-intel.js").NamedBusinessResult,
+  auth: { email: string; tier: UserTier } | null,
+): string {
+  const top = density.slice(0, 8);
+  const maxD = top[0]?.value || 1;
+  const regionsHtml = top.length
+    ? top.map(r => `<div class="svc-region"><div class="svc-region-name">${escapeHtml(titleCaseCounty(r.place))}</div><div class="svc-region-bar"><div class="svc-region-fill" style="width:${Math.round((r.value / maxD) * 100)}%"></div></div><div class="svc-region-val">~${r.value.toLocaleString("en-GB")}</div></div>`).join("")
+    : `<div class="svc-empty">Region data is still building for this sector.</div>`;
+  const leadsHtml = leads.businesses.length
+    ? `<div class="leads-grid">${leads.businesses.map(leadCardHtml).join("")}</div>`
+    : `<div class="svc-empty">Newly registered businesses for this sector are still being indexed.</div>`;
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(sector.label)} businesses in the UK — demand & new launches | AtlasRevenue</title>
+<meta name="description" content="Where the UK's ${escapeHtml(sector.label.toLowerCase())} businesses cluster, how big the market is, and who just registered — real Companies House data you can act on.">
+<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/sector/${sector.slug}">
+<style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
+${pageShellHeader(null, auth)}
+<section class="svc-hero"><div class="svc-hero-inner">
+  <div class="svc-eyebrow">● Sector demand · ${escapeHtml(sector.label)}</div>
+  <h1>The UK ${escapeHtml(sector.label)} market — mapped.</h1>
+  <p>${escapeHtml(sector.blurb)} Below: how big the market is, where it's densest, and businesses that just registered.</p>
+  <form class="svc-search" action="/preview" method="get">
+    <input name="q" value="${escapeHtml(sector.query)}" placeholder="Refine: e.g. ${escapeHtml(sector.example)}" autocomplete="off">
+    <button type="submit">Preview leads</button>
+  </form>
+</div></section>
+<div class="svc-body">
+  <div class="svc-statband">
+    <div class="svc-stat"><div class="svc-stat-val">${leads.estimatedTotal.toLocaleString("en-GB")}</div><div class="svc-stat-lbl">Estimated businesses</div></div>
+    <div class="svc-stat"><div class="svc-stat-val">${density.length || "—"}</div><div class="svc-stat-lbl">Regions with activity</div></div>
+    <div class="svc-stat"><div class="svc-stat-val">${leads.businesses.length}</div><div class="svc-stat-lbl">New registrations shown</div></div>
+  </div>
+  <div class="svc-sec-hd">Where they are</div>
+  <div class="svc-sec-title">Top regions by ${escapeHtml(sector.label.toLowerCase())} density</div>
+  <div>${regionsHtml}</div>
+  <div class="svc-sec-hd">Who just launched</div>
+  <div class="svc-sec-title">Newly registered ${escapeHtml(sector.label.toLowerCase())} businesses</div>
+  <p style="font-size:13px;color:var(--muted);max-width:62ch;margin:-8px 0 16px;line-height:1.6">Companies that just appeared on the register — warm prospects setting up suppliers right now. Each links to its Companies House record.</p>
+  ${leadsHtml}
+  <div class="svc-gate" style="margin-top:28px">
+    <div><div class="svc-gate-title">Get the full ${escapeHtml(sector.label)} prospect list</div>
+    <div class="svc-gate-sub">Run a scan for the complete named list, contact routes, and a 90-day outreach plan built around what you sell.</div></div>
+    <div class="svc-gate-actions"><a class="svc-btn" href="/scan?services=${encodeURIComponent(sector.query)}">Run a scan &rarr;</a><a class="svc-btn svc-btn-ghost" href="/preview?q=${encodeURIComponent(sector.query)}">Free preview</a></div>
+  </div>
+</div>
+${pageShellFoot()}
+</body></html>`;
+}
+
 // Land Registry / Companies House counties arrive UPPERCASE; present them nicely.
 function titleCaseCounty(s: string): string {
   return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/\bAnd\b/g, "and").replace(/\bOf\b/g, "of");
@@ -10371,6 +10745,22 @@ ${pageShellHeader(null, authCtx)}
   </div>
 </section>
 
+<!-- Named leads — the WHO behind the WHERE (shown when a search returns companies) -->
+<section class="atl-map-section" id="atl-leads-section" style="display:none">
+  <div class="atl-map-inner">
+    <div class="atl-section-hd">
+      <div>
+        <div class="atl-section-label">Who to contact</div>
+        <div class="atl-section-title" id="atl-leads-title">Newly registered businesses</div>
+      </div>
+      <div id="atl-leads-meta" style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em">Companies House · live register</div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);max-width:60ch;margin:-6px 0 18px;line-height:1.6">Recently incorporated UK companies in this sector — warm prospects who are setting up suppliers right now. Each links to its Companies House record.</p>
+    <div id="atl-leads-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
+    <div id="atl-leads-foot" style="margin-top:18px"></div>
+  </div>
+</section>
+
 <!-- Feature blocks -->
 <section class="atl-features">
   <div class="atl-feat-inner">
@@ -10586,6 +10976,38 @@ function renderAtlasSignals(signals){
   }).join('');
 }
 
+function leadEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtNum(n){return (n||0).toLocaleString('en-GB');}
+function renderLeads(data){
+  var sec=document.getElementById('atl-leads-section');
+  var grid=document.getElementById('atl-leads-grid');
+  var foot=document.getElementById('atl-leads-foot');
+  var title=document.getElementById('atl-leads-title');
+  var meta=document.getElementById('atl-leads-meta');
+  if(!sec||!grid)return;
+  var biz=(data&&data.businesses)||[];
+  if(!biz.length){sec.style.display='none';return;}
+  sec.style.display='';
+  if(title)title.textContent='Who to contact — '+(data.label||'newly registered businesses');
+  if(meta)meta.textContent='~'+fmtNum(data.estimatedTotal)+' in this market · Companies House';
+  grid.innerHTML=biz.map(function(b){
+    var when=b.incorporatedOn?('Registered '+b.incorporatedOn):'';
+    var loc=b.county?leadEsc(b.county):'';
+    return '<a href="'+leadEsc(b.chUrl)+'" target="_blank" rel="noopener" style="display:block;background:var(--surface);border:1px solid var(--border);padding:14px 16px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--brand)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+      +'<div style="font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);line-height:1.25;margin-bottom:5px">'+leadEsc(b.name)+'</div>'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.02em">'
+        +'<span>'+(loc||'UK')+'</span><span>'+leadEsc(when)+'</span></div>'
+      +(b.address?'<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4">'+leadEsc(b.address)+'</div>':'')
+      +'</a>';
+  }).join('');
+  if(foot){
+    foot.innerHTML='<div style="background:var(--surface-2);border:1px solid var(--border);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">'
+      +'<div style="font-size:13px;color:var(--text)"><b>'+fmtNum(data.estimatedTotal)+'</b> total registered businesses in this market. Get the full named list, contacts and a 90-day outreach plan.</div>'
+      +'<a href="/scan" style="background:var(--brand);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:11px 20px;text-decoration:none;text-transform:uppercase;white-space:nowrap">Build my lead list &rarr;</a>'
+      +'</div>';
+  }
+}
+
 function doSearch(){
   var q=document.getElementById('atl-q').value.trim();
   if(!q){hideLdr();return;}
@@ -10614,6 +11036,11 @@ function doSearch(){
   fetch('/api/signals/for-keyword?q='+encodeURIComponent(q))
     .then(function(r){return r.json();})
     .then(function(data){renderAtlasSignals(data.signals||[]);})
+    .catch(function(){});
+  // And the named businesses behind the demand — the WHO
+  fetch('/api/leads?q='+encodeURIComponent(q)+'&limit=12')
+    .then(function(r){return r.json();})
+    .then(function(data){renderLeads(data);})
     .catch(function(){});
 }
 
@@ -16884,9 +17311,10 @@ function pageShellHeader(profile: DeskProfile | null, authCtx?: { email: string;
         <a href="/" class="gh-logo">Atlas<b>Revenue</b></a>
       </div>
       <nav class="gh-main-nav">
-        <a href="/atlas" class="gh-nav-atlas">Atlas</a>
-        <a href="/desks">Desks</a>
-        <a href="/signals">Signals</a>
+        <a href="/preview" class="gh-nav-atlas">Find clients</a>
+        <a href="/sectors">Sectors</a>
+        <a href="/atlas">Atlas</a>
+        <a href="/desks">Contracts</a>
         <a href="/articles">Articles</a>
         <a href="/scan">The Scan</a>
         <a href="/pricing">Pricing</a>
@@ -21524,6 +21952,169 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   res.status(500).json({ error: "Internal server error" });
 });
 
+// Idempotent seed of service-business articles (broadens content beyond
+// procurement to "how to find B2B clients" search intent). ON CONFLICT (slug)
+// DO NOTHING keeps restarts safe and lets the user edit/delete them after.
+async function seedServiceArticles(p: Pool): Promise<void> {
+  const arts: { slug: string; title: string; dek: string; eyebrow: string; published: string; readingTime: number; seoTitle: string; seoDesc: string; tags: string; body: string }[] = [
+    {
+      slug: "how-to-find-b2b-clients-uk-without-cold-lists",
+      title: "How to Find B2B Clients in the UK Without Buying a Cold List",
+      dek: "Cold lists are dead weight. The live business register tells you who just launched, where they are, and when to reach out. Here is how to use it.",
+      eyebrow: "Lead generation",
+      published: "2026-04-09",
+      readingTime: 6,
+      seoTitle: "How to Find B2B Clients in the UK (2026) | AtlasRevenue",
+      seoDesc: "Stop buying stale cold lists. Use the live UK business register to find named B2B prospects by sector and region, then reach out before your competitors do.",
+      tags: "lead generation,b2b,uk",
+      body: `Most B2B lead lists are sold to a hundred buyers before they reach you. The contacts are stale, the companies have moved on, and the open rates show it. There is a better source sitting in plain sight: the live UK business register.
+
+## Why new businesses are your warmest prospects
+
+Every week thousands of UK companies incorporate. A new business needs suppliers. It needs a brand, a website, an accountant, software, insurance, an office fit out. It has a budget and no incumbent relationships. That is the definition of a warm prospect.
+
+The trick is timing. Reach a company in its first ninety days and you are early. Reach it two years in and you are fighting whoever got there first.
+
+## Find them by sector and region
+
+Companies House publishes every incorporation, the registered sector, and the registered office. That means you can filter the whole register down to the businesses that look like your ideal client, then sort by where they cluster.
+
+Type what you sell into the [free demand preview](/preview) and you get three things instantly. The size of your market. The regions where demand is densest. And real named businesses you can contact today.
+
+## Turn a map into a list
+
+Geography tells you where to focus. Names tell you who to email. AtlasRevenue gives you both. The [Atlas demand map](/atlas) shows the heat. The preview and the full scan give you the names behind it.
+
+If you run a service business, start with your [sector page](/sectors). Design studios, software shops, agencies and consultancies each have a live view of where their market is forming.
+
+## Build a ninety day outreach motion
+
+A list is not a strategy. Once you have named prospects, work them in order:
+
+- Week one, pick the twenty newest registrations in your top region.
+- Week two, find the founder on the public record and one thing about the company.
+- Week three, send a short, specific message that references that one thing.
+- Week four, follow up once, then move to the next twenty.
+
+Run a [full scan](/scan) and AtlasRevenue builds this plan around what you sell, with the named list attached.
+
+## FAQ
+
+### Is this data legal to use?
+Yes. Companies House data is public record. You still follow UK GDPR and PECR for outreach, so keep messages relevant and offer an easy opt out.
+
+### How is this different from a bought list?
+A bought list is a static file sold many times. This is the live register, filtered to your sector, sorted by recency, so you reach companies while they are still choosing suppliers.
+
+### I sell to consumers, not businesses. Does this help?
+The demand map still shows you where your market concentrates by population and spend. The named list is most powerful for B2B.
+
+Ready to see who is forming in your market right now? [Open the free preview](/preview).`,
+    },
+    {
+      slug: "uk-demand-design-creative-services-2026",
+      title: "Where Demand for Design and Creative Services Is Growing in the UK",
+      dek: "Branding, web and product design demand does not spread evenly. Here is where the UK's creative buyers are clustering in 2026, and how to reach them.",
+      eyebrow: "Sector demand",
+      published: "2026-05-06",
+      readingTime: 6,
+      seoTitle: "UK Demand for Design & Creative Services 2026 | AtlasRevenue",
+      seoDesc: "Where demand for design, branding and creative services is growing in the UK in 2026, by region, with named prospects from the live business register.",
+      tags: "creative,design,sector demand",
+      body: `If you run a design studio, your next client is probably a company that incorporated in the last six months and has not picked an agency yet. The question is where they are.
+
+## The creative market is concentrating, not flattening
+
+London still leads creative demand, but the gap is closing. Manchester, Bristol, Leeds and Birmingham are forming new businesses fast, and new businesses are the ones buying brand and web work. The [Creative and Design sector page](/sector/creative-design) shows the live regional split from Companies House data.
+
+## What the data actually tells a studio
+
+Three signals matter for a creative business:
+
+- **Formation rate.** How many businesses in adjacent sectors just launched. Each is a potential brand or web brief.
+- **Density.** Where those businesses cluster, so you can focus outreach and local networking.
+- **Recency.** The newest registrations, because they are still choosing suppliers.
+
+You can read all three in the [free preview](/preview). Type "branding" or "web design" and you see the market size, the top regions, and three named prospects.
+
+## Stop pitching into a void
+
+The mistake most studios make is broadcasting. A better motion is narrow and timed. Pick one region. Pull the newest registrations. Send specific, short messages. The [full scan](/scan) hands you the complete named list and a ninety day plan built around your service.
+
+## Where to look first
+
+Start with your home region to win on proximity, then expand to the densest market you can service remotely. The [sector view](/sectors) makes that call obvious.
+
+## FAQ
+
+### Does this only work for London studios?
+No. The regional data helps studios outside London most, because it shows where demand is rising before the big agencies notice.
+
+### What counts as a creative prospect?
+Newly registered businesses that need brand, web, product or content work. The preview maps your specific service to the right slice of the register.
+
+### How fresh is the data?
+It tracks the live register and refreshes regularly, so the newest registrations surface near the top.
+
+See where your creative market is forming. [Open the free preview](/preview).`,
+    },
+    {
+      slug: "uk-software-it-services-market-where-clients-form",
+      title: "The UK Software and IT Services Market: Where Your Next Clients Are Forming",
+      dek: "SaaS, dev shops and IT support all sell into a moving target. Here is how to read where UK software demand is forming and reach buyers first.",
+      eyebrow: "Sector demand",
+      published: "2026-06-03",
+      readingTime: 6,
+      seoTitle: "UK Software & IT Services Market 2026 | AtlasRevenue",
+      seoDesc: "Where UK software and IT services demand is forming in 2026, by region, with named newly registered businesses you can approach from the live register.",
+      tags: "software,it services,sector demand",
+      body: `Software and IT services have the same problem every service business has. The buyers move. A company that needed nothing last quarter is suddenly hiring, scaling, and shopping for tools and support. The edge goes to whoever spots that moment first.
+
+## New incorporations are demand signals
+
+A newly formed company is a stack of buying decisions waiting to happen. CRM, hosting, security, support, integrations. If you sell software or IT services, the [Software and Tech sector page](/sector/software-tech) shows where those companies are forming across the UK.
+
+## Read the market in three numbers
+
+- **Market size.** Roughly how many businesses sit in your addressable sector.
+- **Regional density.** Where they cluster, so your outreach and partnerships land.
+- **New registrations.** The companies that just appeared, with names and registered offices.
+
+All three are in the [free preview](/preview). Type "IT support", "SaaS" or "software development" and read your market in seconds.
+
+## From signal to pipeline
+
+A signal is not a sale. Turn it into a pipeline with a tight motion. Pick the densest region you can service. Pull the newest registrations. Reach out with something specific to each company. Run a [full scan](/scan) and AtlasRevenue assembles the named list and a ninety day outreach plan around your offer.
+
+## Why timing beats volume
+
+Spraying a thousand cold emails loses to twenty well timed ones. The register tells you who is new. New means unattached. Unattached means winnable. That is the whole game.
+
+## FAQ
+
+### Does this work for niche technical services?
+Yes. The preview maps your specific service to the right slice of the register, so a managed security firm and a no code studio see different prospects.
+
+### Are these companies actually buying?
+They are newly formed, which is the strongest public signal that buying decisions are live. You still qualify, but you are early.
+
+### Can I track a sector over time?
+Subscribe from the preview and you get new registrations in your sector by email as they appear.
+
+See where your software market is forming. [Open the free preview](/preview).`,
+    },
+  ];
+
+  for (const a of arts) {
+    await p.query(
+      `INSERT INTO articles (id, slug, title, dek, eyebrow, body_md, desk, status, author_id, published_at, updated_at, reading_time, seo_title, seo_description, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,NULL,'published','seed-system',$7,now(),$8,$9,$10,$11)
+       ON CONFLICT (slug) DO NOTHING`,
+      [`art_seed_${a.slug.slice(0, 24)}`, a.slug, a.title, a.dek, a.eyebrow, a.body, a.published, a.readingTime, a.seoTitle, a.seoDesc, a.tags],
+    ).catch(err => console.warn("[seed-articles]", a.slug, String(err).slice(0, 80)));
+  }
+}
+
 initDb()
   .then(() => initBuyerGraphTables())
   .then(() => initEmailDiscoveryTables())
@@ -21538,6 +22129,7 @@ initDb()
       await initWebhookTables(pool);
       await initGovernanceTables(pool);
       await seedLineageGraph(pool).catch(() => null);
+      await seedServiceArticles(pool).catch(() => null);
       // Sync source registry into metadata catalog
       for (const s of DATA_SOURCES) {
         await upsertMetadataCatalog(pool, {
