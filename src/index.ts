@@ -13358,9 +13358,9 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
 
   const liveEvidenceHtml = liveEvidence.length ? `
     <div class="sr-tier-banner sr-tier-1-banner">
-      <div class="sr-tier-tag">Tier 1 of 3 &middot; Live Evidence</div>
+      <div class="sr-tier-tag">Tier 1 of 3 &middot; Live Procurement Records</div>
       <div class="sr-tier-h">Real UK public-sector notices the engine ingests today</div>
-      <div class="sr-tier-p">Each card below is an actual notice pulled from Contracts Finder or Find a Tender within the last 90 days &mdash; real buyer, real value, real source link. This is the live evidence layer that drives every paid scan.</div>
+      <div class="sr-tier-p">Each card below is an actual notice pulled from Contracts Finder or Find a Tender within the last 90 days &mdash; real buyer, real value, real source link. This is one of several evidence layers a paid scan combines (see Tier 3 below for the full picture).</div>
     </div>
     <div class="sr-section sr-tier-1">
       <div class="sr-label">Live evidence &middot; refreshed hourly</div>
@@ -13478,7 +13478,27 @@ ${pageShellCss()}
 .sr-live-card:hover .sr-live-src{color:var(--brand)}
 .sr-live-foot{font-size:12px;color:var(--muted);line-height:1.5;padding:12px 14px;background:var(--surface-2);border:1px dashed var(--border);font-style:italic}
 .sr-demo-tag{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);background:rgba(180,146,78,.08);border:1px solid rgba(180,146,78,.25);padding:1px 5px;margin-left:4px;vertical-align:middle;font-weight:700;line-height:1.6}
-@media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}.sr-live-grid{grid-template-columns:1fr}}
+.sr-tier-3-banner{border-left-color:var(--brand);background:rgba(180,146,78,.04)}
+.sr-tier-3-banner .sr-tier-tag{color:var(--brand)}
+.sr-tier-note{font-size:12.5px;color:var(--muted);font-style:italic;padding:10px 14px;background:rgba(255,255,255,.55);border-left:2px solid var(--border-2);margin-top:12px;line-height:1.55}
+.sr-evidence-preview{margin-bottom:28px}
+.sr-ep-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start}
+.sr-ep-left{display:flex;flex-direction:column}
+.sr-ep-h{font-family:var(--serif);font-size:22px;font-weight:500;line-height:1.25;margin-bottom:14px;color:var(--text)}
+.sr-ep-body{font-size:14px;color:var(--text-mid);line-height:1.65;margin-bottom:24px}
+.sr-ep-steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:16px}
+.sr-ep-steps li{display:flex;gap:14px;align-items:flex-start}
+.sr-ep-num{flex-shrink:0;width:30px;height:30px;border:1px solid var(--brand);color:var(--brand);font-family:var(--mono);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;line-height:1}
+.sr-ep-step-h{font-family:var(--serif);font-size:15px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:4px}
+.sr-ep-step-p{font-size:12.5px;color:var(--muted);line-height:1.55}
+.sr-ep-right{display:flex;flex-direction:column;gap:12px}
+.sr-ev-card{background:var(--surface-2);border:1px solid var(--border-2);border-left:3px solid var(--brand);padding:18px 20px}
+.sr-ev-type{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:8px;font-weight:700}
+.sr-ev-org{font-family:var(--serif);font-size:14.5px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:10px}
+.sr-ev-sig,.sr-ev-why{font-size:12.5px;color:var(--text-mid);line-height:1.55;margin-bottom:6px}
+.sr-ev-conf{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--green);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-weight:600;text-transform:uppercase}
+.sr-ev-cta{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);padding-top:4px;font-style:italic}
+@media(max-width:640px){.sr-edp-grid{grid-template-columns:1fr 1fr}.sr-wrap{padding:24px 14px 60px}.sr-live-grid{grid-template-columns:1fr}.sr-ep-grid{grid-template-columns:1fr;gap:24px}}
 @media(max-width:480px){
   .sr-ribbon{padding:8px 14px;font-size:10px;flex-direction:column;gap:8px;align-items:flex-start}
   .sr-wrap{padding:16px 12px 48px}
@@ -13639,6 +13659,53 @@ ${pageShellHeader(null, authCtx)}
     <div class="sr-qa"><span style="color:var(--muted)">Data freshness (target SLA on live scans)</span><span style="font-family:var(--mono);font-weight:600">Contracts Finder: &lt;24h &middot; FTS: &lt;48h</span></div>
     <div style="margin-top:16px;padding:14px;background:var(--surface-2);border:1px solid var(--border-2);font-size:12px;color:var(--muted);line-height:1.6">
       <strong style="color:var(--text-mid)">Caveat:</strong> Live AtlasRevenue reports are based on publicly available procurement data plus company, geographic and market-demand signals. Award values are as published by the contracting authority and may differ from final contract values. AtlasRevenue provides intelligence, not certainty.
+    </div>
+  </div>
+
+  <div class="sr-tier-banner sr-tier-3-banner">
+    <div class="sr-tier-tag">Tier 3 of 3 &middot; Live Evidence Preview</div>
+    <div class="sr-tier-h">Live Evidence Preview</div>
+    <div class="sr-tier-p">Real examples of buyer activity and market-demand signals AtlasRevenue can track from public records, procurement data, geography, company intelligence, and sector sources.</div>
+    <div class="sr-tier-note">These examples are separate from the fictional Brightwell demo above. They show the type of real evidence AtlasRevenue can use in live scans. Cards below are example slots &mdash; real source links appear in live deployments.</div>
+  </div>
+
+  <div class="sr-section sr-evidence-preview">
+    <div class="sr-ep-grid">
+      <div class="sr-ep-left">
+        <h3 class="sr-ep-h">How AtlasRevenue turns evidence into commercial direction</h3>
+        <p class="sr-ep-body">AtlasRevenue does not just list tenders. It reads buyer activity, demand signals, sector movement, geography, and commercial fit to show where a company should sell next.</p>
+        <ol class="sr-ep-steps">
+          <li><span class="sr-ep-num">1</span><div><div class="sr-ep-step-h">Detect demand signals</div><div class="sr-ep-step-p">Across public procurement records, company filings, geographic and property data, and sector demand indicators.</div></div></li>
+          <li><span class="sr-ep-num">2</span><div><div class="sr-ep-step-h">Match them to supplier capability</div><div class="sr-ep-step-p">Filter signals by the scanned company&rsquo;s service mix, threshold profile, frameworks held and geographic reach.</div></div></li>
+          <li><span class="sr-ep-num">3</span><div><div class="sr-ep-step-h">Recommend the next route to revenue</div><div class="sr-ep-step-p">Direct tender, framework, subcontractor route, partner route or buyer engagement &mdash; whichever the evidence supports.</div></div></li>
+        </ol>
+      </div>
+      <div class="sr-ep-right">
+        <div class="sr-ev-card">
+          <div class="sr-ev-type">Public procurement record</div>
+          <div class="sr-ev-org">Source-linked buyer appears here <span class="sr-demo-tag">example slot</span></div>
+          <div class="sr-ev-sig"><b>Detected signal:</b> Recent buyer activity in a supplier category relevant to the scanned company.</div>
+          <div class="sr-ev-why"><b>Why it matters:</b> Public records can reveal buyer behaviour, recurring spend, category demand, and likely route-to-market.</div>
+          <div class="sr-ev-conf">Source-linked in live scans</div>
+          <div class="sr-ev-cta">Source link added in live deployment</div>
+        </div>
+        <div class="sr-ev-card">
+          <div class="sr-ev-type">Market-demand signal</div>
+          <div class="sr-ev-org">Sector or geography appears here <span class="sr-demo-tag">example slot</span></div>
+          <div class="sr-ev-sig"><b>Detected signal:</b> Demand movement identified from geography, company, property, funding, or sector data.</div>
+          <div class="sr-ev-why"><b>Why it matters:</b> Early signals can show where demand is forming before a formal tender appears.</div>
+          <div class="sr-ev-conf">Market signal in live scans</div>
+          <div class="sr-ev-cta">Evidence added in live deployment</div>
+        </div>
+        <div class="sr-ev-card">
+          <div class="sr-ev-type">Framework / route-to-market signal</div>
+          <div class="sr-ev-org">Relevant framework or buyer group appears here <span class="sr-demo-tag">example slot</span></div>
+          <div class="sr-ev-sig"><b>Detected signal:</b> A likely route to revenue based on buyer behaviour, supplier category, or procurement pattern.</div>
+          <div class="sr-ev-why"><b>Why it matters:</b> Some companies should not chase tenders directly. The better path may be a framework, subcontractor route, partner route, or buyer engagement.</div>
+          <div class="sr-ev-conf">Route assessed in live scans</div>
+          <div class="sr-ev-cta">Source added in live deployment</div>
+        </div>
+      </div>
     </div>
   </div>
 
