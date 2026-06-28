@@ -6519,7 +6519,7 @@ ${featuredHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK revenue intelligence for suppliers, agencies, contractors, and consultants selling into public-sector and private-sector demand. Combines official procurement records with company, geography, and market data to surface demand, named buyers, and live opportunities.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -8105,7 +8105,7 @@ app.get("/", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Know exactly who wants what you sell. AtlasRevenue turns real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — into a demand map for your products and services, plus live public-sector contracts from Contracts Finder and Find a Tender. One scan. No guesses.">
+<meta name="description" content="AtlasRevenue maps demand signals, named buyers, and live contract opportunities across UK public and private markets. Public-sector intelligence powered by official procurement records (Contracts Finder, Find a Tender); wider market demand built from company, geography, property, economic and sector signals.">
 <meta name="keywords" content="UK market demand intelligence, B2B sales intelligence UK, who is buying, public sector contracts, Contracts Finder, Find a Tender, market signals, demand data UK, sales leads by sector">
 <link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/">
 <meta name="robots" content="index, follow, max-image-preview:large">
@@ -8115,12 +8115,12 @@ app.get("/", asyncRoute(async (req, res) => {
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AtlasRevenue">
 <meta property="og:title" content="Know exactly who wants what you sell — before your competitors do.">
-<meta property="og:description" content="Real UK demand signals (DVLA, ONS, SMMT, Companies House) + live public contracts, in one scan. No guesses.">
+<meta property="og:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
 <meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/">
 <meta property="og:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Know exactly who wants what you sell — AtlasRevenue">
-<meta name="twitter:description" content="Real UK demand signals + live public contracts in one scan. DVLA, ONS, SMMT, Companies House, Contracts Finder.">
+<meta name="twitter:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
 <meta name="twitter:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
 <script type="application/ld+json">${JSON.stringify({
   "@context": "https://schema.org",
@@ -8159,7 +8159,7 @@ app.get("/", asyncRoute(async (req, res) => {
         {
           "@type": "Question",
           "name": "What does an AtlasRevenue scan actually show me?",
-          "acceptedAnswer": { "@type": "Answer", "text": "It maps real UK demand for what you sell — pulled from DVLA, ONS, SMMT, Land Registry and Companies House — and surfaces live public-sector contracts from Contracts Finder and Find a Tender. You get named buyers, demand signals with real numbers, the best routes to revenue, and a 90-day activation plan." }
+          "acceptedAnswer": { "@type": "Answer", "text": "AtlasRevenue maps where demand is forming across UK public and private markets. Public-sector contract intelligence is powered by official procurement records (Contracts Finder, Find a Tender). Wider market-demand intelligence combines company data (Companies House) with geography, property, economic, and sector signals (DVLA, ONS, SMMT, Land Registry, Planning Data). You get named buyers, demand signals with figures and dates, the best routes to revenue, and a 90-day activation plan." }
         },
         {
           "@type": "Question",
@@ -8431,7 +8431,7 @@ ${pageShellHeader(null, homepageAuth)}
     <div>
       <div class="eyebrow">Real UK data &middot; Demand &amp; contract intelligence</div>
       <h1>Know exactly who wants<br>what you sell <em>before your<br>competitors do.</em></h1>
-      <p class="lede">AtlasRevenue turns real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — into a demand map for your products and services, plus live public-sector contracts you can win. One scan. No guesses.</p>
+      <p class="lede">AtlasRevenue maps demand signals, named buyers, spend patterns, and live contract opportunities across UK public and private markets — so firms know where to sell, who to approach, and what to chase next. One sourced scan. No guesses.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="/preview">See who's buying &mdash; free &rarr;</a>
         <a href="/scan" style="display:inline-flex;align-items:center;padding:0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:#ECE6D6;text-decoration:none;border-bottom:1px solid rgba(180,146,78,.5)">Run a full scan</a>
@@ -8542,7 +8542,7 @@ ${chaseNowHtml}
     <div class="scan-strip-left">
       <div class="scan-strip-eyebrow">Intelligence scan &middot; 2&ndash;4 minutes</div>
       <div class="scan-strip-hed">Stop guessing where your next revenue comes from.</div>
-      <div class="scan-strip-sub">Tell us what you sell and where you operate. We read real UK data and return a sourced commercial brief &mdash; demand signals, named buyers, route-to-revenue map, and a 90-day plan. From £29.</div>
+      <div class="scan-strip-sub">Tell us what you sell and where. We combine procurement records, company data, geography, property, economic and sector signals to show where demand is forming and which buyers match your services. From £29.</div>
     </div>
     <div class="scan-strip-right">
       <a class="scan-strip-btn" href="/scan">Run a scan &rarr;</a>
@@ -8555,7 +8555,7 @@ ${chaseNowHtml}
     <div>
       <div class="eyebrow">The product underneath</div>
       <h2>One profile in.<br>A <em>sourced plan</em> out.</h2>
-      <p>Tell us what you sell, who you sell to, and where. The engine pre-fetches real UK demand data, scores route-to-revenue fit, and returns a professional brief &mdash; every figure sourced, dated, and tied to a specific next action. No invented numbers.</p>
+      <p>Tell us what you sell, who you sell to, and where. The engine combines procurement records, company data, and market demand signals across public and private markets &mdash; every figure sourced, dated, and tied to a specific next action. No invented numbers.</p>
       <a class="btn-primary" href="/scan">Run your first scan</a>
     </div>
     <div class="steps">
@@ -8621,7 +8621,7 @@ ${chaseNowHtml}
   </div>
 </section>
 <footer class="hp-foot"><div class="wrap">
-  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK public-sector procurement intelligence. We turn Contracts Finder and Find a Tender data into one sourced commercial decision for your firm: bid, partner, monitor, prepare, or ignore.</p></div>
+  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK revenue intelligence for suppliers, agencies, contractors, and consultants selling into public-sector and private-sector demand. Combines official procurement records with company, geography, and market data to surface demand, named buyers, and live opportunities.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
   <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/desks">Sector Desks</a></li><li><a href="/charts">Opportunity Radar</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://www.gov.uk/government/publications/local-government-transparency-code-2015" target="_blank" rel="noopener noreferrer">LA transparency</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
@@ -13591,7 +13591,7 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — get a sourced report on who's buying it, where demand is concentrated, and the contracts you can win. Real UK data, 2-4 minutes, from £29.">
+<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — get a sourced report combining procurement records, company data, and market signals on who's buying, where demand sits, and the contracts you can win. From £29.">
 <link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/scan">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Run an AtlasRevenue intelligence scan">
@@ -13708,7 +13708,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
   <div class="page-head">
     <div class="eyebrow">Intelligence scan</div>
     <h1>Tell us what you sell.</h1>
-    <p class="sub">The more context you give, the sharper the signal. We read real UK data — DVLA, ONS, SMMT, Land Registry, Companies House, Contracts Finder — then return a sourced plan on who's buying, where the demand is, and how to reach it.</p>
+    <p class="sub">The more context you give, the sharper the signal. We combine procurement records, company data, and geography, property, economic and sector signals across UK public and private markets — then return a sourced plan on who's buying, where the demand is, and how to reach it.</p>
     <details style="margin-top:16px;font-size:13px;color:var(--muted);line-height:1.6;cursor:pointer">
       <summary style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);cursor:pointer">What is an Evidence Grade?</summary>
       <p style="margin-top:10px">Every report receives a grade from <strong style="color:var(--text)">A</strong> (strongest fit) to <strong style="color:var(--text)">E</strong> (weakest). The grade measures how well your profile matches live public contracts: buyer overlap, contract size fit, sector relevance, and track record. Filling in experience, certifications, and past wins strengthens the grade. First-time bidders typically start at C and improve as they build evidence.</p>
@@ -22283,7 +22283,7 @@ initDb()
       app.listen(PORT, () => {
         console.log(`[server] AtlasRevenue Agent running on port ${PORT}`);
         // Warm up live desk caches on startup — staggered to avoid hammering Contracts Finder.
-        // Compiles one desk every 8s; 24 desks ≈ 3min total, well within rate limits.
+        // Compiles one desk every 8s; 28 desks ≈ 4min total, well within rate limits.
         const liveDesks = DESK_PROFILES.filter(d => d.live);
         let delay = 0;
         for (const desk of liveDesks) {

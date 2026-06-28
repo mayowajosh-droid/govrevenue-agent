@@ -928,7 +928,7 @@ export function renderChaseNowSection(signals: HomepageTeaserSignal[], stats: Ch
   const seeAllCard = `<a class="cnc-card-see-all" href="/signals">
   <div>
     <div class="cnc-see-count">${remaining > 0 ? remaining : stats.totalOpen}</div>
-    <div class="cnc-see-label">more open contracts<br>across 24 desks</div>
+    <div class="cnc-see-label">more open contracts<br>across 28 desks</div>
   </div>
   <div class="cnc-see-cta">Browse all open notices &rarr;</div>
 </a>`;
