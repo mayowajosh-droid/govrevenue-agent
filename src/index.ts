@@ -5589,20 +5589,46 @@ function calcPremiumScores(scan: ScanRecord) {
   const hasCerts = certs.length > 40 && !hasAny(certs, ["to be confirmed", "none", "not confirmed"]);
   const hasTeam = team.length > 0 && !hasAny(team, ["to be confirmed", "not confirmed"]);
 
-  const buyerFit = clampScore(
-    48 +
-      (openCount * 2.2) +
-      (awardCount * 1.4) +
-      (hasSectorFocus ? 12 : 0)
-  );
+  // For private/B2B intelligence scans, count contracts is always 0 — so the
+  // procurement-derived buyer/evidence scores all collapse to Weak no matter
+  // how strong the actual report is. Derive both from the report markdown
+  // instead: count source-labelled signal rows (the `SOURCE · stat · geo · date
+  // · implication →` format that prompts ask for) and named Buyer Watchlist
+  // rows.
+  const scanModeForScores = (input?.scanMode || "both").toString().toLowerCase();
+  const isIntelligenceScoring = scanModeForScores === "intelligence";
+  const reportMd: string = scan.report_markdown || "";
+  // Signal-row count: lines ending in "→" with at least 3 middle-dot/pipe
+  // separators (matches the prompt's required format and is robust to spacing).
+  const signalRowCount = isIntelligenceScoring
+    ? (reportMd.match(/(?:·|\|)[^\n]*(?:·|\|)[^\n]*(?:·|\|)[^\n]*→/g) || []).length
+    : 0;
+  // Named-buyer count: rows of a buyer-watchlist-style markdown table.
+  const buyerWatchlistBlock = reportMd.match(/##\s*6\..*?(?=\n##\s|\Z)/s)?.[0] || "";
+  const buyerRowCount = isIntelligenceScoring
+    ? (buyerWatchlistBlock.match(/^\|[^|\n]+\|[^|\n]+\|/gm) || []).length - 2 // minus header + divider
+    : 0;
+  const intelBuyerFit = buyerRowCount >= 8 ? 86 : buyerRowCount >= 5 ? 74 : buyerRowCount >= 3 ? 60 : 40;
+  const intelEvidenceStrength = signalRowCount >= 16 ? 88 : signalRowCount >= 10 ? 74 : signalRowCount >= 5 ? 58 : 38;
 
-  const evidenceStrength = clampScore(
-    22 +
-      (hasPublicExperience ? 25 : 0) +
-      (hasCaseStudies ? 25 : 0) +
-      (hasCerts ? 18 : 0) +
-      (hasTeam ? 10 : 0)
-  );
+  const buyerFit = isIntelligenceScoring && signalRowCount > 0
+    ? intelBuyerFit
+    : clampScore(
+        48 +
+          (openCount * 2.2) +
+          (awardCount * 1.4) +
+          (hasSectorFocus ? 12 : 0)
+      );
+
+  const evidenceStrength = isIntelligenceScoring && signalRowCount > 0
+    ? intelEvidenceStrength
+    : clampScore(
+        22 +
+          (hasPublicExperience ? 25 : 0) +
+          (hasCaseStudies ? 25 : 0) +
+          (hasCerts ? 18 : 0) +
+          (hasTeam ? 10 : 0)
+      );
 
   const procurementReadiness = clampScore(
     28 +
