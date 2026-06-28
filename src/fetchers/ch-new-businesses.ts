@@ -66,7 +66,15 @@ const SIC_SECTOR_LABELS: Record<string, string> = {
   "96": "Personal Services",
 };
 
+const SIC_SECTOR_OVERRIDES: Record<string, string> = {
+  "47710": "Fashion & Clothing", "47721": "Fashion & Clothing", "47722": "Fashion & Clothing",
+  "47723": "Fashion & Clothing", "47782": "Fashion & Clothing", "47789": "Fashion & Clothing",
+};
+
 function sectorFromSic(sicCodes: string[]): string {
+  for (const code of sicCodes) {
+    if (SIC_SECTOR_OVERRIDES[code]) return SIC_SECTOR_OVERRIDES[code];
+  }
   for (const code of sicCodes) {
     const prefix2 = code.slice(0, 2);
     if (SIC_SECTOR_LABELS[prefix2]) return SIC_SECTOR_LABELS[prefix2];
