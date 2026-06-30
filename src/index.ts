@@ -8699,9 +8699,9 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="hero-grad"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Real UK data &middot; Demand &amp; contract intelligence</div>
+      <div class="eyebrow">Buyer intent &middot; Demand detection &middot; Real UK data</div>
       <h1>Know exactly who wants <br>what you sell <em>before your <br>competitors do.</em></h1>
-      <p class="lede">AtlasRevenue maps demand signals, named buyers, spend patterns, and live contract opportunities across UK public and private markets — so firms know where to sell, who to approach, and what to chase next. One sourced scan. No guesses.</p>
+      <p class="lede">AtlasRevenue finds buyers showing evidence-backed demand before they publicly ask for suppliers. We map intent signals, named buyers, spend patterns, and live opportunities across UK markets — so you know who to approach, what to say, and when to move. One sourced scan. No guesses.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="/preview">See who's buying &mdash; free &rarr;</a>
         <a href="/scan" style="display:inline-flex;align-items:center;padding:0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:#ECE6D6;text-decoration:none;border-bottom:1px solid rgba(180,146,78,.5)">Run a full scan</a>
@@ -13407,8 +13407,8 @@ app.get("/pricing", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — AtlasRevenue | From £29 per Intelligence Scan</title>
-<meta name="description" content="AtlasRevenue pricing. Pay £29 per scan or subscribe for continuous UK demand and contract intelligence. Real data, named buyers, 90-day plans — no guesses.">
+<title>Pricing — AtlasRevenue | Buyer Packs from £299</title>
+<meta name="description" content="AtlasRevenue pricing. Buyer Packs from £299 one-off, Buyer Watchlist from £149/month, Growth Intelligence from £750/month. Named buyers with intent scores, outreach packs, and action plans.">
 <link rel="canonical" href="${BASE_URL}/pricing">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="AtlasRevenue Pricing — From £29 per scan">
@@ -13416,12 +13416,12 @@ app.get("/pricing", (req, res) => {
 <meta property="og:url" content="${BASE_URL}/pricing">
 <style>
 ${pageShellCss()}
-.pr-wrap{max-width:960px;margin:0 auto;padding:0 32px}
+.pr-wrap{max-width:1120px;margin:0 auto;padding:0 32px}
 .pr-hero{padding:64px 0 48px;text-align:center}
 .pr-eye{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
 .pr-h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px;color:var(--text)}
 .pr-sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 0 80px}
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:0 0 80px}
 .plan{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface);position:relative;transition:border-color .2s,box-shadow .2s;display:flex;flex-direction:column}
 .plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.08)}
 .plan.featured{border-color:rgba(180,146,78,.4);box-shadow:0 0 0 1px rgba(180,146,78,.2)}
@@ -13451,6 +13451,7 @@ ${pageShellCss()}
 .faq-item:last-child{border-bottom:1px solid var(--border)}
 .faq-q{font-weight:600;font-size:15px;margin-bottom:8px;color:var(--text)}
 .faq-a{font-size:14px;color:var(--muted);line-height:1.7}
+@media(max-width:960px){.plans{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.plans{grid-template-columns:1fr}.pr-hero{padding:48px 0 40px}.pr-h1{font-size:28px}}
 @media(max-width:480px){.pr-wrap{padding:0 14px}.pr-h1{font-size:22px}.pr-hero{padding:28px 0 24px}.plan{padding:20px}.plan-price{font-size:32px}.plan li{font-size:13px}.faq h2{font-size:20px}.faq-q{font-size:14px}}
 </style>
@@ -13461,59 +13462,77 @@ ${pageShellHeader(null, getAuthUser(req))}
 <div class="pr-wrap">
   <div class="pr-hero">
     <div class="pr-eye">Pricing</div>
-    <h1 class="pr-h1">Real intelligence, priced to pay for itself.</h1>
-    <p class="pr-sub">One scan tells you who wants what you sell and which contracts you can win. Pay per scan, or subscribe for continuous demand and contract intelligence in your sector.</p>
+    <h1 class="pr-h1">Find buyers before your competitors do.</h1>
+    <p class="pr-sub">Named buyers with intent scores, outreach packs, and action plans. Start with a one-off Buyer Pack, then subscribe for continuous monitoring.</p>
   </div>
   <div class="plans">
-    <div class="plan">
-      <div class="plan-name">Pay as you go</div>
-      <div class="plan-price"><sup>£</sup>29</div>
-      <div class="plan-period">per scan &middot; one-time</div>
-      <div class="plan-desc">A single full scan — demand intelligence, contracts, or both. Sourced report, buyer watchlist, money map and PDF. No subscription needed.</div>
-      <ul>
-        <li><span class="tick">&#10003;</span> Demand signals + live contracts (your choice)</li>
-        <li><span class="tick">&#10003;</span> Named buyers &amp; route-to-revenue money map</li>
-        <li><span class="tick">&#10003;</span> Regional demand heat map</li>
-        <li><span class="tick">&#10003;</span> 90-day activation plan + PDF export</li>
-        <li><span class="dash">&ndash;</span> Weekly opportunity alerts</li>
-        <li><span class="dash">&ndash;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
-        <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
-      </ul>
-      <a href="/checkout?plan=payg" class="btn btn-outline">Get started &rarr;</a>
-    </div>
     <div class="plan featured">
-      <div class="plan-badge">Most popular</div>
-      <div class="plan-name">Pro</div>
-      <div class="plan-price"><sup>£</sup>79</div>
-      <div class="plan-period">per month &middot; cancel anytime</div>
-      <div class="plan-desc">Unlimited scans plus weekly alerts when new demand or contracts land in your categories. Built for firms actively growing revenue.</div>
+      <div class="plan-badge">Start here</div>
+      <div class="plan-name">Buyer Pack</div>
+      <div class="plan-price"><sup>£</sup>299</div>
+      <div class="plan-period">one-off &middot; per niche</div>
+      <div class="plan-desc">15&ndash;25 named buyers in your niche with intent scores, outreach packs, and a 30-day action plan. Proves the value before you subscribe.</div>
       <ul>
-        <li><span class="tick">&#10003;</span> Unlimited scans</li>
-        <li><span class="tick">&#10003;</span> Weekly opportunity alerts (email)</li>
+        <li><span class="tick">&#10003;</span> 15&ndash;25 buyer opportunity cards</li>
+        <li><span class="tick">&#10003;</span> Intent Score (0&ndash;100) per buyer</li>
+        <li><span class="tick">&#10003;</span> Why Now? analysis per buyer</li>
+        <li><span class="tick">&#10003;</span> Outreach pack (email + call + LinkedIn)</li>
+        <li><span class="tick">&#10003;</span> Routes to revenue map</li>
+        <li><span class="tick">&#10003;</span> 30-day activation plan</li>
+        <li><span class="tick">&#10003;</span> &ldquo;Do not say&rdquo; warnings</li>
+        <li><span class="tick">&#10003;</span> PDF export</li>
+      </ul>
+      <a href="/scan" class="btn btn-primary">Get buyer pack &rarr;</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Buyer Watchlist</div>
+      <div class="plan-price"><sup>£</sup>149</div>
+      <div class="plan-period">per month &middot; cancel anytime</div>
+      <div class="plan-desc">Continuous monitoring of your niche. Weekly score updates, new buyer alerts, and refreshed outreach angles when signals change.</div>
+      <ul>
+        <li><span class="tick">&#10003;</span> Everything in Buyer Pack</li>
+        <li><span class="tick">&#10003;</span> Weekly intent score updates</li>
+        <li><span class="tick">&#10003;</span> New buyer alerts (email)</li>
+        <li><span class="tick">&#10003;</span> Refreshed outreach angles</li>
+        <li><span class="tick">&#10003;</span> Contract expiry tracking</li>
         <li><span class="tick">&#10003;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
-        <li><span class="tick">&#10003;</span> Full reports &amp; PDF exports</li>
-        <li><span class="tick">&#10003;</span> Buyer watchlist monitoring</li>
-        <li><span class="dash">&ndash;</span> Multiple firm profiles</li>
+        <li><span class="dash">&ndash;</span> Multi-niche coverage</li>
         <li><span class="dash">&ndash;</span> Team access</li>
       </ul>
-      <a href="/checkout?plan=pro" class="btn btn-primary">Get started &rarr;</a>
+      <a href="/checkout?plan=watchlist" class="btn btn-outline">Subscribe &rarr;</a>
     </div>
     <div class="plan">
-      <div class="plan-name">Agency</div>
-      <div class="plan-price"><sup>£</sup>499</div>
+      <div class="plan-name">Growth Intelligence</div>
+      <div class="plan-price"><sup>£</sup>750</div>
       <div class="plan-period">per month</div>
-      <div class="plan-desc">For consultancies and bid writers managing client portfolios. Multiple firm profiles, team seats, and a quarterly review call.</div>
+      <div class="plan-desc">For agencies, bid writers, and consultancies managing multiple niches or client portfolios. Multi-niche packs and team collaboration.</div>
       <ul>
-        <li><span class="tick">&#10003;</span> Everything in Pro</li>
-        <li><span class="tick">&#10003;</span> Up to 10 firm profiles</li>
+        <li><span class="tick">&#10003;</span> Everything in Watchlist</li>
+        <li><span class="tick">&#10003;</span> Up to 5 niche verticals</li>
+        <li><span class="tick">&#10003;</span> Client portfolio management</li>
         <li><span class="tick">&#10003;</span> Team access (5 seats)</li>
         <li><span class="tick">&#10003;</span> Client-ready PDF reports</li>
         <li><span class="tick">&#10003;</span> Priority support</li>
-        <li><span class="tick">&#10003;</span> Dedicated desk monitoring</li>
-        <li><span class="tick">&#10003;</span> Quarterly portfolio review call</li>
+        <li><span class="tick">&#10003;</span> Quarterly strategy call</li>
       </ul>
-      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Deploying across 10+ profiles? Talk to us &rarr;</a>
-      <a href="/checkout?plan=agency" class="btn btn-outline">Get started &rarr;</a>
+      <a href="/checkout?plan=growth" class="btn btn-outline">Get started &rarr;</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Exclusive Feed</div>
+      <div class="plan-price"><sup>£</sup>1,500+</div>
+      <div class="plan-period">per month</div>
+      <div class="plan-desc">Category or territory exclusivity. You see the buyers before anyone else on AtlasRevenue. White-label reports for your brand.</div>
+      <ul>
+        <li><span class="tick">&#10003;</span> Everything in Growth</li>
+        <li><span class="tick">&#10003;</span> Territory or category exclusivity</li>
+        <li><span class="tick">&#10003;</span> White-label buyer packs</li>
+        <li><span class="tick">&#10003;</span> Unlimited niches</li>
+        <li><span class="tick">&#10003;</span> API access</li>
+        <li><span class="tick">&#10003;</span> Dedicated account manager</li>
+        <li><span class="tick">&#10003;</span> Custom scoring weights</li>
+      </ul>
+      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Custom pricing &mdash; talk to us &rarr;</a>
+      <a href="/checkout?plan=exclusive" class="btn btn-outline">Get started &rarr;</a>
     </div>
   </div>
   <div class="faq">
@@ -13565,21 +13584,42 @@ ${pageShellFoot()}
 
 const PLAN_CONFIG: Record<string, { name: string; price: string; period: string; mode: string; items: string[] }> = {
   payg: {
-    name: "Pay as you go",
-    price: "£29",
-    period: "one-time",
+    name: "Buyer Pack",
+    price: "£299",
+    period: "one-off per niche",
     mode: "payment",
-    items: ["Full 10-section intelligence report", "Buyer watchlist & route-to-revenue map", "PDF export", "Evidence grade & verdict"],
+    items: ["15–25 buyer opportunity cards", "Intent Score (0–100) per buyer", "Why Now? analysis", "Outreach pack (email + call + LinkedIn)", "Routes to revenue map", "30-day activation plan", "PDF export"],
   },
-  pro: {
-    name: "Pro",
-    price: "£79",
+  watchlist: {
+    name: "Buyer Watchlist",
+    price: "£149",
     period: "per month — cancel anytime",
     mode: "subscription",
-    items: ["Unlimited scans", "Weekly opportunity alerts (email)", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`, "Full reports & PDF exports", "Buyer watchlist monitoring"],
+    items: ["Everything in Buyer Pack", "Weekly intent score updates", "New buyer alerts (email)", "Refreshed outreach angles", "Contract expiry tracking", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`],
+  },
+  pro: {
+    name: "Buyer Watchlist (Pro)",
+    price: "£399",
+    period: "per month — cancel anytime",
+    mode: "subscription",
+    items: ["Everything in Watchlist", "Up to 3 niche verticals", "Priority support", "Full reports & PDF exports", "Buyer watchlist monitoring"],
+  },
+  growth: {
+    name: "Growth Intelligence",
+    price: "£750",
+    period: "per month",
+    mode: "subscription",
+    items: ["Everything in Watchlist", "Up to 5 niche verticals", "Client portfolio management", "Team access (5 seats)", "Client-ready PDF reports", "Priority support", "Quarterly strategy call"],
+  },
+  exclusive: {
+    name: "Exclusive Opportunity Feed",
+    price: "£1,500+",
+    period: "per month",
+    mode: "subscription",
+    items: ["Everything in Growth", "Territory or category exclusivity", "White-label buyer packs", "Unlimited niches", "API access", "Dedicated account manager", "Custom scoring weights"],
   },
   agency: {
-    name: "Agency",
+    name: "Agency (Legacy)",
     price: "£499",
     period: "per month",
     mode: "subscription",
@@ -14114,13 +14154,13 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — get a sourced report combining procurement records, company data, and market signals on who's buying, where demand sits, and the contracts you can win. From £29.">
+<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — find buyers showing evidence-backed demand before they publicly ask for suppliers. Named buyers, intent scores, outreach angles. From £29.">
 <link rel="canonical" href="${BASE_URL}/scan">
 <meta name="robots" content="index, follow">
-<meta property="og:title" content="Run an AtlasRevenue intelligence scan">
-<meta property="og:description" content="Who's buying what you sell + contracts you can win. Real UK data, one scan.">
+<meta property="og:title" content="Find buyers before they ask for suppliers">
+<meta property="og:description" content="Evidence-backed buyer intent + demand detection. Named buyers, outreach packs, action plans. Real UK data.">
 <meta property="og:url" content="${BASE_URL}/scan">
-<title>Run a Scan — Demand &amp; Contract Intelligence | AtlasRevenue</title>
+<title>Run a Scan — Buyer Intent &amp; Demand Detection | AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 :root{
@@ -17453,6 +17493,164 @@ ${sampleCtaBlock("compact")}
 </html>`;
 }
 
+// ── Intent scoring engine ────────────────────────────────────────────────────
+interface BuyerIntentProfile {
+  buyer: string;
+  orgType: string;
+  awardedValue: number;
+  noticeCount: number;
+  openCount: number;
+  latestDate: string;
+  hasRecentOpen: boolean;
+  signals: string[];
+  intentScore: number;
+  whyNow: string;
+  likelyNeed: string;
+  route: string;
+  outreachAngle: string;
+  outreachEmail: string;
+  outreachCall: string;
+  outreachLinkedIn: string;
+  doNotSay: string[];
+  contractorFit: string;
+  timing: string;
+}
+
+function computeIntentScore(buyer: string, stats: { awardedValue: number; noticeCount: number; openCount: number; hasRecentOpen: boolean; signals: string[]; orgType: string }): number {
+  let score = 0;
+  if (stats.hasRecentOpen) score += 25;
+  if (stats.awardedValue > 500_000) score += 20;
+  else if (stats.awardedValue > 100_000) score += 12;
+  else if (stats.awardedValue > 0) score += 5;
+  if (stats.noticeCount >= 5) score += 15;
+  else if (stats.noticeCount >= 3) score += 10;
+  else if (stats.noticeCount === 1) score -= 5;
+  if (stats.signals.includes("SHDF")) score += 15;
+  if (stats.signals.includes("ECO4")) score += 12;
+  if (stats.signals.includes("Heat Pump")) score += 10;
+  if (stats.signals.includes("Retrofit")) score += 8;
+  if (stats.signals.includes("Solar")) score += 8;
+  if (stats.signals.includes("Insulation")) score += 8;
+  if (["LOCAL AUTHORITY", "HOUSING"].includes(stats.orgType)) score += 10;
+  else if (["EDUCATION", "HEALTH"].includes(stats.orgType)) score += 7;
+  return Math.max(0, Math.min(100, score));
+}
+
+function detectSignals(title: string): string[] {
+  const tl = title.toLowerCase();
+  const tags: string[] = [];
+  if (tl.includes("shdf") || tl.includes("social housing decarbonisation")) tags.push("SHDF");
+  if (tl.includes("eco4") || tl.includes("eco ")) tags.push("ECO4");
+  if (tl.includes("retrofit")) tags.push("Retrofit");
+  if (tl.includes("solar") || tl.includes("pv") || tl.includes("photovoltaic")) tags.push("Solar");
+  if (tl.includes("heat pump") || tl.includes("air source") || tl.includes("ground source")) tags.push("Heat Pump");
+  if (tl.includes("insulation") || tl.includes("ewi") || tl.includes("cavity") || tl.includes("loft")) tags.push("Insulation");
+  if (tl.includes("roofing") || tl.includes("roof repair") || tl.includes("roof replacement")) tags.push("Roofing");
+  if (tl.includes("window") || tl.includes("glazing") || tl.includes("door replacement")) tags.push("Windows");
+  if (tl.includes("net zero") || tl.includes("decarbonis")) tags.push("Net Zero");
+  if (tl.includes("hug") || tl.includes("home upgrade")) tags.push("HUG2");
+  if (tl.includes("mees") || tl.includes("minimum energy")) tags.push("MEES");
+  if (tl.includes("warm homes") || tl.includes("green homes")) tags.push("Green Homes");
+  return [...new Set(tags)];
+}
+
+function generateWhyNow(orgType: string, signals: string[], hasRecentOpen: boolean, awardedValue: number): string {
+  const parts: string[] = [];
+  if (signals.includes("SHDF")) parts.push("SHDF Wave 3 recipient — central government co-funding requires appointed installers by programme deadline.");
+  if (signals.includes("ECO4")) parts.push("ECO4 delivery partner — utilities must place insulation and heating work through approved installers.");
+  if (signals.includes("HUG2")) parts.push("HUG2 grant holder — off-gas-grid homes need EPC C upgrades through council-led procurement.");
+  if (signals.includes("Net Zero")) parts.push("Published Net Zero estate strategy with capital works budget for building fabric upgrades.");
+  if (signals.includes("MEES")) parts.push("MEES compliance deadline approaching — commercial stock must reach EPC B by 2030.");
+  if (hasRecentOpen) parts.push("Live procurement right now — competition is open.");
+  if (parts.length === 0) {
+    if (orgType === "LOCAL AUTHORITY") parts.push("Councils have recurring retrofit programmes driven by housing stock condition and Net Zero targets.");
+    else if (orgType === "HOUSING") parts.push("Housing associations face EPC C by 2030 targets across their stock — ongoing installer demand.");
+    else if (orgType === "EDUCATION") parts.push("DfE Condition Improvement Fund and estate sustainability plans drive fabric upgrade procurement.");
+    else if (orgType === "HEALTH") parts.push("NHS Net Zero roadmap commits to estate decarbonisation with phased capital programmes.");
+    else parts.push("Active procurement history in retrofit and building fabric — likely to rebid or extend scope.");
+  }
+  if (awardedValue > 1_000_000) parts.push(`£${(awardedValue / 1_000_000).toFixed(1)}M+ already awarded — this is a scale buyer, not a one-off.`);
+  return parts.join(" ");
+}
+
+function generateOutreach(orgType: string, signals: string[]): { angle: string; email: string; call: string; linkedIn: string; doNotSay: string[] } {
+  const hasSHDF = signals.includes("SHDF");
+  const hasECO = signals.includes("ECO4");
+  const hasSolar = signals.includes("Solar");
+  const hasHeatPump = signals.includes("Heat Pump");
+
+  let angle = "PAS 2035 whole-house retrofit delivery at scale";
+  if (hasSHDF) angle = "SHDF Wave 3 delivery — PAS 2035 compliant, references from similar social landlord programmes";
+  else if (hasECO) angle = "ECO4 measure installation — TrustMark registered, end-to-end delivery including lodgement";
+  else if (hasSolar) angle = "MCS-certified solar PV installation for public estate — roof surveys through to DNO connection";
+  else if (hasHeatPump) angle = "ASHP/GSHP installation — MCS registered, experienced with social housing switchover programmes";
+
+  const orgName = orgType === "LOCAL AUTHORITY" ? "the council" : orgType === "HOUSING" ? "the association" : orgType === "EDUCATION" ? "the trust" : "the organisation";
+
+  const email = `Subject: Retrofit delivery capacity — happy to share references
+
+We deliver [EWI / insulation / roofing / solar] at scale for [housing associations / councils / trusts] and noticed ${orgName} is active in this space.
+
+Happy to share references from similar programmes and outline our capacity for the coming quarter. No obligation — just seeing if there's a fit before any formal process starts.
+
+Would a 15-minute call this week or next work?`;
+
+  const call = `Opening: "I'm calling about your retrofit programme — we deliver [specific service] for organisations like yours and wanted to see if there's scope to support upcoming work."
+
+If gatekeeper: "Could you point me to whoever manages your retrofit or building fabric programme? I have some relevant references to share."
+
+Key point: Lead with references from comparable organisations, not a sales pitch.`;
+
+  const linkedIn = `Hi — noticed ${orgName} has been active in retrofit procurement recently. We deliver [specific service] for similar organisations and have references from comparable programmes. Happy to share if useful. No pitch, just seeing if there's a fit.`;
+
+  const doNotSay = [
+    "Don't mention specific contract values you've seen — buyers find it intrusive",
+    "Don't claim you can beat incumbents on price — focus on quality and reliability",
+    "Don't reference 'our AI found you' — say 'we track public procurement activity'",
+    "Don't cold-pitch framework membership — ask about their procurement route first",
+  ];
+
+  return { angle, email, call, linkedIn, doNotSay };
+}
+
+function generateLikelyNeed(signals: string[]): string {
+  const needs: string[] = [];
+  if (signals.includes("Insulation") || signals.includes("SHDF") || signals.includes("ECO4")) needs.push("EWI, cavity fill, loft insulation");
+  if (signals.includes("Roofing")) needs.push("pitched/flat roof repair or replacement");
+  if (signals.includes("Windows")) needs.push("window and door replacement");
+  if (signals.includes("Solar")) needs.push("solar PV installation");
+  if (signals.includes("Heat Pump")) needs.push("air/ground source heat pump installation");
+  if (signals.includes("Net Zero") || signals.includes("Retrofit")) needs.push("whole-house retrofit coordination");
+  if (needs.length === 0) needs.push("building fabric upgrades, energy efficiency measures");
+  return needs.join(", ");
+}
+
+function generateRoute(orgType: string, hasRecentOpen: boolean): string {
+  if (hasRecentOpen) return "Respond to live opportunity → demonstrate relevant experience";
+  if (orgType === "LOCAL AUTHORITY") return "Approach procurement lead → offer capacity for upcoming programme rounds";
+  if (orgType === "HOUSING") return "Contact asset management / sustainability director → share comparable HA references";
+  if (orgType === "EDUCATION") return "Reach estate manager or business manager → reference DfE-funded work";
+  if (orgType === "HEALTH") return "Contact estates department → reference NHS Net Zero experience";
+  return "Direct approach → procurement or estates lead with relevant references";
+}
+
+function generateContractorFit(awardedValue: number, noticeCount: number): string {
+  if (awardedValue > 5_000_000) return "Best for established firms (15+ operatives) or JV with smaller partner";
+  if (awardedValue > 1_000_000) return "Good fit for mid-size firms (5–15 operatives) with track record";
+  if (noticeCount >= 3) return "Good fit for small firms (2–15 operatives) — recurring need suits local delivery";
+  return "Good fit for small contractors (2–10 operatives)";
+}
+
+function generateTiming(hasRecentOpen: boolean, latestDate: string): string {
+  if (hasRecentOpen) return "Live now — respond within deadline";
+  if (!latestDate) return "Monitor for next procurement round";
+  const age = Date.now() - new Date(latestDate).getTime();
+  const months = Math.round(age / (30 * 24 * 3_600_000));
+  if (months <= 3) return "Recently active — next round likely within 6 months";
+  if (months <= 9) return "Active this year — monitor for rebid or extension";
+  return "Last active 12+ months ago — may be approaching contract expiry";
+}
+
 // ── Retrofit / Roofing / Solar money page renderer ──────────────────────────
 function retrofitMarketPage(
   cached: { data: ProcurementData; cached_at: string } | null,
@@ -17486,20 +17684,47 @@ function retrofitMarketPage(
   const allAwarded = (data?.contractsFinder.awarded || []).filter(matchAll)
     .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
 
-  const buyerMap = new Map<string, { awardedValue: number; count: number; latestDate: string }>();
+  const cutoff30 = Date.now() - 30 * 24 * 3_600_000;
+  const buyerMap = new Map<string, { awardedValue: number; count: number; openCount: number; latestDate: string; signals: Set<string> }>();
   for (const n of (allAwarded as ProcurementNotice[]).concat(allOpen)) {
     if (!n.buyer || n.buyer === "Not stated") continue;
-    const e = buyerMap.get(n.buyer) || { awardedValue: 0, count: 0, latestDate: "" };
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, count: 0, openCount: 0, latestDate: "", signals: new Set<string>() };
     e.count++;
     e.awardedValue += n.awardedValue ?? 0;
     const d = n.awardedDate || n.publishedDate || "";
     if (d > e.latestDate) e.latestDate = d;
+    const isOpen = allOpen.includes(n);
+    if (isOpen) e.openCount++;
+    for (const s of detectSignals(n.title)) e.signals.add(s);
     buyerMap.set(n.buyer, e);
   }
-  const topBuyers = [...buyerMap.entries()]
+
+  const buyerProfiles: BuyerIntentProfile[] = [...buyerMap.entries()]
     .filter(([buyer]) => !isAggregatorBuyer(buyer))
-    .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
-    .slice(0, 12);
+    .map(([buyer, info]) => {
+      const orgType = buyerOrgType(buyer);
+      const signals = [...info.signals];
+      const hasRecentOpen = info.openCount > 0 && new Date(info.latestDate).getTime() > cutoff30;
+      const intentScore = computeIntentScore(buyer, { awardedValue: info.awardedValue, noticeCount: info.count, openCount: info.openCount, hasRecentOpen, signals, orgType });
+      const whyNow = generateWhyNow(orgType, signals, hasRecentOpen, info.awardedValue);
+      const outreach = generateOutreach(orgType, signals);
+      return {
+        buyer, orgType, awardedValue: info.awardedValue, noticeCount: info.count, openCount: info.openCount,
+        latestDate: info.latestDate, hasRecentOpen, signals, intentScore, whyNow,
+        likelyNeed: generateLikelyNeed(signals),
+        route: generateRoute(orgType, hasRecentOpen),
+        outreachAngle: outreach.angle,
+        outreachEmail: outreach.email,
+        outreachCall: outreach.call,
+        outreachLinkedIn: outreach.linkedIn,
+        doNotSay: outreach.doNotSay,
+        contractorFit: generateContractorFit(info.awardedValue, info.count),
+        timing: generateTiming(hasRecentOpen, info.latestDate),
+      };
+    })
+    .sort((a, b) => b.intentScore - a.intentScore);
+
+  const topBuyers = buyerProfiles.slice(0, 15);
 
   const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
   const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
@@ -17508,19 +17733,13 @@ function retrofitMarketPage(
     return t > cutoff365;
   });
 
+  const avgScore = topBuyers.length > 0 ? Math.round(topBuyers.reduce((s, b) => s + b.intentScore, 0) / topBuyers.length) : 0;
+  const highIntentCount = buyerProfiles.filter(b => b.intentScore >= 60).length;
+
   const openRowsHtml = recentOpen.slice(0, 20).map(n => {
     const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
     const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
-    const tags: string[] = [];
-    const tl = n.title.toLowerCase();
-    if (tl.includes("shdf") || tl.includes("social housing decarbonisation")) tags.push("SHDF");
-    if (tl.includes("eco4") || tl.includes("eco ")) tags.push("ECO4");
-    if (tl.includes("retrofit")) tags.push("Retrofit");
-    if (tl.includes("solar") || tl.includes("pv") || tl.includes("photovoltaic")) tags.push("Solar");
-    if (tl.includes("heat pump") || tl.includes("air source") || tl.includes("ground source")) tags.push("Heat Pump");
-    if (tl.includes("insulation") || tl.includes("ewi") || tl.includes("cavity") || tl.includes("loft")) tags.push("Insulation");
-    if (tl.includes("roofing") || tl.includes("roof repair") || tl.includes("roof replacement")) tags.push("Roofing");
-    if (tl.includes("window") || tl.includes("glazing") || tl.includes("door replacement")) tags.push("Windows");
+    const tags = detectSignals(n.title);
     const tagHtml = tags.length > 0 ? `<div class="rm-tags">${tags.map(t => `<span class="rm-tag">${escapeHtml(t)}</span>`).join("")}</div>` : "";
     return `<div class="rm-opp">
       <div class="rm-opp-title"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 100))}</a></div>
@@ -17533,17 +17752,41 @@ function retrofitMarketPage(
     </div>`;
   }).join("");
 
-  const buyerCardsHtml = topBuyers.map(([buyer, info]) => {
-    const orgType = buyerOrgType(buyer);
-    const tagClass = orgType === "HEALTH" ? "bw-tag-health" : orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : orgType === "CENTRAL GOV" ? "bw-tag-gov" : orgType === "HOUSING" ? "bw-tag-housing" : orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
-    const spend = info.awardedValue > 0 ? fmtMoney(info.awardedValue) : "—";
+  const opportunityCardsHtml = topBuyers.slice(0, 6).map((bp, i) => {
+    const tagClass = bp.orgType === "HEALTH" ? "bw-tag-health" : bp.orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : bp.orgType === "CENTRAL GOV" ? "bw-tag-gov" : bp.orgType === "HOUSING" ? "bw-tag-housing" : bp.orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
+    const scoreColor = bp.intentScore >= 70 ? "var(--green)" : bp.intentScore >= 40 ? "var(--brand)" : "var(--muted)";
+    const isGated = i >= 3;
+    return `<div class="rm-opp-card${isGated ? " rm-opp-gated" : ""}">
+      <div class="rm-oc-head">
+        <div class="rm-oc-eyebrow">Buyer Opportunity ${i + 1} of ${buyerProfiles.length}</div>
+        <div class="rm-oc-score" style="color:${scoreColor}">${bp.intentScore}<span class="rm-oc-score-max">/100</span></div>
+      </div>
+      <div class="rm-oc-org">${escapeHtml(bp.buyer.slice(0, 65))}</div>
+      ${bp.orgType ? `<span class="bw-tag ${tagClass}" style="margin-bottom:10px">${escapeHtml(bp.orgType)}</span>` : ""}
+      <div class="rm-oc-body">
+        <div class="rm-oc-row"><span class="rm-oc-k">Likely need</span><span class="rm-oc-v">${escapeHtml(bp.likelyNeed)}</span></div>
+        <div class="rm-oc-row"><span class="rm-oc-k">Why now</span><span class="rm-oc-v">${escapeHtml(bp.whyNow.slice(0, 180))}</span></div>
+        <div class="rm-oc-row"><span class="rm-oc-k">Route</span><span class="rm-oc-v">${escapeHtml(bp.route)}</span></div>
+        <div class="rm-oc-row"><span class="rm-oc-k">Timing</span><span class="rm-oc-v">${escapeHtml(bp.timing)}</span></div>
+        <div class="rm-oc-row"><span class="rm-oc-k">Outreach angle</span><span class="rm-oc-v">${isGated ? '<span style="filter:blur(4px);user-select:none">' + escapeHtml(bp.outreachAngle.slice(0, 60)) + '</span>' : escapeHtml(bp.outreachAngle)}</span></div>
+        <div class="rm-oc-row"><span class="rm-oc-k">Contractor fit</span><span class="rm-oc-v">${escapeHtml(bp.contractorFit)}</span></div>
+      </div>
+      ${bp.signals.length > 0 ? `<div class="rm-tags" style="padding:0 18px 14px">${bp.signals.map(s => `<span class="rm-tag">${escapeHtml(s)}</span>`).join("")}</div>` : ""}
+      ${isGated ? `<div class="rm-oc-gate"><span>Full card + outreach pack in the Buyer Pack</span></div>` : ""}
+    </div>`;
+  }).join("");
+
+  const buyerWatchlistHtml = topBuyers.map(bp => {
+    const tagClass = bp.orgType === "HEALTH" ? "bw-tag-health" : bp.orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : bp.orgType === "CENTRAL GOV" ? "bw-tag-gov" : bp.orgType === "HOUSING" ? "bw-tag-housing" : bp.orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
+    const spend = bp.awardedValue > 0 ? fmtMoney(bp.awardedValue) : "—";
+    const scoreColor = bp.intentScore >= 70 ? "var(--green)" : bp.intentScore >= 40 ? "var(--brand)" : "var(--muted)";
     return `<div class="rm-buyer-card">
-      <div class="rm-buyer-avatar">${escapeHtml(buyerInitials(buyer))}</div>
+      <div class="rm-buyer-avatar" style="font-size:14px;font-weight:600;color:${scoreColor}">${bp.intentScore}</div>
       <div class="rm-buyer-info">
-        <div class="rm-buyer-name">${escapeHtml(buyer.slice(0, 60))}</div>
-        ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
+        <div class="rm-buyer-name">${escapeHtml(bp.buyer.slice(0, 60))}</div>
+        ${bp.orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(bp.orgType)}</span>` : ""}
         <div class="rm-buyer-spend">${escapeHtml(spend)} <span class="rm-buyer-label">awarded</span></div>
-        <div class="rm-buyer-label">${info.count} ${info.count === 1 ? "notice" : "notices"} &middot; last active ${escapeHtml(timeAgo(info.latestDate))}</div>
+        <div class="rm-buyer-label">${bp.noticeCount} ${bp.noticeCount === 1 ? "notice" : "notices"} &middot; ${escapeHtml(bp.timing.toLowerCase())}</div>
       </div>
     </div>`;
   }).join("");
@@ -17698,6 +17941,41 @@ ${pageShellCss()}
 .rm-cta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#10110D;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:16px 32px;transition:background .15s;text-decoration:none}
 .rm-cta-btn:hover{background:var(--brand-hot)}
 .rm-cta-note{font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.35);margin-top:16px}
+/* opportunity cards */
+.rm-opp-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.rm-opp-card{background:var(--surface);border:1px solid var(--border-2);position:relative;overflow:hidden;transition:border-color .15s}
+.rm-opp-card:hover{border-color:var(--brand)}
+.rm-opp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
+.rm-opp-gated{opacity:.85}
+.rm-oc-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px 8px}
+.rm-oc-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.rm-oc-score{font-family:var(--mono);font-size:22px;font-weight:700}
+.rm-oc-score-max{font-size:11px;font-weight:400;color:var(--muted)}
+.rm-oc-org{font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text);padding:0 18px 8px;line-height:1.3}
+.rm-oc-body{padding:0 18px 14px}
+.rm-oc-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.rm-oc-row:last-child{border-bottom:none}
+.rm-oc-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:2px;flex-shrink:0;min-width:90px}
+.rm-oc-v{color:var(--text-mid);text-align:right;line-height:1.45;max-width:65%}
+.rm-oc-gate{background:var(--surface-2);border-top:1px solid var(--border);padding:10px 18px;font-family:var(--mono);font-size:10px;color:var(--brand);text-align:center;letter-spacing:.04em}
+/* outreach preview */
+.rm-outreach{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-outreach-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-outreach h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:6px;color:var(--text)}
+.rm-outreach-sub{font-size:13px;color:var(--muted);margin-bottom:20px;max-width:560px;line-height:1.5}
+.rm-outreach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.rm-outreach-card{background:var(--surface);border:1px solid var(--border-2);padding:18px 20px}
+.rm-outreach-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.rm-outreach-body{font-size:13px;color:var(--text-mid);line-height:1.6;white-space:pre-line}
+.rm-outreach-blur{filter:blur(4px);user-select:none;pointer-events:none}
+.rm-dontlist{list-style:none;margin-top:12px}
+.rm-dontlist li{font-size:12px;color:var(--muted);padding:4px 0;display:flex;gap:8px;align-items:flex-start}
+.rm-dontlist li::before{content:'\\2717';color:var(--red);font-size:11px;flex-shrink:0;margin-top:1px}
+/* intent band */
+.rm-intent-band{display:flex;gap:1px;background:var(--border-2);border:1px solid var(--border-2);width:fit-content;flex-wrap:wrap;margin-bottom:28px}
+.rm-intent-stat{padding:14px 22px;background:var(--surface)}
+.rm-intent-val{display:block;font-family:var(--mono);font-size:24px;font-weight:600;line-height:1.1}
+.rm-intent-lbl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px}
 /* trust */
 .rm-trust{padding:32px 0;border-top:1px solid var(--border)}
 .rm-trust-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -17716,13 +17994,19 @@ ${pageShellCss()}
   .rm-for-grid{grid-template-columns:1fr}
   .rm-opp-meta{flex-direction:column;gap:4px;align-items:flex-start}
   .rm-cta-inner{padding:0 16px}
+  .rm-opp-cards{grid-template-columns:1fr}
+  .rm-outreach-grid{grid-template-columns:1fr}
+  .rm-intent-band{width:100%;flex-wrap:wrap}
+  .rm-intent-stat{flex:1 1 45%}
 }
 @media(max-width:480px){
   .rm-hero{padding:32px 0 24px}
   .rm-hero-inner,.rm-body{padding-left:12px;padding-right:12px}
   .rm-hero h1{font-size:22px}
   .rm-hero-stat{flex:1 1 100%}
+  .rm-intent-stat{flex:1 1 100%}
   .rm-cta h2{font-size:22px}
+  .rm-oc-v{max-width:55%}
 }
 </style>
 </head>
@@ -17803,14 +18087,66 @@ ${pageShellHeader(null, authCtx)}
   </section>
 
   <section class="rm-buyers">
-    <div class="rm-buyers-head">Buyer watchlist</div>
-    <h3>Who is spending on retrofit and roofing</h3>
-    <p class="rm-buyers-sub">Ranked by awarded contract value. These organisations have active procurement history in retrofit, insulation, roofing and building fabric.</p>
+    <div class="rm-buyers-head">Buyer opportunity cards</div>
+    <h3>Real buyers, scored by intent</h3>
+    <p class="rm-buyers-sub">Each card is generated from live procurement data. Intent Score (0&ndash;100) weights: live opportunity +25, awarded spend +20, notice volume +15, funding programme +15, buyer type +10. First 3 cards are open &mdash; full pack includes all ${isCompiling ? "&mdash;" : String(buyerProfiles.length)} buyers with outreach packs.</p>
+    ${!isCompiling && topBuyers.length > 0 ? `
+    <div class="rm-intent-band">
+      <div class="rm-intent-stat"><span class="rm-intent-val" style="color:var(--green)">${highIntentCount}</span><span class="rm-intent-lbl">High-intent buyers (60+)</span></div>
+      <div class="rm-intent-stat"><span class="rm-intent-val">${avgScore}</span><span class="rm-intent-lbl">Avg intent score</span></div>
+      <div class="rm-intent-stat"><span class="rm-intent-val">${buyerProfiles.length}</span><span class="rm-intent-lbl">Total buyers tracked</span></div>
+    </div>` : ""}
     ${isCompiling
       ? `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">Compiling&hellip;</p>`
       : topBuyers.length > 0
-        ? `<div class="rm-buyer-grid">${buyerCardsHtml}</div>`
+        ? `<div class="rm-opp-cards">${opportunityCardsHtml}</div>
+           ${buyerProfiles.length > 6 ? `<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px;text-align:center">${buyerProfiles.length - 6} more buyer cards in the full Buyer Pack</p>` : ""}`
         : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">No buyers found yet. Data populates on first desk refresh.</p>`
+    }
+  </section>
+
+  <section class="rm-outreach">
+    <div class="rm-outreach-head">Outreach pack preview</div>
+    <h3>What you get for each buyer</h3>
+    <p class="rm-outreach-sub">Every Buyer Pack card comes with a tailored outreach pack &mdash; angle, email draft, call script, LinkedIn message, and &ldquo;do not say&rdquo; warnings. Here&rsquo;s a preview.</p>
+    <div class="rm-outreach-grid">
+      <div class="rm-outreach-card">
+        <div class="rm-outreach-label">Email template</div>
+        <div class="rm-outreach-body" style="font-size:12px">${escapeHtml(topBuyers.length > 0 ? topBuyers[0].outreachEmail.slice(0, 250) : "Subject: Retrofit delivery capacity — happy to share references\n\nWe deliver [EWI / insulation / roofing] at scale...")}${topBuyers.length > 0 && topBuyers[0].outreachEmail.length > 250 ? "…" : ""}</div>
+      </div>
+      <div class="rm-outreach-card">
+        <div class="rm-outreach-label">Call script</div>
+        <div class="rm-outreach-body rm-outreach-blur" style="font-size:12px">${escapeHtml(topBuyers.length > 0 ? topBuyers[0].outreachCall.slice(0, 200) : "Opening: \"I'm calling about your retrofit programme...\"")}</div>
+        <div style="text-align:center;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--brand)">Full script in Buyer Pack</div>
+      </div>
+      <div class="rm-outreach-card">
+        <div class="rm-outreach-label">LinkedIn message</div>
+        <div class="rm-outreach-body rm-outreach-blur" style="font-size:12px">${escapeHtml(topBuyers.length > 0 ? topBuyers[0].outreachLinkedIn.slice(0, 150) : "Hi — noticed the organisation has been active...")}</div>
+        <div style="text-align:center;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--brand)">Full message in Buyer Pack</div>
+      </div>
+      <div class="rm-outreach-card">
+        <div class="rm-outreach-label">Do not say</div>
+        <ul class="rm-dontlist">
+          ${(topBuyers.length > 0 ? topBuyers[0].doNotSay : [
+            "Don't mention specific contract values",
+            "Don't claim you can beat incumbents on price",
+            "Don't reference 'our AI found you'",
+            "Don't cold-pitch framework membership"
+          ]).map(d => `<li>${escapeHtml(d)}</li>`).join("")}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="rm-buyers" style="border-bottom:1px solid var(--border)">
+    <div class="rm-buyers-head">Buyer watchlist</div>
+    <h3>All tracked buyers, ranked by intent score</h3>
+    <p class="rm-buyers-sub">Intent score replaces the avatar — higher score means more evidence of imminent need. Buyer Watchlist subscribers get weekly updates when scores change.</p>
+    ${isCompiling
+      ? `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">Compiling&hellip;</p>`
+      : topBuyers.length > 0
+        ? `<div class="rm-buyer-grid">${buyerWatchlistHtml}</div>`
+        : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">No buyers found yet.</p>`
     }
   </section>
 
@@ -17831,33 +18167,6 @@ ${pageShellHeader(null, authCtx)}
     </div>
   </section>
 
-  <section class="rm-sample">
-    <div class="rm-sample-head">What a buyer pack includes</div>
-    <h3>Sample buyer opportunity card</h3>
-    <p class="rm-sample-sub">Each Buyer Pack contains 15&ndash;25 cards like this &mdash; named buyers, evidence sources, intent scoring, outreach angles, and a 30-day action plan.</p>
-    <div class="rm-sample-card">
-      <div class="rm-sc-head">
-        <div class="rm-sc-eyebrow">Buyer Opportunity Card</div>
-        <div class="rm-sc-org">Midlands Metropolitan Housing Trust</div>
-      </div>
-      <div class="rm-sc-body">
-        <div class="rm-sc-row"><span class="rm-sc-k">Sector</span><span class="rm-sc-v">Social Housing</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Signal</span><span class="rm-sc-v">SHDF Wave 3 recipient &bull; EPC upgrade programme</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Likely need</span><span class="rm-sc-v">EWI, cavity fill, loft insulation across 3,200 units</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Evidence</span><span class="rm-sc-v">Board paper (Mar 2026) + SHDF grant allocation</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Intent score</span><span class="rm-sc-v" style="color:var(--green);font-family:var(--mono);font-weight:700">78 / 100</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Timing</span><span class="rm-sc-v">Procurement expected Q3 2026</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Route</span><span class="rm-sc-v">Direct approach &rarr; procurement lead</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Outreach angle</span><span class="rm-sc-v">&ldquo;We deliver PAS 2035 whole-house retrofit at scale &mdash; happy to share references from similar HA programmes.&rdquo;</span></div>
-        <div class="rm-sc-row"><span class="rm-sc-k">Contractor fit</span><span class="rm-sc-v"><span class="rm-sc-badge">Good fit &bull; 2&ndash;15 operatives</span></span></div>
-      </div>
-      <div class="rm-sc-foot">
-        <span>Source: DLUHC &middot; Companies House &middot; Contracts Finder</span>
-        <span style="color:var(--brand)">1 of 25</span>
-      </div>
-    </div>
-  </section>
-
   <section class="rm-trust" style="margin-bottom:0">
     <div class="rm-trust-inner rm-body">
       <span>Public record only. Intelligence, not certainty. Always verify on the source.</span>
@@ -17874,11 +18183,16 @@ ${pageShellHeader(null, authCtx)}
 
 <section class="rm-cta">
   <div class="rm-cta-inner">
-    <div class="rm-cta-eyebrow">Buyer Pack</div>
-    <h2>Get 15 retrofit buyer opportunities this week</h2>
-    <p class="rm-cta-lede">Named buyers, evidence-backed demand signals, intent scores, outreach angles, and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
-    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&rarr;</a>
-    <p class="rm-cta-note">No commitment &bull; public data only &bull; delivered within 48 hours</p>
+    <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;299</div>
+    <h2>Get ${isCompiling ? "15+" : String(Math.min(buyerProfiles.length, 25))} retrofit buyer opportunities this week</h2>
+    <p class="rm-cta-lede">Named buyers, intent scores, Why Now? analysis, tailored outreach packs (email + call + LinkedIn + &ldquo;do not say&rdquo;), and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
+    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;299 &rarr;</a>
+    <p class="rm-cta-note">One-off &bull; public data only &bull; delivered within 48 hours</p>
+    <p style="font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.3);margin-top:24px;line-height:1.6">
+      Want ongoing monitoring? <strong style="color:rgba(236,230,214,.5)">Buyer Watchlist &pound;149&ndash;&pound;399/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.<br>
+      Agencies &amp; bid writers? <strong style="color:rgba(236,230,214,.5)">Growth Intelligence &pound;750&ndash;&pound;2,000/mo</strong> &mdash; multi-niche packs, client portfolios, territory exclusivity.<br>
+      Enterprise? <strong style="color:rgba(236,230,214,.5)">Exclusive Opportunity Feed &pound;1,500+/mo</strong> &mdash; category or territory exclusivity, white-label reports.
+    </p>
   </div>
 </section>
 
