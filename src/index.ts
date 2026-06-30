@@ -13411,17 +13411,17 @@ app.get("/pricing", (req, res) => {
 <meta name="description" content="AtlasRevenue pricing. Buyer Packs from £299 one-off, Buyer Watchlist from £149/month, Growth Intelligence from £750/month. Named buyers with intent scores, outreach packs, and action plans.">
 <link rel="canonical" href="${BASE_URL}/pricing">
 <meta name="robots" content="index, follow">
-<meta property="og:title" content="AtlasRevenue Pricing — From £29 per scan">
-<meta property="og:description" content="Pay per scan or subscribe for continuous UK demand and contract intelligence built on real data.">
+<meta property="og:title" content="AtlasRevenue Pricing — Buyer Packs from £299">
+<meta property="og:description" content="Named buyers with intent scores, outreach packs, and action plans. One-off or subscribe.">
 <meta property="og:url" content="${BASE_URL}/pricing">
 <style>
 ${pageShellCss()}
-.pr-wrap{max-width:1120px;margin:0 auto;padding:0 32px}
+.pr-wrap{max-width:1060px;margin:0 auto;padding:0 32px}
 .pr-hero{padding:64px 0 48px;text-align:center}
 .pr-eye{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
 .pr-h1{font-family:var(--serif);font-size:clamp(32px,4vw,44px);font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px;color:var(--text)}
 .pr-sub{font-size:17px;color:var(--muted);max-width:36em;margin:0 auto}
-.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:0 0 80px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 0 80px}
 .plan{border:1px solid var(--border-2);padding:36px 32px;background:var(--surface);position:relative;transition:border-color .2s,box-shadow .2s;display:flex;flex-direction:column}
 .plan:hover{border-color:var(--border-3);box-shadow:0 6px 32px rgba(0,0,0,.08)}
 .plan.featured{border-color:rgba(180,146,78,.4);box-shadow:0 0 0 1px rgba(180,146,78,.2)}
@@ -13445,14 +13445,30 @@ ${pageShellCss()}
 .btn-outline:hover{background:var(--surface-2);border-color:var(--brand);color:var(--text)}
 .plan-talk{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:auto;padding-top:10px;margin-bottom:10px;letter-spacing:.04em}
 .plan-talk:hover{color:var(--muted)}
+/* comparison table */
+.cmp{padding:0 0 80px}
+.cmp h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:8px;color:var(--text)}
+.cmp-sub{font-size:14px;color:var(--muted);margin-bottom:28px}
+.cmp-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.cmp-table thead th{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:center;padding:14px 12px;border-bottom:2px solid var(--border-2);background:var(--surface-2)}
+.cmp-table thead th:first-child{text-align:left;padding-left:0}
+.cmp-table thead th.cmp-hl{color:var(--brand);background:rgba(180,146,78,.06);border-bottom-color:var(--brand)}
+.cmp-table tbody td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:center;color:var(--text-mid);vertical-align:middle}
+.cmp-table tbody td:first-child{text-align:left;padding-left:0;font-weight:500;color:var(--text)}
+.cmp-table tbody td.cmp-hl{background:rgba(180,146,78,.03)}
+.cmp-table tbody tr:last-child td{border-bottom:none}
+.cmp-yes{color:var(--brand);font-weight:700;font-size:15px}
+.cmp-no{color:var(--faint);font-size:13px}
+.cmp-val{font-family:var(--mono);font-size:12px;color:var(--text)}
+.cmp-cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);padding:18px 0 8px!important;border-bottom:1px solid var(--border-2)!important}
+.cmp-cat-row td{border-bottom:1px solid var(--border-2)!important}
 .faq{padding:0 0 80px}
 .faq h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:32px;color:var(--text)}
 .faq-item{border-top:1px solid var(--border);padding:20px 0}
 .faq-item:last-child{border-bottom:1px solid var(--border)}
 .faq-q{font-weight:600;font-size:15px;margin-bottom:8px;color:var(--text)}
 .faq-a{font-size:14px;color:var(--muted);line-height:1.7}
-@media(max-width:960px){.plans{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.plans{grid-template-columns:1fr}.pr-hero{padding:48px 0 40px}.pr-h1{font-size:28px}}
+@media(max-width:760px){.plans{grid-template-columns:1fr}.pr-hero{padding:48px 0 40px}.pr-h1{font-size:28px}.cmp-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}}
 @media(max-width:480px){.pr-wrap{padding:0 14px}.pr-h1{font-size:22px}.pr-hero{padding:28px 0 24px}.plan{padding:20px}.plan-price{font-size:32px}.plan li{font-size:13px}.faq h2{font-size:20px}.faq-q{font-size:14px}}
 </style>
 </head>
@@ -13479,7 +13495,6 @@ ${pageShellHeader(null, getAuthUser(req))}
         <li><span class="tick">&#10003;</span> Outreach pack (email + call + LinkedIn)</li>
         <li><span class="tick">&#10003;</span> Routes to revenue map</li>
         <li><span class="tick">&#10003;</span> 30-day activation plan</li>
-        <li><span class="tick">&#10003;</span> &ldquo;Do not say&rdquo; warnings</li>
         <li><span class="tick">&#10003;</span> PDF export</li>
       </ul>
       <a href="/scan" class="btn btn-primary">Get buyer pack &rarr;</a>
@@ -13488,7 +13503,7 @@ ${pageShellHeader(null, getAuthUser(req))}
       <div class="plan-name">Buyer Watchlist</div>
       <div class="plan-price"><sup>£</sup>149</div>
       <div class="plan-period">per month &middot; cancel anytime</div>
-      <div class="plan-desc">Continuous monitoring of your niche. Weekly score updates, new buyer alerts, and refreshed outreach angles when signals change.</div>
+      <div class="plan-desc">Continuous monitoring of your niche. Weekly score updates, new buyer alerts, and refreshed outreach angles as signals change.</div>
       <ul>
         <li><span class="tick">&#10003;</span> Everything in Buyer Pack</li>
         <li><span class="tick">&#10003;</span> Weekly intent score updates</li>
@@ -13496,8 +13511,6 @@ ${pageShellHeader(null, getAuthUser(req))}
         <li><span class="tick">&#10003;</span> Refreshed outreach angles</li>
         <li><span class="tick">&#10003;</span> Contract expiry tracking</li>
         <li><span class="tick">&#10003;</span> All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</li>
-        <li><span class="dash">&ndash;</span> Multi-niche coverage</li>
-        <li><span class="dash">&ndash;</span> Team access</li>
       </ul>
       <a href="/checkout?plan=watchlist" class="btn btn-outline">Subscribe &rarr;</a>
     </div>
@@ -13505,36 +13518,64 @@ ${pageShellHeader(null, getAuthUser(req))}
       <div class="plan-name">Growth Intelligence</div>
       <div class="plan-price"><sup>£</sup>750</div>
       <div class="plan-period">per month</div>
-      <div class="plan-desc">For agencies, bid writers, and consultancies managing multiple niches or client portfolios. Multi-niche packs and team collaboration.</div>
+      <div class="plan-desc">For agencies, bid writers, and consultancies managing client portfolios. Multi-niche coverage, team access, and white-label reports.</div>
       <ul>
         <li><span class="tick">&#10003;</span> Everything in Watchlist</li>
         <li><span class="tick">&#10003;</span> Up to 5 niche verticals</li>
         <li><span class="tick">&#10003;</span> Client portfolio management</li>
         <li><span class="tick">&#10003;</span> Team access (5 seats)</li>
-        <li><span class="tick">&#10003;</span> Client-ready PDF reports</li>
+        <li><span class="tick">&#10003;</span> White-label PDF reports</li>
         <li><span class="tick">&#10003;</span> Priority support</li>
         <li><span class="tick">&#10003;</span> Quarterly strategy call</li>
       </ul>
+      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Managing 5+ client accounts? Talk to us &rarr;</a>
       <a href="/checkout?plan=growth" class="btn btn-outline">Get started &rarr;</a>
     </div>
-    <div class="plan">
-      <div class="plan-name">Exclusive Feed</div>
-      <div class="plan-price"><sup>£</sup>1,500+</div>
-      <div class="plan-period">per month</div>
-      <div class="plan-desc">Category or territory exclusivity. You see the buyers before anyone else on AtlasRevenue. White-label reports for your brand.</div>
-      <ul>
-        <li><span class="tick">&#10003;</span> Everything in Growth</li>
-        <li><span class="tick">&#10003;</span> Territory or category exclusivity</li>
-        <li><span class="tick">&#10003;</span> White-label buyer packs</li>
-        <li><span class="tick">&#10003;</span> Unlimited niches</li>
-        <li><span class="tick">&#10003;</span> API access</li>
-        <li><span class="tick">&#10003;</span> Dedicated account manager</li>
-        <li><span class="tick">&#10003;</span> Custom scoring weights</li>
-      </ul>
-      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Custom pricing &mdash; talk to us &rarr;</a>
-      <a href="/checkout?plan=exclusive" class="btn btn-outline">Get started &rarr;</a>
-    </div>
   </div>
+
+  <div class="cmp">
+    <h2>Compare plans</h2>
+    <p class="cmp-sub">Every plan includes public-record data from Contracts Finder, Find a Tender, and Companies House.</p>
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th style="min-width:220px">Feature</th>
+          <th class="cmp-hl" style="min-width:120px">Buyer Pack<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;299</span></th>
+          <th style="min-width:120px">Watchlist<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;149/mo</span></th>
+          <th style="min-width:120px">Growth<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;750/mo</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="cmp-cat-row"><td class="cmp-cat" colspan="4">Buyer Intelligence</td></tr>
+        <tr><td>Buyer opportunity cards</td><td class="cmp-hl"><span class="cmp-val">15&ndash;25</span></td><td><span class="cmp-val">Unlimited</span></td><td><span class="cmp-val">Unlimited</span></td></tr>
+        <tr><td>Intent Score (0&ndash;100)</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Why Now? analysis</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Routes to revenue map</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>30-day activation plan</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>PDF export</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr class="cmp-cat-row"><td class="cmp-cat" colspan="4">Outreach</td></tr>
+        <tr><td>Outreach angle per buyer</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Email draft</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Call script</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>LinkedIn message</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>&ldquo;Do not say&rdquo; warnings</td><td class="cmp-hl"><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr class="cmp-cat-row"><td class="cmp-cat" colspan="4">Monitoring &amp; Alerts</td></tr>
+        <tr><td>Weekly intent score updates</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>New buyer alerts (email)</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Refreshed outreach angles</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Contract expiry tracking</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr class="cmp-cat-row"><td class="cmp-cat" colspan="4">Scale &amp; Team</td></tr>
+        <tr><td>Niche verticals</td><td class="cmp-hl"><span class="cmp-val">1</span></td><td><span class="cmp-val">1</span></td><td><span class="cmp-val">Up to 5</span></td></tr>
+        <tr><td>Team seats</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-no">&ndash;</span></td><td><span class="cmp-val">5</span></td></tr>
+        <tr><td>Client portfolio management</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>White-label PDF reports</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Priority support</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+        <tr><td>Quarterly strategy call</td><td class="cmp-hl"><span class="cmp-no">&ndash;</span></td><td><span class="cmp-no">&ndash;</span></td><td><span class="cmp-yes">&#10003;</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <div class="faq">
     <h2>Common questions</h2>
     <div class="faq-item">
@@ -13597,33 +13638,12 @@ const PLAN_CONFIG: Record<string, { name: string; price: string; period: string;
     mode: "subscription",
     items: ["Everything in Buyer Pack", "Weekly intent score updates", "New buyer alerts (email)", "Refreshed outreach angles", "Contract expiry tracking", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`],
   },
-  pro: {
-    name: "Buyer Watchlist (Pro)",
-    price: "£399",
-    period: "per month — cancel anytime",
-    mode: "subscription",
-    items: ["Everything in Watchlist", "Up to 3 niche verticals", "Priority support", "Full reports & PDF exports", "Buyer watchlist monitoring"],
-  },
   growth: {
     name: "Growth Intelligence",
     price: "£750",
     period: "per month",
     mode: "subscription",
-    items: ["Everything in Watchlist", "Up to 5 niche verticals", "Client portfolio management", "Team access (5 seats)", "Client-ready PDF reports", "Priority support", "Quarterly strategy call"],
-  },
-  exclusive: {
-    name: "Exclusive Opportunity Feed",
-    price: "£1,500+",
-    period: "per month",
-    mode: "subscription",
-    items: ["Everything in Growth", "Territory or category exclusivity", "White-label buyer packs", "Unlimited niches", "API access", "Dedicated account manager", "Custom scoring weights"],
-  },
-  agency: {
-    name: "Agency (Legacy)",
-    price: "£499",
-    period: "per month",
-    mode: "subscription",
-    items: ["Everything in Pro", "Up to 10 firm profiles", "Team access (5 seats)", "Client-ready PDF reports", "Priority support", "Dedicated desk monitoring", "Quarterly portfolio review call"],
+    items: ["Everything in Watchlist", "Up to 5 niche verticals", "Client portfolio management", "Team access (5 seats)", "White-label PDF reports", "Priority support", "Quarterly strategy call"],
   },
 };
 
