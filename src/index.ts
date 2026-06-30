@@ -10829,6 +10829,12 @@ const KEYWORD_SIC_FILTER: { terms: string[]; sics: string[]; label: string }[] =
     sics: ["43910"], label: "roofers" },
   { terms: ["scaffold", "scaffolding"],
     sics: ["43991"], label: "scaffolding companies" },
+  { terms: ["facilities management", "facilities manager", "fm contractor", "fm services", "soft services", "hard services"],
+    sics: ["81100", "81210", "81221", "81222", "81229", "81299"], label: "facilities management companies" },
+  { terms: ["building maintenance", "property maintenance", "planned maintenance", "reactive maintenance", "estates maintenance"],
+    sics: ["43999", "81100", "81221"], label: "building & property maintenance companies" },
+  { terms: ["hvac", "air conditioning", "ventilation contractor", "mechanical and electrical", "m&e contractor", "m and e contractor"],
+    sics: ["43221", "43222", "43210", "43290"], label: "HVAC & M&E contractors" },
 ];
 
 function matchSicFilter(q: string): { sics: string[]; label: string } | null {
