@@ -20,7 +20,7 @@ export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 export const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || "";
 export const STRIPE_AGENCY_PRICE_ID = process.env.STRIPE_AGENCY_PRICE_ID || "";
 export const STRIPE_PAYG_PRICE_ID = process.env.STRIPE_PAYG_PRICE_ID || "";
-export const BASE_URL = process.env.BASE_URL || "https://atlasrevenue-agent-production.up.railway.app";
+export const BASE_URL = process.env.BASE_URL || "https://atlasrevenue.io";
 export const REDIS_URL = process.env.REDIS_URL || null;
 export const RUN_WEB = process.env.RUN_WEB !== "false";
 export const RUN_WORKER = process.env.RUN_WORKER !== "false";

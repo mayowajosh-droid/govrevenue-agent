@@ -2,7 +2,7 @@
 
 UK public-sector procurement intelligence tool. Companies submit a profile → agent scans Contracts Finder + Find a Tender → LLM generates a structured commercial report → PDF export.
 
-**Live URL:** https://atlasrevenue-agent-production.up.railway.app
+**Live URL:** https://atlasrevenue.io (Railway origin: https://atlasrevenue-agent-production.up.railway.app)
 **GitHub:** mayowajosh-droid/atlasrevenue-agent (main branch → Railway auto-deploy)
 
 ---

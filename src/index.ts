@@ -259,7 +259,7 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const STRIPE_PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || "";
 const STRIPE_AGENCY_PRICE_ID = process.env.STRIPE_AGENCY_PRICE_ID || "";
 const STRIPE_PAYG_PRICE_ID = process.env.STRIPE_PAYG_PRICE_ID || "";
-const BASE_URL = process.env.BASE_URL || "https://atlasrevenue-agent-production.up.railway.app";
+const BASE_URL = process.env.BASE_URL || "https://atlasrevenue.io";
 const REDIS_URL = process.env.REDIS_URL || null;
 const RUN_WEB = process.env.RUN_WEB !== "false";
 const RUN_WORKER = process.env.RUN_WORKER !== "false";
@@ -6218,7 +6218,7 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
   </form>
 </div>`;
 
-  const canonical = `https://atlasrevenue-agent-production.up.railway.app/articles/${escapeHtml(article.slug)}`;
+  const canonical = `${BASE_URL}/articles/${escapeHtml(article.slug)}`;
   const ogImg = article.og_image || article.hero_image_url || "";
   const seoTitle = article.seo_title || `${article.title} — AtlasRevenue`;
   const seoDesc = article.seo_description || article.dek || "";
@@ -8295,7 +8295,7 @@ app.get("/", asyncRoute(async (req, res) => {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="AtlasRevenue maps demand signals, named buyers, and live contract opportunities across UK public and private markets. Public-sector intelligence powered by official procurement records (Contracts Finder, Find a Tender); wider market demand built from company, geography, property, economic and sector signals.">
 <meta name="keywords" content="UK market demand intelligence, B2B sales intelligence UK, who is buying, public sector contracts, Contracts Finder, Find a Tender, market signals, demand data UK, sales leads by sector">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/">
+<link rel="canonical" href="${BASE_URL}/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#0A1C12">
 <title>AtlasRevenue — Know Who's Buying What You Sell | UK Demand &amp; Contract Intelligence</title>
@@ -8304,41 +8304,41 @@ app.get("/", asyncRoute(async (req, res) => {
 <meta property="og:site_name" content="AtlasRevenue">
 <meta property="og:title" content="Know exactly who wants what you sell — before your competitors do.">
 <meta property="og:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
-<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/">
-<meta property="og:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
+<meta property="og:url" content="${BASE_URL}/">
+<meta property="og:image" content="${BASE_URL}/og-cover.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Know exactly who wants what you sell — AtlasRevenue">
 <meta name="twitter:description" content="UK revenue intelligence across public and private markets. Demand signals, named buyers, live contract opportunities — in one sourced scan.">
-<meta name="twitter:image" content="https://atlasrevenue-agent-production.up.railway.app/og-cover.png">
+<meta name="twitter:image" content="${BASE_URL}/og-cover.png">
 <script type="application/ld+json">${JSON.stringify({
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://atlasrevenue-agent-production.up.railway.app/#org",
+      "@id": "${BASE_URL}/#org",
       "name": "AtlasRevenue",
-      "url": "https://atlasrevenue-agent-production.up.railway.app/",
+      "url": "${BASE_URL}/",
       "description": "UK demand and public-sector contract intelligence built on real government and market data.",
       "areaServed": "GB"
     },
     {
       "@type": "WebSite",
-      "@id": "https://atlasrevenue-agent-production.up.railway.app/#website",
-      "url": "https://atlasrevenue-agent-production.up.railway.app/",
+      "@id": "${BASE_URL}/#website",
+      "url": "${BASE_URL}/",
       "name": "AtlasRevenue",
-      "publisher": { "@id": "https://atlasrevenue-agent-production.up.railway.app/#org" }
+      "publisher": { "@id": "${BASE_URL}/#org" }
     },
     {
       "@type": "Product",
       "name": "AtlasRevenue Intelligence Scan",
       "description": "A commercial intelligence scan that maps real UK demand for your products and services and surfaces live public-sector contracts you can win.",
-      "brand": { "@id": "https://atlasrevenue-agent-production.up.railway.app/#org" },
+      "brand": { "@id": "${BASE_URL}/#org" },
       "offers": {
         "@type": "Offer",
         "priceCurrency": "GBP",
         "price": "29",
         "availability": "https://schema.org/InStock",
-        "url": "https://atlasrevenue-agent-production.up.railway.app/scan"
+        "url": "${BASE_URL}/scan"
       }
     },
     {
@@ -9011,7 +9011,7 @@ app.get("/market-intelligence", asyncRoute(async (req, res) => {
   const auth = getAuthUser(req);
   const mktSnap = pool ? await generateMarketSignals(pool, { limit: 8 }).catch(() => null) : null;
   const sigs: MarketSignal[] = mktSnap?.signals ?? [];
-  const BASE = "https://atlasrevenue-agent-production.up.railway.app";
+  const BASE = BASE_URL;
   const sigCards = sigs.length > 0
     ? sigs.map(s => `
       <div style="background:var(--surface-2);border:1px solid var(--border-2);border-left:3px solid var(--brand);padding:18px 20px">
@@ -10285,7 +10285,7 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Free demand preview — see who's buying what you sell | AtlasRevenue</title>
 <meta name="description" content="Type what you sell and instantly see how many UK businesses are in your market, where demand is densest, and three named prospects — free, from real Companies House data.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/preview">
+<link rel="canonical" href="${BASE_URL}/preview">
 <style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
 ${pageShellHeader(null, auth)}
 <section class="svc-hero"><div class="svc-hero-inner">
@@ -10323,7 +10323,7 @@ function sectorsIndexPage(auth: { email: string; tier: UserTier } | null): strin
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Service-sector demand — find clients for your business | AtlasRevenue</title>
 <meta name="description" content="Where the UK's design, software, marketing and professional-services businesses cluster — and who just launched. Real Companies House demand data for service businesses.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/sectors">
+<link rel="canonical" href="${BASE_URL}/sectors">
 <style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
 ${pageShellHeader(null, auth)}
 <section class="svc-hero"><div class="svc-hero-inner">
@@ -10381,7 +10381,7 @@ function sectorPage(
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(sector.label)} businesses in the UK — demand & new launches | AtlasRevenue</title>
 <meta name="description" content="Where the UK's ${escapeHtml(sector.label.toLowerCase())} businesses cluster, how big the market is, and who just registered — real Companies House data you can act on.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/sector/${sector.slug}">
+<link rel="canonical" href="${BASE_URL}/sector/${sector.slug}">
 <style>${pageShellCss()}${SERVICE_PAGE_CSS}</style></head><body>
 ${pageShellHeader(null, auth)}
 <section class="svc-hero"><div class="svc-hero-inner">
@@ -13221,7 +13221,7 @@ app.get("/api-docs", (req, res) => {
 <p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Agency accounts — contact <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a> to request access.</p>
 
 <h2>Base URL</h2>
-<p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">https://atlasrevenue-agent-production.up.railway.app</code></p>
+<p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">${BASE_URL}</code></p>
 
 <h2>Endpoints</h2>
 
@@ -13326,11 +13326,11 @@ app.get("/pricing", (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — AtlasRevenue | From £29 per Intelligence Scan</title>
 <meta name="description" content="AtlasRevenue pricing. Pay £29 per scan or subscribe for continuous UK demand and contract intelligence. Real data, named buyers, 90-day plans — no guesses.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/pricing">
+<link rel="canonical" href="${BASE_URL}/pricing">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="AtlasRevenue Pricing — From £29 per scan">
 <meta property="og:description" content="Pay per scan or subscribe for continuous UK demand and contract intelligence built on real data.">
-<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/pricing">
+<meta property="og:url" content="${BASE_URL}/pricing">
 <style>
 ${pageShellCss()}
 .pr-wrap{max-width:960px;margin:0 auto;padding:0 32px}
@@ -14032,11 +14032,11 @@ app.get("/scan", (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — get a sourced report combining procurement records, company data, and market signals on who's buying, where demand sits, and the contracts you can win. From £29.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/scan">
+<link rel="canonical" href="${BASE_URL}/scan">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Run an AtlasRevenue intelligence scan">
 <meta property="og:description" content="Who's buying what you sell + contracts you can win. Real UK data, one scan.">
-<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/scan">
+<meta property="og:url" content="${BASE_URL}/scan">
 <title>Run a Scan — Demand &amp; Contract Intelligence | AtlasRevenue</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Libre+Franklin:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
@@ -14789,7 +14789,7 @@ svg.addEventListener('mouseleave',hide);
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Live UK Demand Signals — DVLA, ONS, Land Registry, Companies House | AtlasRevenue</title>
 <meta name="description" content="Live UK market demand signals from DVLA, ONS, Land Registry, Companies House and government procurement. Spot demand building in your sector before competitors act.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/signals">
+<link rel="canonical" href="${BASE_URL}/signals">
 <meta name="robots" content="index, follow">
 <style>${pageShellCss()}
 /* ── signals page ── */
@@ -15145,9 +15145,9 @@ app.get("/charts", asyncRoute(async (req, res) => {
 <meta property="og:type" content="article">
 <meta property="og:title" content="${fmtBnShort(totalAnnualM)} in UK Public Contracts — Live Procurement Intelligence">
 <meta property="og:description" content="${totalNotices.toLocaleString()} procurement notices tracked. ${fmtBnShort(openPipelineM)} open pipeline. ${closing30} contracts closing in the next 30 days.">
-<meta property="og:url" content="https://atlasrevenue-agent-production.up.railway.app/charts">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/charts">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across ${DESK_PROFILES.filter(d => d.live).length} procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"https://atlasrevenue-agent-production.up.railway.app/charts","provider":{"@type":"Organization","name":"AtlasRevenue","url":"https://atlasrevenue-agent-production.up.railway.app"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
+<meta property="og:url" content="${BASE_URL}/charts">
+<link rel="canonical" href="${BASE_URL}/charts">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK Public Sector Procurement Spend Intelligence 2026","description":"Live spend signal across ${DESK_PROFILES.filter(d => d.live).length} procurement sector desks. ${totalNotices.toLocaleString()} notices. ${fmtBnShort(totalAnnualM)} awarded value.","url":"${BASE_URL}/charts","provider":{"@type":"Organization","name":"AtlasRevenue","url":"${BASE_URL}"},"temporalCoverage":"${escapeHtml(reportMonthRange)}","keywords":["UK public procurement","government contracts 2026","contracts finder","find a tender","public sector spend","procurement intelligence","awarded contracts UK"]}<\/script>
 <style>${pageShellCss()}
 /* ── charts / intelligence page ── */
 strong{font-weight:700}
@@ -15549,7 +15549,7 @@ ${deskBreak.length > 0 ? `
 
     <div class="brief-refs">
       <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.04em;line-height:1.9">
-        AtlasRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Available at: atlasrevenue-agent-production.up.railway.app/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
+        AtlasRevenue (2026) <em>UK Procurement Spend Signal — ${escapeHtml(reportMonthRange)}</em>. ${totalNotices.toLocaleString()} notices indexed across ${DESK_PROFILES.filter(d => d.live).length} sector desks. Available at: ${BASE_URL.replace(/^https?:\/\//, "")}/charts &middot; Contracts Finder (Crown Commercial Service, 2026) &middot; Find a Tender Service (Cabinet Office, 2026) &middot; National Audit Office (2023) <em>Government&rsquo;s management of its commercial relationships</em> &middot; Arrowsmith, S. (2014) <em>The Law of Public and Utilities Procurement</em>. 3rd ed. London: Sweet &amp; Maxwell.
       </p>
     </div>
   </div>
@@ -18062,7 +18062,7 @@ function desksPage(entries: Array<{ profile: DeskProfile; cached: { data: Procur
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>UK Public-Sector Contracts by Sector — ${DESK_PROFILES.filter(d => d.live).length} Intelligence Desks | AtlasRevenue</title>
 <meta name="description" content="Live UK public-sector contracts across ${DESK_PROFILES.filter(d => d.live).length} industry desks — construction, health, education, transport, facilities and more. Real data from Contracts Finder and Find a Tender, updated hourly.">
-<link rel="canonical" href="https://atlasrevenue-agent-production.up.railway.app/desks">
+<link rel="canonical" href="${BASE_URL}/desks">
 <meta name="robots" content="index, follow">
 <style>
 ${pageShellCss()}
@@ -22495,7 +22495,7 @@ app.post("/admin/articles/comments/:id/reply", requireAdmin, asyncRoute(async (r
         from: process.env.FROM_EMAIL ?? "noreply@atlasrevenue.co.uk",
         to: commenterEmail,
         subject: `AtlasRevenue replied to your comment on "${article.title}"`,
-        html: `<p>AtlasRevenue replied to your comment on <a href="https://atlasrevenue-agent-production.up.railway.app/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
+        html: `<p>AtlasRevenue replied to your comment on <a href="${BASE_URL}/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
       }).catch(() => {});
     }
   }
