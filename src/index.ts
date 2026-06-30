@@ -8106,6 +8106,88 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send(
+    `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\nDisallow: /account\nDisallow: /scan/*/status\n\nSitemap: ${BASE_URL}/sitemap.xml\n`
+  );
+});
+
+app.get("/sitemap.xml", asyncRoute(async (_req, res) => {
+  const staticUrls = ["/", "/pricing", "/sectors", "/preview", "/scan", "/scan/sample", "/atlas", "/charts", "/articles", "/market-intelligence", "/market/retrofit"];
+  const deskUrls = DESK_PROFILES.filter(d => d.live).map(d => `/desk/${d.slug}`);
+  const sectorUrls = SERVICE_SECTORS.map(s => `/sector/${s.slug}`);
+  let articleSlugs: string[] = [];
+  if (pool) {
+    try {
+      const r = await pool.query<{ slug: string }>(`SELECT slug FROM articles WHERE published_at IS NOT NULL ORDER BY published_at DESC LIMIT 500`);
+      articleSlugs = r.rows.map(row => `/articles/${row.slug}`);
+    } catch { articleSlugs = []; }
+  }
+  const urls = [...staticUrls, ...deskUrls, ...sectorUrls, ...articleSlugs];
+  const today = new Date().toISOString().slice(0, 10);
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map(u => `  <url><loc>${BASE_URL}${u}</loc><lastmod>${today}</lastmod><changefreq>${u === "/" ? "daily" : "weekly"}</changefreq><priority>${u === "/" ? "1.0" : "0.7"}</priority></url>`)
+    .join("\n")}\n</urlset>\n`;
+  res.type("application/xml").send(body);
+}));
+
+app.get("/favicon.ico", (_req, res) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0A1C12"/><circle cx="32" cy="32" r="14" fill="#B4924E"/></svg>`;
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+  res.send(svg);
+});
+
+let ogCoverCache: Buffer | null = null;
+let ogCoverInFlight: Promise<Buffer> | null = null;
+async function renderOgCover(): Promise<Buffer> {
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500&family=Spline+Sans+Mono:wght@500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{width:1200px;height:630px;overflow:hidden;background:radial-gradient(120% 160% at 85% 0%,#16341F 0%,#0E2417 60%,#0A1C12 100%);color:#ECE6D6}
+.f{width:100%;height:100%;padding:64px 72px;display:flex;flex-direction:column;justify-content:space-between;position:relative}
+.brand{display:flex;align-items:center;gap:14px}
+.dot{width:18px;height:18px;border-radius:50%;background:#B4924E}
+.name{font-family:"Newsreader",Georgia,serif;font-size:36px;letter-spacing:-0.01em}
+.headline{font-family:"Newsreader",Georgia,serif;font-weight:400;font-size:88px;line-height:1.02;letter-spacing:-.02em;max-width:1000px}
+.headline em{font-style:italic;color:#B4924E}
+.meta{font-family:"Spline Sans Mono",monospace;font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:#B4924E}
+.foot{display:flex;justify-content:space-between;align-items:flex-end}
+.tags{font-family:"Spline Sans Mono",monospace;font-size:13px;color:#9AA093;letter-spacing:.06em}
+</style></head><body><div class="f">
+<div><div class="brand"><div class="dot"></div><div class="name">AtlasRevenue</div></div>
+<div class="meta" style="margin-top:48px">UK Demand &amp; Contract Intelligence</div></div>
+<div class="headline">Know exactly who wants what you sell <em>before your competitors do.</em></div>
+<div class="foot"><div class="tags">Companies House &middot; Contracts Finder &middot; DVLA &middot; ONS &middot; SMMT</div><div class="tags">atlasrevenue.io</div></div>
+</div></body></html>`;
+  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
+    await page.setContent(html, { waitUntil: "load" });
+    await new Promise(r => setTimeout(r, 500));
+    const buf = await page.screenshot({ type: "png", omitBackground: false });
+    return Buffer.from(buf);
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+app.get("/og-cover.png", asyncRoute(async (_req, res) => {
+  try {
+    if (!ogCoverCache) {
+      if (!ogCoverInFlight) ogCoverInFlight = renderOgCover();
+      ogCoverCache = await ogCoverInFlight;
+      ogCoverInFlight = null;
+    }
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(ogCoverCache);
+  } catch (err) {
+    captureError(err, { route: "/og-cover.png" });
+    res.status(500).type("text/plain").send("og-cover render failed");
+  }
+}));
+
 app.post("/api/track", (req, res) => {
   const event = String(req.body?.event || "").slice(0, 60);
   const path = String(req.body?.path || "").slice(0, 200);
@@ -8293,7 +8375,7 @@ app.get("/", asyncRoute(async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="AtlasRevenue maps demand signals, named buyers, and live contract opportunities across UK public and private markets. Public-sector intelligence powered by official procurement records (Contracts Finder, Find a Tender); wider market demand built from company, geography, property, economic and sector signals.">
+<meta name="description" content="AtlasRevenue maps UK demand signals, named buyers and live contract opportunities in one sourced scan. Real data from Companies House, Contracts Finder, ONS.">
 <meta name="keywords" content="UK market demand intelligence, B2B sales intelligence UK, who is buying, public sector contracts, Contracts Finder, Find a Tender, market signals, demand data UK, sales leads by sector">
 <link rel="canonical" href="${BASE_URL}/">
 <meta name="robots" content="index, follow, max-image-preview:large">
@@ -8315,30 +8397,30 @@ app.get("/", asyncRoute(async (req, res) => {
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "${BASE_URL}/#org",
+      "@id": `${BASE_URL}/#org`,
       "name": "AtlasRevenue",
-      "url": "${BASE_URL}/",
+      "url": `${BASE_URL}/`,
       "description": "UK demand and public-sector contract intelligence built on real government and market data.",
       "areaServed": "GB"
     },
     {
       "@type": "WebSite",
-      "@id": "${BASE_URL}/#website",
-      "url": "${BASE_URL}/",
+      "@id": `${BASE_URL}/#website`,
+      "url": `${BASE_URL}/`,
       "name": "AtlasRevenue",
-      "publisher": { "@id": "${BASE_URL}/#org" }
+      "publisher": { "@id": `${BASE_URL}/#org` }
     },
     {
       "@type": "Product",
       "name": "AtlasRevenue Intelligence Scan",
       "description": "A commercial intelligence scan that maps real UK demand for your products and services and surfaces live public-sector contracts you can win.",
-      "brand": { "@id": "${BASE_URL}/#org" },
+      "brand": { "@id": `${BASE_URL}/#org` },
       "offers": {
         "@type": "Offer",
         "priceCurrency": "GBP",
         "price": "29",
         "availability": "https://schema.org/InStock",
-        "url": "${BASE_URL}/scan"
+        "url": `${BASE_URL}/scan`
       }
     },
     {
@@ -8618,7 +8700,7 @@ ${pageShellHeader(null, homepageAuth)}
   <div class="wrap">
     <div>
       <div class="eyebrow">Real UK data &middot; Demand &amp; contract intelligence</div>
-      <h1>Know exactly who wants<br>what you sell <em>before your<br>competitors do.</em></h1>
+      <h1>Know exactly who wants <br>what you sell <em>before your <br>competitors do.</em></h1>
       <p class="lede">AtlasRevenue maps demand signals, named buyers, spend patterns, and live contract opportunities across UK public and private markets — so firms know where to sell, who to approach, and what to chase next. One sourced scan. No guesses.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="/preview">See who's buying &mdash; free &rarr;</a>
@@ -8720,8 +8802,9 @@ ${chaseNowHtml}
           : `<a class="desk-card reveal" href="/desk/${escapeHtml(d.slug)}"><div class="dc-top"><span class="dc-label">${escapeHtml(d.label)}</span><div class="dc-chips"><span class="dc-chip dc-chip-src">CF</span></div></div><div class="dc-title">Scanning for live notices…</div><div class="dc-buyer">Signals load on first hourly refresh.</div><div class="dc-foot"><span class="dc-date">—</span><span class="dc-cta">View desk &rarr;</span></div></a>`;
       }).join("")}
     </div>
-    <div style="text-align:center;margin-top:32px">
+    <div style="text-align:center;margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
       <a href="/desks" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mid);border:1px solid var(--border-2);padding:12px 28px;transition:border-color .15s,color .15s">See all ${DESK_PROFILES.filter(d => d.live).length} desks &rarr;</a>
+      <a href="/market/retrofit" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);border:1px solid rgba(180,146,78,.3);padding:12px 28px;background:rgba(180,146,78,.06);transition:border-color .15s,color .15s">Retrofit buyer pack &rarr;</a>
     </div>
   </div>
 </section>
@@ -15968,6 +16051,15 @@ app.get("/desks", asyncRoute(async (req, res) => {
   res.type("html").send(desksPage(entries, page, getAuthUser(req)));
 }));
 
+// ── Retrofit / Roofing / Solar money page ──────────────────────────────────
+app.get("/market/retrofit", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === "construction")!;
+  const cached = await getDeskCache("construction").catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "construction" } }));
+  res.type("html").send(retrofitMarketPage(cached, getAuthUser(req)));
+}));
+
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === req.params.slug);
   if (!profile) { res.status(404).type("html").send(notFoundHtml("Desk not found", getAuthUser(req))); return; }
@@ -17356,6 +17448,447 @@ ${mktIntelHtml}
 </div>
 ${sampleCtaBlock("compact")}
 <div class="dm-foot-copy"><a href="/" style="color:inherit;text-decoration:underline;text-decoration-color:var(--border)">&larr; AtlasRevenue</a> &nbsp;&middot;&nbsp; &copy; 2026 AtlasRevenue &middot; Intelligence, not certainty. Public data only.</div>
+
+</body>
+</html>`;
+}
+
+// ── Retrofit / Roofing / Solar money page renderer ──────────────────────────
+function retrofitMarketPage(
+  cached: { data: ProcurementData; cached_at: string } | null,
+  authCtx?: { email: string; tier: UserTier } | null
+): string {
+  const data = cached?.data;
+  const isCompiling = cached === null;
+
+  const RETROFIT_KW = ["retrofit", "roofing", "insulation", "solar", "epc", "energy efficiency",
+    "fabric first", "shdf", "eco4", "ewi", "cavity", "loft insulation", "decarbonis", "net zero",
+    "heat pump", "air source", "ground source", "cladding", "window replacement", "door replacement",
+    "external wall", "roof repair", "roof replacement", "pitched roof", "flat roof", "pv",
+    "photovoltaic", "thermal", "u-value", "building fabric", "damp", "mould", "ventilation",
+    "whole house", "warm homes", "green homes", "home upgrade", "hug2", "social housing decarbonisation"];
+
+  const matchTitle = (n: ProcurementNotice): boolean => {
+    const title = n.title.toLowerCase();
+    return RETROFIT_KW.some(kw => title.includes(kw));
+  };
+  const matchAll = (n: ProcurementNotice): boolean => {
+    const text = `${n.title} ${n.description || ""}`.toLowerCase();
+    return RETROFIT_KW.some(kw => text.includes(kw));
+  };
+
+  const allOpen = dedupeNoticesSoft(
+    (data?.contractsFinder.open || [])
+      .concat(data?.findTender?.notices || [])
+      .filter(matchTitle)
+  ).sort((a, b) => new Date(b.publishedDate || b.awardedDate || "").getTime() - new Date(a.publishedDate || a.awardedDate || "").getTime());
+
+  const allAwarded = (data?.contractsFinder.awarded || []).filter(matchAll)
+    .sort((a, b) => new Date(b.awardedDate || b.publishedDate || "").getTime() - new Date(a.awardedDate || a.publishedDate || "").getTime());
+
+  const buyerMap = new Map<string, { awardedValue: number; count: number; latestDate: string }>();
+  for (const n of (allAwarded as ProcurementNotice[]).concat(allOpen)) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, count: 0, latestDate: "" };
+    e.count++;
+    e.awardedValue += n.awardedValue ?? 0;
+    const d = n.awardedDate || n.publishedDate || "";
+    if (d > e.latestDate) e.latestDate = d;
+    buyerMap.set(n.buyer, e);
+  }
+  const topBuyers = [...buyerMap.entries()]
+    .filter(([buyer]) => !isAggregatorBuyer(buyer))
+    .sort((a, b) => b[1].awardedValue - a[1].awardedValue)
+    .slice(0, 12);
+
+  const totalValue = allAwarded.reduce((s, n) => s + (n.awardedValue ?? 0), 0);
+  const cutoff365 = Date.now() - 365 * 24 * 3_600_000;
+  const recentOpen = allOpen.filter(n => {
+    const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
+    return t > cutoff365;
+  });
+
+  const openRowsHtml = recentOpen.slice(0, 20).map(n => {
+    const rawVal = n.valueHigh ?? n.valueLow ?? n.awardedValue;
+    const val = rawVal != null && rawVal > 0 ? fmtMoney(rawVal) : "Not public";
+    const tags: string[] = [];
+    const tl = n.title.toLowerCase();
+    if (tl.includes("shdf") || tl.includes("social housing decarbonisation")) tags.push("SHDF");
+    if (tl.includes("eco4") || tl.includes("eco ")) tags.push("ECO4");
+    if (tl.includes("retrofit")) tags.push("Retrofit");
+    if (tl.includes("solar") || tl.includes("pv") || tl.includes("photovoltaic")) tags.push("Solar");
+    if (tl.includes("heat pump") || tl.includes("air source") || tl.includes("ground source")) tags.push("Heat Pump");
+    if (tl.includes("insulation") || tl.includes("ewi") || tl.includes("cavity") || tl.includes("loft")) tags.push("Insulation");
+    if (tl.includes("roofing") || tl.includes("roof repair") || tl.includes("roof replacement")) tags.push("Roofing");
+    if (tl.includes("window") || tl.includes("glazing") || tl.includes("door replacement")) tags.push("Windows");
+    const tagHtml = tags.length > 0 ? `<div class="rm-tags">${tags.map(t => `<span class="rm-tag">${escapeHtml(t)}</span>`).join("")}</div>` : "";
+    return `<div class="rm-opp">
+      <div class="rm-opp-title"><a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title.slice(0, 100))}</a></div>
+      <div class="rm-opp-meta">
+        <span class="rm-opp-buyer">${escapeHtml((n.buyer || "—").slice(0, 50))}</span>
+        <span class="rm-opp-val">${escapeHtml(val)}</span>
+        <span class="rm-opp-date">${escapeHtml(timeAgo(n.publishedDate || n.awardedDate))}</span>
+      </div>
+      ${tagHtml}
+    </div>`;
+  }).join("");
+
+  const buyerCardsHtml = topBuyers.map(([buyer, info]) => {
+    const orgType = buyerOrgType(buyer);
+    const tagClass = orgType === "HEALTH" ? "bw-tag-health" : orgType === "LOCAL AUTHORITY" ? "bw-tag-la" : orgType === "CENTRAL GOV" ? "bw-tag-gov" : orgType === "HOUSING" ? "bw-tag-housing" : orgType === "EDUCATION" ? "bw-tag-edu" : "bw-tag-other";
+    const spend = info.awardedValue > 0 ? fmtMoney(info.awardedValue) : "—";
+    return `<div class="rm-buyer-card">
+      <div class="rm-buyer-avatar">${escapeHtml(buyerInitials(buyer))}</div>
+      <div class="rm-buyer-info">
+        <div class="rm-buyer-name">${escapeHtml(buyer.slice(0, 60))}</div>
+        ${orgType ? `<span class="bw-tag ${tagClass}">${escapeHtml(orgType)}</span>` : ""}
+        <div class="rm-buyer-spend">${escapeHtml(spend)} <span class="rm-buyer-label">awarded</span></div>
+        <div class="rm-buyer-label">${info.count} ${info.count === 1 ? "notice" : "notices"} &middot; last active ${escapeHtml(timeAgo(info.latestDate))}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const BUYER_TYPES = [
+    { label: "Local Authorities", desc: "SHDF Wave 3 + HUG2 delivery, council housing stock retrofit, Net Zero estate plans", icon: "LA" },
+    { label: "Housing Associations", desc: "Social housing decarbonisation at scale, EPC C by 2030 targets, planned programme works", icon: "HA" },
+    { label: "Academy Trusts & Schools", desc: "DfE Condition Improvement Fund, RAAC remediation, sustainability estate plans", icon: "ED" },
+    { label: "NHS Trusts & Care Providers", desc: "Net Zero NHS roadmap, estate rationalisation, building fabric upgrades", icon: "NH" },
+    { label: "Commercial Landlords", desc: "MEES EPC B by 2030 compliance, tenant retention through energy efficiency", icon: "CL" },
+  ];
+
+  const ROUTES = [
+    { label: "SHDF Wave 3", desc: "Social Housing Decarbonisation Fund — central government co-funding for social landlords. Councils + HAs must appoint installers.", signal: "Active" },
+    { label: "ECO4 Delivery", desc: "Energy Company Obligation — utilities fund insulation and heating for fuel-poor homes via approved installers.", signal: "Active" },
+    { label: "HUG2 (Home Upgrade Grant)", desc: "Off-gas-grid homes upgraded to EPC C. Council-led procurement of retrofit installers.", signal: "Active" },
+    { label: "MEES Compliance", desc: "Minimum Energy Efficiency Standards — commercial landlords must hit EPC B by 2030. Drives private-sector retrofit spend.", signal: "Building" },
+    { label: "Net Zero Estate Plans", desc: "NHS, MoD, and councils publishing decarbonisation strategies with capital works budgets.", signal: "Planning" },
+    { label: "Contract Expiry / Rebid", desc: "Existing retrofit framework agreements expiring within 12 months — new competition opens.", signal: "Recurring" },
+  ];
+
+  const BUILT_FOR = [
+    "Roofing contractors (2–15 operatives)",
+    "Insulation installers (EWI, cavity, loft)",
+    "Solar PV & renewable energy installers",
+    "Heat pump fitters (ASHP / GSHP)",
+    "Window & door replacement firms",
+    "Retrofit coordinators & assessors",
+    "Building fabric specialists",
+    "Bid writers serving construction / estates",
+  ];
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retrofit, Roofing &amp; Solar Buyers &mdash; AtlasRevenue</title>
+<meta name="description" content="Find retrofit, roofing and solar buyers showing evidence-backed demand before they publicly ask for suppliers. Councils, housing associations, schools and landlords with live budget signals.">
+<link rel="canonical" href="${BASE_URL}/market/retrofit">
+<meta property="og:title" content="Find Retrofit Buyers Before the Tender Goes Live">
+<meta property="og:description" content="Evidence-backed buyer opportunities for roofing, insulation, solar and heat pump installers selling into UK public-sector demand.">
+<meta property="og:url" content="${BASE_URL}/market/retrofit">
+<meta property="og:type" content="website">
+<meta property="og:image" content="${BASE_URL}/og-cover.png">
+<style>
+${pageShellCss()}
+/* ── retrofit market page ── */
+.rm-hero{background:radial-gradient(140% 180% at 80% 0%,#16341F 0%,#0E2417 50%,#0A1C12 100%);color:#ECE6D6;padding:72px 0 56px;border-bottom:1px solid rgba(236,230,214,.08)}
+.rm-hero-inner{padding:0 40px;max-width:1200px;margin:0 auto}
+.rm-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.rm-eyebrow::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;box-shadow:0 0 6px rgba(34,197,94,.5)}
+.rm-hero h1{font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:400;line-height:1.06;letter-spacing:-.025em;margin-bottom:18px;max-width:680px}
+.rm-hero h1 em{font-style:italic;color:var(--brand)}
+.rm-hero-lede{font-size:16px;color:rgba(236,230,214,.6);max-width:560px;line-height:1.65;margin-bottom:32px}
+.rm-hero-stats{display:flex;gap:1px;background:rgba(236,230,214,.1);border:1px solid rgba(236,230,214,.1);width:fit-content;flex-wrap:wrap}
+.rm-hero-stat{padding:18px 28px;background:rgba(10,28,18,.5)}
+.rm-hero-stat-val{display:block;font-family:var(--serif);font-size:28px;font-weight:500;letter-spacing:-.01em;line-height:1.1;color:#ECE6D6}
+.rm-hero-stat-label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,230,214,.45);margin-top:5px}
+.rm-body{max-width:1200px;margin:0 auto;padding:0 40px}
+/* money interpretation */
+.rm-interp{padding:52px 0 44px;border-bottom:1px solid var(--border)}
+.rm-interp-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-interp h2{font-family:var(--serif);font-size:26px;font-weight:400;letter-spacing:-.01em;margin-bottom:16px;color:var(--text)}
+.rm-interp-text{font-size:15px;color:var(--text-mid);line-height:1.7;max-width:680px}
+.rm-interp-text strong{color:var(--text)}
+/* built for */
+.rm-for{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-for-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-for h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text)}
+.rm-for-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.rm-for-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-mid);padding:10px 14px;background:var(--surface);border:1px solid var(--border)}
+.rm-for-item::before{content:'\\2713';color:var(--green);font-weight:700;font-size:13px;flex-shrink:0}
+/* buyer types */
+.rm-types{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-types-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-types h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text)}
+.rm-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.rm-type-card{background:var(--surface);border:1px solid var(--border-2);padding:20px 22px;transition:border-color .15s}
+.rm-type-card:hover{border-color:var(--brand)}
+.rm-type-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.rm-type-icon{width:36px;height:36px;background:var(--surface-3);font-family:var(--mono);font-size:10px;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
+.rm-type-label{font-family:var(--serif);font-size:17px;font-weight:500;color:var(--text)}
+.rm-type-desc{font-size:13px;color:var(--muted);line-height:1.55}
+/* live signals */
+.rm-signals{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-signals-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.rm-signals-left{display:flex;flex-direction:column;gap:4px}
+.rm-signals-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);display:flex;align-items:center;gap:6px}
+.rm-signals h3{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--text)}
+.rm-signals-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.rm-opp{background:var(--surface);border:1px solid var(--border);padding:16px 20px;margin-bottom:6px;transition:border-color .15s}
+.rm-opp:hover{border-color:var(--brand)}
+.rm-opp-title{font-size:14px;font-weight:500;line-height:1.4;margin-bottom:8px;color:var(--text)}
+.rm-opp-title a{color:var(--brand);text-decoration:underline;text-decoration-color:var(--brand-dim)}
+.rm-opp-title a:hover{text-decoration-color:var(--brand)}
+.rm-opp-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.rm-opp-buyer{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm-opp-val{font-weight:600;color:var(--text-mid)}
+.rm-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.rm-tag{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;background:rgba(180,146,78,.08);color:var(--brand);border:1px solid rgba(180,146,78,.2)}
+/* buyer watchlist */
+.rm-buyers{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-buyers-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-buyers h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:6px;color:var(--text)}
+.rm-buyers-sub{font-size:13px;color:var(--muted);margin-bottom:20px;max-width:560px;line-height:1.5}
+.rm-buyer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px}
+.rm-buyer-card{display:flex;gap:12px;padding:16px 18px;background:var(--surface);border:1px solid var(--border);transition:border-color .15s}
+.rm-buyer-card:hover{border-color:var(--brand)}
+.rm-buyer-avatar{width:40px;height:40px;background:var(--surface-3);font-family:var(--mono);font-size:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
+.rm-buyer-info{flex:1;min-width:0}
+.rm-buyer-name{font-size:13px;font-weight:500;line-height:1.3;margin-bottom:4px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-buyer-spend{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-top:4px}
+.rm-buyer-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+/* routes to revenue */
+.rm-routes{padding:44px 0;border-bottom:1px solid var(--border)}
+.rm-routes-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-routes h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:20px;color:var(--text)}
+.rm-route-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.rm-route{background:var(--surface);border:1px solid var(--border-2);padding:18px 20px}
+.rm-route-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.rm-route-label{font-family:var(--serif);font-size:16px;font-weight:500;color:var(--text)}
+.rm-route-signal{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px}
+.rm-route-signal-active{background:rgba(34,197,94,.1);color:#1d6b4f;border:1px solid rgba(34,197,94,.2)}
+.rm-route-signal-building{background:rgba(29,78,216,.08);color:#1d4ed8;border:1px solid rgba(29,78,216,.2)}
+.rm-route-signal-planning{background:rgba(180,146,78,.1);color:#7a5a22;border:1px solid rgba(180,146,78,.28)}
+.rm-route-signal-recurring{background:rgba(109,40,217,.07);color:#6d28d9;border:1px solid rgba(109,40,217,.2)}
+.rm-route-desc{font-size:13px;color:var(--muted);line-height:1.55}
+/* sample card */
+.rm-sample{padding:52px 0;border-bottom:1px solid var(--border)}
+.rm-sample-head{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-sample h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:6px;color:var(--text)}
+.rm-sample-sub{font-size:13px;color:var(--muted);margin-bottom:24px;max-width:560px;line-height:1.5}
+.rm-sample-card{max-width:560px;border:2px solid var(--brand-dim);background:var(--surface);position:relative;overflow:hidden}
+.rm-sample-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--brand),#22C55E,var(--brand))}
+.rm-sc-head{padding:18px 22px 14px;border-bottom:1px solid var(--border)}
+.rm-sc-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.rm-sc-org{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--text)}
+.rm-sc-body{padding:16px 22px}
+.rm-sc-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.rm-sc-row:last-child{border-bottom:none}
+.rm-sc-k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.rm-sc-v{text-align:right;color:var(--text);max-width:60%;font-weight:500}
+.rm-sc-foot{padding:12px 22px;background:var(--surface-2);border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.rm-sc-badge{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;background:rgba(34,197,94,.1);color:#1d6b4f;border:1px solid rgba(34,197,94,.2)}
+/* CTA */
+.rm-cta{background:radial-gradient(120% 140% at 50% 100%,#16341F 0%,#0E2417 60%,#0A1C12 100%);padding:64px 0;text-align:center}
+.rm-cta-inner{max-width:620px;margin:0 auto;padding:0 40px}
+.rm-cta-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
+.rm-cta h2{font-family:var(--serif);font-size:clamp(26px,3.4vw,38px);font-weight:400;letter-spacing:-.02em;line-height:1.1;color:#ECE6D6;margin-bottom:16px}
+.rm-cta-lede{font-size:15px;color:rgba(236,230,214,.55);line-height:1.6;margin-bottom:28px;max-width:460px;margin-left:auto;margin-right:auto}
+.rm-cta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#10110D;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:16px 32px;transition:background .15s;text-decoration:none}
+.rm-cta-btn:hover{background:var(--brand-hot)}
+.rm-cta-note{font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.35);margin-top:16px}
+/* trust */
+.rm-trust{padding:32px 0;border-top:1px solid var(--border)}
+.rm-trust-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.rm-trust-sources{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rm-trust-src{color:var(--muted);text-decoration:underline;text-decoration-color:var(--border-2)}
+.rm-trust-src:hover{color:var(--text)}
+/* responsive */
+@media(max-width:760px){
+  .rm-hero{padding:48px 0 36px}
+  .rm-hero-inner,.rm-body{padding-left:16px;padding-right:16px}
+  .rm-hero h1{font-size:28px}
+  .rm-hero-stats{width:100%;flex-wrap:wrap}
+  .rm-hero-stat{flex:1 1 45%}
+  .rm-type-grid,.rm-route-grid{grid-template-columns:1fr}
+  .rm-buyer-grid{grid-template-columns:1fr}
+  .rm-for-grid{grid-template-columns:1fr}
+  .rm-opp-meta{flex-direction:column;gap:4px;align-items:flex-start}
+  .rm-cta-inner{padding:0 16px}
+}
+@media(max-width:480px){
+  .rm-hero{padding:32px 0 24px}
+  .rm-hero-inner,.rm-body{padding-left:12px;padding-right:12px}
+  .rm-hero h1{font-size:22px}
+  .rm-hero-stat{flex:1 1 100%}
+  .rm-cta h2{font-size:22px}
+}
+</style>
+</head>
+<body>
+${pageShellHeader(null, authCtx)}
+
+<section class="rm-hero">
+  <div class="rm-hero-inner">
+    <div class="rm-eyebrow">Buyer Intelligence &mdash; Retrofit &amp; Roofing</div>
+    <h1>Find retrofit and roofing buyers <em>before the tender goes live</em></h1>
+    <p class="rm-hero-lede">AtlasRevenue maps councils, housing associations, schools and landlords showing evidence-backed demand for insulation, roofing, solar and building fabric work &mdash; with source-backed reasons and suggested outreach angles.</p>
+    <div class="rm-hero-stats">
+      <div class="rm-hero-stat">
+        <span class="rm-hero-stat-val">${isCompiling ? "&mdash;" : String(recentOpen.length)}</span>
+        <span class="rm-hero-stat-label">Live opportunities</span>
+      </div>
+      <div class="rm-hero-stat">
+        <span class="rm-hero-stat-val">${isCompiling ? "&mdash;" : String(buyerMap.size)}</span>
+        <span class="rm-hero-stat-label">Active buyers</span>
+      </div>
+      <div class="rm-hero-stat">
+        <span class="rm-hero-stat-val">${isCompiling ? "&mdash;" : totalValue > 0 ? fmtMoney(totalValue) + "+" : "&mdash;"}</span>
+        <span class="rm-hero-stat-label">Awarded value</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="rm-body">
+
+  <section class="rm-interp">
+    <div class="rm-interp-head">What the data means for you</div>
+    <h2>Not a list of tenders. A map of who is about to buy.</h2>
+    <p class="rm-interp-text">
+      Most competitors wait for the contract notice. By then the buyer already has a shortlist, a preferred installer, and a framework in mind.
+      <strong>AtlasRevenue reads the signals that come before the tender</strong> &mdash; SHDF funding announcements, housing stock condition surveys,
+      Net Zero estate strategies, planning applications, budget papers &mdash; and translates them into named buyers with reasons, timing, and a route in.
+      This page tracks the retrofit, roofing and solar corner of that market in real time.
+    </p>
+  </section>
+
+  <section class="rm-for">
+    <div class="rm-for-head">Built for</div>
+    <h3>Small and mid-size contractors who want to find buyers, not chase portals</h3>
+    <div class="rm-for-grid">
+      ${BUILT_FOR.map(b => `<div class="rm-for-item">${escapeHtml(b)}</div>`).join("")}
+    </div>
+  </section>
+
+  <section class="rm-types">
+    <div class="rm-types-head">Best buyer types</div>
+    <h3>Organisations most likely to need what you sell</h3>
+    <div class="rm-type-grid">
+      ${BUYER_TYPES.map(bt => `<div class="rm-type-card">
+        <div class="rm-type-top">
+          <div class="rm-type-icon">${escapeHtml(bt.icon)}</div>
+          <div class="rm-type-label">${escapeHtml(bt.label)}</div>
+        </div>
+        <div class="rm-type-desc">${escapeHtml(bt.desc)}</div>
+      </div>`).join("")}
+    </div>
+  </section>
+
+  <section class="rm-signals">
+    <div class="rm-signals-head">
+      <div class="rm-signals-left">
+        <span class="rm-signals-eyebrow"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:gh-pulse 2.2s infinite"></span>&nbsp;Live demand signals</span>
+        <h3>Open opportunities right now</h3>
+      </div>
+      <span class="rm-signals-count">${isCompiling ? "Compiling&hellip;" : `${recentOpen.length} open`}</span>
+    </div>
+    ${isCompiling
+      ? `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">Compiling &mdash; desk data refreshes every 24 hours. Check back shortly.</p>`
+      : recentOpen.length > 0
+        ? openRowsHtml + (recentOpen.length > 20 ? `<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:14px">Showing 20 of ${recentOpen.length}. <a href="/desk/construction" style="color:var(--brand);text-decoration:underline">View all on the Construction desk &rarr;</a></p>` : "")
+        : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">No open retrofit opportunities found right now. Data refreshes every 24 hours.</p>`
+    }
+  </section>
+
+  <section class="rm-buyers">
+    <div class="rm-buyers-head">Buyer watchlist</div>
+    <h3>Who is spending on retrofit and roofing</h3>
+    <p class="rm-buyers-sub">Ranked by awarded contract value. These organisations have active procurement history in retrofit, insulation, roofing and building fabric.</p>
+    ${isCompiling
+      ? `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">Compiling&hellip;</p>`
+      : topBuyers.length > 0
+        ? `<div class="rm-buyer-grid">${buyerCardsHtml}</div>`
+        : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">No buyers found yet. Data populates on first desk refresh.</p>`
+    }
+  </section>
+
+  <section class="rm-routes">
+    <div class="rm-routes-head">Routes to revenue</div>
+    <h3>Where the money is coming from</h3>
+    <div class="rm-route-grid">
+      ${ROUTES.map(r => {
+        const sigClass = r.signal === "Active" ? "rm-route-signal-active" : r.signal === "Building" ? "rm-route-signal-building" : r.signal === "Recurring" ? "rm-route-signal-recurring" : "rm-route-signal-planning";
+        return `<div class="rm-route">
+          <div class="rm-route-top">
+            <div class="rm-route-label">${escapeHtml(r.label)}</div>
+            <span class="rm-route-signal ${sigClass}">${escapeHtml(r.signal)}</span>
+          </div>
+          <div class="rm-route-desc">${escapeHtml(r.desc)}</div>
+        </div>`;
+      }).join("")}
+    </div>
+  </section>
+
+  <section class="rm-sample">
+    <div class="rm-sample-head">What a buyer pack includes</div>
+    <h3>Sample buyer opportunity card</h3>
+    <p class="rm-sample-sub">Each Buyer Pack contains 15&ndash;25 cards like this &mdash; named buyers, evidence sources, intent scoring, outreach angles, and a 30-day action plan.</p>
+    <div class="rm-sample-card">
+      <div class="rm-sc-head">
+        <div class="rm-sc-eyebrow">Buyer Opportunity Card</div>
+        <div class="rm-sc-org">Midlands Metropolitan Housing Trust</div>
+      </div>
+      <div class="rm-sc-body">
+        <div class="rm-sc-row"><span class="rm-sc-k">Sector</span><span class="rm-sc-v">Social Housing</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Signal</span><span class="rm-sc-v">SHDF Wave 3 recipient &bull; EPC upgrade programme</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Likely need</span><span class="rm-sc-v">EWI, cavity fill, loft insulation across 3,200 units</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Evidence</span><span class="rm-sc-v">Board paper (Mar 2026) + SHDF grant allocation</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Intent score</span><span class="rm-sc-v" style="color:var(--green);font-family:var(--mono);font-weight:700">78 / 100</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Timing</span><span class="rm-sc-v">Procurement expected Q3 2026</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Route</span><span class="rm-sc-v">Direct approach &rarr; procurement lead</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Outreach angle</span><span class="rm-sc-v">&ldquo;We deliver PAS 2035 whole-house retrofit at scale &mdash; happy to share references from similar HA programmes.&rdquo;</span></div>
+        <div class="rm-sc-row"><span class="rm-sc-k">Contractor fit</span><span class="rm-sc-v"><span class="rm-sc-badge">Good fit &bull; 2&ndash;15 operatives</span></span></div>
+      </div>
+      <div class="rm-sc-foot">
+        <span>Source: DLUHC &middot; Companies House &middot; Contracts Finder</span>
+        <span style="color:var(--brand)">1 of 25</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="rm-trust" style="margin-bottom:0">
+    <div class="rm-trust-inner rm-body">
+      <span>Public record only. Intelligence, not certainty. Always verify on the source.</span>
+      <div class="rm-trust-sources">
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px">Sources</span>
+        <a class="rm-trust-src" href="https://www.contractsfinder.service.gov.uk" target="_blank" rel="noopener noreferrer">Contracts Finder</a>
+        <a class="rm-trust-src" href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a>
+        <a class="rm-trust-src" href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<section class="rm-cta">
+  <div class="rm-cta-inner">
+    <div class="rm-cta-eyebrow">Buyer Pack</div>
+    <h2>Get 15 retrofit buyer opportunities this week</h2>
+    <p class="rm-cta-lede">Named buyers, evidence-backed demand signals, intent scores, outreach angles, and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
+    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&rarr;</a>
+    <p class="rm-cta-note">No commitment &bull; public data only &bull; delivered within 48 hours</p>
+  </div>
+</section>
+
+<footer class="hp-foot"><div class="wrap">
+  <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK revenue intelligence for suppliers, agencies, contractors, and consultants selling into public-sector demand.</p></div>
+  <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/market/retrofit">Retrofit Buyers</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
+  <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
+  <div class="legal"><span>&copy; 2026 AtlasRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
+</div></footer>
 
 </body>
 </html>`;
