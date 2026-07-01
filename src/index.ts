@@ -8113,7 +8113,7 @@ app.get("/robots.txt", (_req, res) => {
 });
 
 app.get("/sitemap.xml", asyncRoute(async (_req, res) => {
-  const staticUrls = ["/", "/pricing", "/sectors", "/preview", "/scan", "/scan/sample", "/atlas", "/charts", "/articles", "/market-intelligence", "/market/retrofit"];
+  const staticUrls = ["/", "/pricing", "/sectors", "/preview", "/scan", "/scan/sample", "/atlas", "/charts", "/articles", "/market-intelligence", "/market/retrofit", "/market/plumbing", "/market/facilities"];
   const deskUrls = DESK_PROFILES.filter(d => d.live).map(d => `/desk/${d.slug}`);
   const sectorUrls = SERVICE_SECTORS.map(s => `/sector/${s.slug}`);
   let articleSlugs: string[] = [];
@@ -8805,6 +8805,8 @@ ${chaseNowHtml}
     <div style="text-align:center;margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
       <a href="/desks" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mid);border:1px solid var(--border-2);padding:12px 28px;transition:border-color .15s,color .15s">See all ${DESK_PROFILES.filter(d => d.live).length} desks &rarr;</a>
       <a href="/market/retrofit" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);border:1px solid rgba(180,146,78,.3);padding:12px 28px;background:rgba(180,146,78,.06);transition:border-color .15s,color .15s">Retrofit buyer pack &rarr;</a>
+      <a href="/market/plumbing" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);border:1px solid rgba(180,146,78,.3);padding:12px 28px;background:rgba(180,146,78,.06);transition:border-color .15s,color .15s">Plumbing &amp; M&amp;E buyer pack &rarr;</a>
+      <a href="/market/facilities" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);border:1px solid rgba(180,146,78,.3);padding:12px 28px;background:rgba(180,146,78,.06);transition:border-color .15s,color .15s">Facilities buyer pack &rarr;</a>
     </div>
   </div>
 </section>
@@ -16117,13 +16119,29 @@ app.get("/desks", asyncRoute(async (req, res) => {
   res.type("html").send(desksPage(entries, page, getAuthUser(req)));
 }));
 
-// ── Retrofit / Roofing / Solar money page ──────────────────────────────────
+// ── Niche market pages ──────────────────────────────────────────────────────
 app.get("/market/retrofit", asyncRoute(async (req, res) => {
   const profile = DESK_PROFILES.find(d => d.slug === "construction")!;
   const cached = await getDeskCache("construction").catch(() => null);
   const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
   if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "construction" } }));
-  res.type("html").send(retrofitMarketPage(cached, getAuthUser(req)));
+  res.type("html").send(nicheMarketPage(NICHE_RETROFIT, cached, getAuthUser(req)));
+}));
+
+app.get("/market/plumbing", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === "construction")!;
+  const cached = await getDeskCache("construction").catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "construction" } }));
+  res.type("html").send(nicheMarketPage(NICHE_PLUMBING, cached, getAuthUser(req)));
+}));
+
+app.get("/market/facilities", asyncRoute(async (req, res) => {
+  const profile = DESK_PROFILES.find(d => d.slug === "facilities")!;
+  const cached = await getDeskCache("facilities").catch(() => null);
+  const isStale = !cached || (Date.now() - new Date(cached.cached_at).getTime() > DESK_CACHE_TTL_MS);
+  if (isStale) compileDeskInBackground(profile).catch(err => captureError(err, { desk: { slug: "facilities" } }));
+  res.type("html").send(nicheMarketPage(NICHE_FACILITIES, cached, getAuthUser(req)));
 }));
 
 app.get("/desk/:slug", asyncRoute(async (req, res) => {
@@ -17678,27 +17696,194 @@ function generateTiming(hasRecentOpen: boolean, latestDate: string): string {
 }
 
 // ── Retrofit / Roofing / Solar money page renderer ──────────────────────────
-function retrofitMarketPage(
+interface NicheConfig {
+  slug: string;
+  deskSlug: string;
+  keywords: string[];
+  title: string;
+  metaDesc: string;
+  ogTitle: string;
+  ogDesc: string;
+  heroEyebrow: string;
+  heroH1: string;
+  heroH1Em: string;
+  heroLede: string;
+  interpH2: string;
+  interpText: string;
+  builtForHeading: string;
+  builtFor: string[];
+  buyerTypes: { label: string; desc: string; icon: string }[];
+  routes: { label: string; desc: string; signal: string }[];
+  ctaNiche: string;
+  ctaWatchlistLine: string;
+  ctaGrowthLine: string;
+}
+
+const NICHE_RETROFIT: NicheConfig = {
+  slug: "retrofit",
+  deskSlug: "construction",
+  keywords: ["retrofit", "roofing", "insulation", "solar", "epc", "energy efficiency",
+    "fabric first", "shdf", "eco4", "ewi", "cavity", "loft insulation", "decarbonis", "net zero",
+    "heat pump", "air source", "ground source", "cladding", "window replacement", "door replacement",
+    "external wall", "roof repair", "roof replacement", "pitched roof", "flat roof", "pv",
+    "photovoltaic", "thermal", "u-value", "building fabric", "damp", "mould", "ventilation",
+    "whole house", "warm homes", "green homes", "home upgrade", "hug2", "social housing decarbonisation"],
+  title: "Retrofit, Roofing &amp; Solar Buyers &mdash; AtlasRevenue",
+  metaDesc: "Find retrofit, roofing and solar buyers showing evidence-backed demand before they publicly ask for suppliers. Councils, housing associations, schools and landlords with live budget signals.",
+  ogTitle: "Find Retrofit Buyers Before the Tender Goes Live",
+  ogDesc: "Evidence-backed buyer opportunities for roofing, insulation, solar and heat pump installers selling into UK public-sector demand.",
+  heroEyebrow: "Buyer Intelligence &mdash; Retrofit &amp; Roofing",
+  heroH1: "Find retrofit and roofing buyers ",
+  heroH1Em: "before the tender goes live",
+  heroLede: "AtlasRevenue maps councils, housing associations, schools and landlords showing evidence-backed demand for insulation, roofing, solar and building fabric work &mdash; with source-backed reasons and suggested outreach angles.",
+  interpH2: "Not a list of tenders. A map of who is about to buy.",
+  interpText: "Most competitors wait for the contract notice. By then the buyer already has a shortlist, a preferred installer, and a framework in mind. <strong>AtlasRevenue reads the signals that come before the tender</strong> &mdash; SHDF funding announcements, housing stock condition surveys, Net Zero estate strategies, planning applications, budget papers &mdash; and translates them into named buyers with reasons, timing, and a route in. This page tracks the retrofit, roofing and solar corner of that market in real time.",
+  builtForHeading: "Small and mid-size contractors who want to find buyers, not chase portals",
+  builtFor: [
+    "Roofing contractors (2–15 operatives)",
+    "Insulation installers (EWI, cavity, loft)",
+    "Solar PV & renewable energy installers",
+    "Heat pump fitters (ASHP / GSHP)",
+    "Window & door replacement firms",
+    "Retrofit coordinators & assessors",
+    "Building fabric specialists",
+    "Bid writers serving construction / estates",
+  ],
+  buyerTypes: [
+    { label: "Local Authorities", desc: "SHDF Wave 3 + HUG2 delivery, council housing stock retrofit, Net Zero estate plans", icon: "LA" },
+    { label: "Housing Associations", desc: "Social housing decarbonisation at scale, EPC C by 2030 targets, planned programme works", icon: "HA" },
+    { label: "Academy Trusts & Schools", desc: "DfE Condition Improvement Fund, RAAC remediation, sustainability estate plans", icon: "ED" },
+    { label: "NHS Trusts & Care Providers", desc: "Net Zero NHS roadmap, estate rationalisation, building fabric upgrades", icon: "NH" },
+    { label: "Commercial Landlords", desc: "MEES EPC B by 2030 compliance, tenant retention through energy efficiency", icon: "CL" },
+  ],
+  routes: [
+    { label: "SHDF Wave 3", desc: "Social Housing Decarbonisation Fund — central government co-funding for social landlords. Councils + HAs must appoint installers.", signal: "Active" },
+    { label: "ECO4 Delivery", desc: "Energy Company Obligation — utilities fund insulation and heating for fuel-poor homes via approved installers.", signal: "Active" },
+    { label: "HUG2 (Home Upgrade Grant)", desc: "Off-gas-grid homes upgraded to EPC C. Council-led procurement of retrofit installers.", signal: "Active" },
+    { label: "MEES Compliance", desc: "Minimum Energy Efficiency Standards — commercial landlords must hit EPC B by 2030. Drives private-sector retrofit spend.", signal: "Building" },
+    { label: "Net Zero Estate Plans", desc: "NHS, MoD, and councils publishing decarbonisation strategies with capital works budgets.", signal: "Planning" },
+    { label: "Contract Expiry / Rebid", desc: "Existing retrofit framework agreements expiring within 12 months — new competition opens.", signal: "Recurring" },
+  ],
+  ctaNiche: "retrofit",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+};
+
+const NICHE_PLUMBING: NicheConfig = {
+  slug: "plumbing",
+  deskSlug: "construction",
+  keywords: ["plumbing", "heating", "mechanical", "electrical", "m&e", "hvac", "boiler",
+    "gas", "pipework", "drainage", "sanitary", "ventilation", "air conditioning",
+    "building services", "legionella", "water hygiene", "hot water", "cold water",
+    "sprinkler", "fire suppression", "ductwork", "chiller", "plant room", "bms",
+    "controls", "metering", "commissioning", "planned maintenance", "reactive maintenance",
+    "commercial heating", "district heating", "underfloor heating", "radiator"],
+  title: "Plumbing, Heating &amp; M&amp;E Buyers &mdash; AtlasRevenue",
+  metaDesc: "Find plumbing, heating and M&E buyers showing evidence-backed demand. Councils, NHS trusts, schools and housing associations with live mechanical and electrical contracts.",
+  ogTitle: "Find Plumbing & M&E Buyers Before the Tender Goes Live",
+  ogDesc: "Evidence-backed buyer opportunities for plumbing, heating, HVAC and mechanical & electrical contractors selling into UK public-sector demand.",
+  heroEyebrow: "Buyer Intelligence &mdash; Plumbing, Heating &amp; M&amp;E",
+  heroH1: "Find plumbing and M&amp;E buyers ",
+  heroH1Em: "before the framework closes",
+  heroLede: "AtlasRevenue maps councils, NHS trusts, housing associations and schools showing evidence-backed demand for plumbing, heating, HVAC and building services work &mdash; with source-backed reasons and suggested outreach angles.",
+  interpH2: "Not a list of tenders. A map of who needs your services next.",
+  interpText: "Plumbing and M&E contracts are often bundled into frameworks or planned maintenance agreements that renew every 3–5 years. By the time the contract notice hits Contracts Finder, the buyer already knows who they want. <strong>AtlasRevenue reads the signals that come before the tender</strong> &mdash; framework expiry dates, capital works programmes, estate condition surveys, decarbonisation plans &mdash; and translates them into named buyers with reasons, timing, and a route in.",
+  builtForHeading: "Plumbing and M&E contractors who want to find buyers, not chase portals",
+  builtFor: [
+    "Plumbing & heating contractors (2–20 operatives)",
+    "Mechanical & electrical (M&E) firms",
+    "HVAC and air conditioning installers",
+    "Commercial gas engineers",
+    "Fire suppression & sprinkler installers",
+    "Water hygiene & legionella specialists",
+    "BMS controls & commissioning engineers",
+    "Bid writers serving M&E / building services",
+  ],
+  buyerTypes: [
+    { label: "NHS Trusts & Hospitals", desc: "Ageing estate, HTM compliance, planned preventive maintenance contracts, capital refurbishment", icon: "NH" },
+    { label: "Local Authorities", desc: "Council housing heating programmes, leisure centre plant upgrades, civic estate maintenance", icon: "LA" },
+    { label: "Housing Associations", desc: "Boiler replacement programmes, communal heating upgrades, planned maintenance frameworks", icon: "HA" },
+    { label: "Academy Trusts & Schools", desc: "DfE Condition Improvement Fund, heating system replacements, BMS upgrades", icon: "ED" },
+    { label: "MoD & Central Government", desc: "Defence estate M&E, Crown Commercial Service frameworks, government hub fit-outs", icon: "CG" },
+  ],
+  routes: [
+    { label: "Framework Agreements", desc: "Most public M&E spend flows through frameworks (NHS SBS, CCS, ESPO). Getting on the framework is the route to £millions in call-off work.", signal: "Active" },
+    { label: "Planned Maintenance Rebids", desc: "PPM contracts typically run 3–5 years. Councils and NHS trusts rebid on a rolling cycle — expiry tracking spots the next wave.", signal: "Recurring" },
+    { label: "Capital Refurbishment", desc: "Hospital ward upgrades, school expansions, leisure centre rebuilds — all need full M&E packages.", signal: "Active" },
+    { label: "Decarbonisation & Heat Networks", desc: "Heat pump conversions, district heating connections, hydrogen-ready boiler programmes driving new M&E work.", signal: "Building" },
+    { label: "Compliance & Water Hygiene", desc: "Legionella risk assessments, TMV servicing, and L8 compliance contracts are non-discretionary and recurring.", signal: "Active" },
+    { label: "Emergency & Reactive Cover", desc: "Out-of-hours callout contracts for heating, plumbing and electrical faults — high-margin, recurring.", signal: "Recurring" },
+  ],
+  ctaNiche: "plumbing & M&E",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+};
+
+const NICHE_FACILITIES: NicheConfig = {
+  slug: "facilities",
+  deskSlug: "facilities",
+  keywords: ["facilities management", "fm", "cleaning", "catering", "security", "grounds maintenance",
+    "waste management", "pest control", "window cleaning", "janitorial", "porterage",
+    "reception", "mailroom", "helpdesk", "building management", "hard fm", "soft fm",
+    "total fm", "workplace", "estate management", "property management", "landlord services",
+    "planned preventive maintenance", "reactive maintenance", "compliance", "fire safety",
+    "asbestos", "duct cleaning", "deep clean", "hygiene", "washroom"],
+  title: "Facilities Management Buyers &mdash; AtlasRevenue",
+  metaDesc: "Find facilities management buyers showing evidence-backed demand. Councils, NHS trusts, schools and corporate landlords with live FM contracts and framework opportunities.",
+  ogTitle: "Find FM Buyers Before the Tender Goes Live",
+  ogDesc: "Evidence-backed buyer opportunities for cleaning, security, catering, hard FM and soft FM contractors selling into UK public-sector demand.",
+  heroEyebrow: "Buyer Intelligence &mdash; Facilities Management",
+  heroH1: "Find FM buyers ",
+  heroH1Em: "before the contract goes to market",
+  heroLede: "AtlasRevenue maps councils, NHS trusts, universities and corporate landlords showing evidence-backed demand for cleaning, security, catering, grounds maintenance and total FM &mdash; with source-backed reasons and suggested outreach angles.",
+  interpH2: "Not a list of tenders. A map of who is about to rebid their FM contract.",
+  interpText: "FM contracts are large, long-running, and relationship-driven. Incumbents win 70%+ of rebids because challengers arrive too late. <strong>AtlasRevenue reads the signals that come before the tender</strong> &mdash; contract expiry dates, insourcing reviews, estate consolidation plans, compliance audit failures &mdash; and translates them into named buyers with reasons, timing, and a route in. This page tracks the facilities management market in real time.",
+  builtForHeading: "FM contractors who want to find buyers, not chase portals",
+  builtFor: [
+    "Commercial cleaning companies",
+    "Security & manned guarding firms",
+    "Catering & hospitality contractors",
+    "Grounds maintenance & landscaping firms",
+    "Hard FM / building maintenance contractors",
+    "Total FM / integrated FM providers",
+    "Waste management & recycling firms",
+    "Bid writers serving facilities & estates",
+  ],
+  buyerTypes: [
+    { label: "Local Authorities", desc: "Civic estate FM, leisure centres, schools FM frameworks, waste & recycling contracts", icon: "LA" },
+    { label: "NHS Trusts & Hospitals", desc: "Hospital cleaning, catering, portering, estates maintenance, PFI expiry re-tenders", icon: "NH" },
+    { label: "Universities & Colleges", desc: "Campus FM, student accommodation services, catering, grounds maintenance, security", icon: "ED" },
+    { label: "Central Government", desc: "Crown Commercial Service FM frameworks, government hub FM, MoD estate services", icon: "CG" },
+    { label: "Corporate & PFI", desc: "PFI lifecycle replacements, corporate campus FM, landlord services for multi-tenant estates", icon: "PF" },
+  ],
+  routes: [
+    { label: "FM Framework Agreements", desc: "CCS, NHS SBS, ESPO and regional frameworks carry most public FM spend. Getting listed is the primary route.", signal: "Active" },
+    { label: "Contract Expiry Rebids", desc: "FM contracts run 3–7 years + extensions. Tracking expiry dates spots the next competitive round 12–18 months early.", signal: "Recurring" },
+    { label: "PFI Expiry Wave", desc: "Early PFI deals (1990s–2000s) are expiring. Trusts and councils must rebid cleaning, catering, estates — often unbundled.", signal: "Building" },
+    { label: "Insourcing Reviews", desc: "Post-pandemic, many buyers reviewed outsourced FM. Those that kept outsourcing are now rebidding with tighter specs.", signal: "Planning" },
+    { label: "Social Value & Net Zero", desc: "Buyers increasingly weight social value (local employment, apprenticeships) and carbon reduction in FM scoring.", signal: "Building" },
+    { label: "Emergency & Mobilisation", desc: "Short-notice interim FM contracts when an incumbent fails or a new building opens. High-margin, fast turnaround.", signal: "Recurring" },
+  ],
+  ctaNiche: "FM",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+};
+
+function nicheMarketPage(
+  cfg: NicheConfig,
   cached: { data: ProcurementData; cached_at: string } | null,
   authCtx?: { email: string; tier: UserTier } | null
 ): string {
   const data = cached?.data;
   const isCompiling = cached === null;
 
-  const RETROFIT_KW = ["retrofit", "roofing", "insulation", "solar", "epc", "energy efficiency",
-    "fabric first", "shdf", "eco4", "ewi", "cavity", "loft insulation", "decarbonis", "net zero",
-    "heat pump", "air source", "ground source", "cladding", "window replacement", "door replacement",
-    "external wall", "roof repair", "roof replacement", "pitched roof", "flat roof", "pv",
-    "photovoltaic", "thermal", "u-value", "building fabric", "damp", "mould", "ventilation",
-    "whole house", "warm homes", "green homes", "home upgrade", "hug2", "social housing decarbonisation"];
-
   const matchTitle = (n: ProcurementNotice): boolean => {
     const title = n.title.toLowerCase();
-    return RETROFIT_KW.some(kw => title.includes(kw));
+    return cfg.keywords.some(kw => title.includes(kw));
   };
   const matchAll = (n: ProcurementNotice): boolean => {
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
-    return RETROFIT_KW.some(kw => text.includes(kw));
+    return cfg.keywords.some(kw => text.includes(kw));
   };
 
   const allOpen = dedupeNoticesSoft(
@@ -17817,45 +18002,19 @@ function retrofitMarketPage(
     </div>`;
   }).join("");
 
-  const BUYER_TYPES = [
-    { label: "Local Authorities", desc: "SHDF Wave 3 + HUG2 delivery, council housing stock retrofit, Net Zero estate plans", icon: "LA" },
-    { label: "Housing Associations", desc: "Social housing decarbonisation at scale, EPC C by 2030 targets, planned programme works", icon: "HA" },
-    { label: "Academy Trusts & Schools", desc: "DfE Condition Improvement Fund, RAAC remediation, sustainability estate plans", icon: "ED" },
-    { label: "NHS Trusts & Care Providers", desc: "Net Zero NHS roadmap, estate rationalisation, building fabric upgrades", icon: "NH" },
-    { label: "Commercial Landlords", desc: "MEES EPC B by 2030 compliance, tenant retention through energy efficiency", icon: "CL" },
-  ];
-
-  const ROUTES = [
-    { label: "SHDF Wave 3", desc: "Social Housing Decarbonisation Fund — central government co-funding for social landlords. Councils + HAs must appoint installers.", signal: "Active" },
-    { label: "ECO4 Delivery", desc: "Energy Company Obligation — utilities fund insulation and heating for fuel-poor homes via approved installers.", signal: "Active" },
-    { label: "HUG2 (Home Upgrade Grant)", desc: "Off-gas-grid homes upgraded to EPC C. Council-led procurement of retrofit installers.", signal: "Active" },
-    { label: "MEES Compliance", desc: "Minimum Energy Efficiency Standards — commercial landlords must hit EPC B by 2030. Drives private-sector retrofit spend.", signal: "Building" },
-    { label: "Net Zero Estate Plans", desc: "NHS, MoD, and councils publishing decarbonisation strategies with capital works budgets.", signal: "Planning" },
-    { label: "Contract Expiry / Rebid", desc: "Existing retrofit framework agreements expiring within 12 months — new competition opens.", signal: "Recurring" },
-  ];
-
-  const BUILT_FOR = [
-    "Roofing contractors (2–15 operatives)",
-    "Insulation installers (EWI, cavity, loft)",
-    "Solar PV & renewable energy installers",
-    "Heat pump fitters (ASHP / GSHP)",
-    "Window & door replacement firms",
-    "Retrofit coordinators & assessors",
-    "Building fabric specialists",
-    "Bid writers serving construction / estates",
-  ];
+  const deskLink = cfg.deskSlug;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Retrofit, Roofing &amp; Solar Buyers &mdash; AtlasRevenue</title>
-<meta name="description" content="Find retrofit, roofing and solar buyers showing evidence-backed demand before they publicly ask for suppliers. Councils, housing associations, schools and landlords with live budget signals.">
-<link rel="canonical" href="${BASE_URL}/market/retrofit">
-<meta property="og:title" content="Find Retrofit Buyers Before the Tender Goes Live">
-<meta property="og:description" content="Evidence-backed buyer opportunities for roofing, insulation, solar and heat pump installers selling into UK public-sector demand.">
-<meta property="og:url" content="${BASE_URL}/market/retrofit">
+<title>${cfg.title}</title>
+<meta name="description" content="${escapeHtml(cfg.metaDesc)}">
+<link rel="canonical" href="${BASE_URL}/market/${cfg.slug}">
+<meta property="og:title" content="${escapeHtml(cfg.ogTitle)}">
+<meta property="og:description" content="${escapeHtml(cfg.ogDesc)}">
+<meta property="og:url" content="${BASE_URL}/market/${cfg.slug}">
 <meta property="og:type" content="website">
 <meta property="og:image" content="${BASE_URL}/og-cover.png">
 <style>
@@ -18041,9 +18200,9 @@ ${pageShellHeader(null, authCtx)}
 
 <section class="rm-hero">
   <div class="rm-hero-inner">
-    <div class="rm-eyebrow">Buyer Intelligence &mdash; Retrofit &amp; Roofing</div>
-    <h1>Find retrofit and roofing buyers <em>before the tender goes live</em></h1>
-    <p class="rm-hero-lede">AtlasRevenue maps councils, housing associations, schools and landlords showing evidence-backed demand for insulation, roofing, solar and building fabric work &mdash; with source-backed reasons and suggested outreach angles.</p>
+    <div class="rm-eyebrow">${cfg.heroEyebrow}</div>
+    <h1>${cfg.heroH1}<em>${cfg.heroH1Em}</em></h1>
+    <p class="rm-hero-lede">${cfg.heroLede}</p>
     <div class="rm-hero-stats">
       <div class="rm-hero-stat">
         <span class="rm-hero-stat-val">${isCompiling ? "&mdash;" : String(recentOpen.length)}</span>
@@ -18065,20 +18224,15 @@ ${pageShellHeader(null, authCtx)}
 
   <section class="rm-interp">
     <div class="rm-interp-head">What the data means for you</div>
-    <h2>Not a list of tenders. A map of who is about to buy.</h2>
-    <p class="rm-interp-text">
-      Most competitors wait for the contract notice. By then the buyer already has a shortlist, a preferred installer, and a framework in mind.
-      <strong>AtlasRevenue reads the signals that come before the tender</strong> &mdash; SHDF funding announcements, housing stock condition surveys,
-      Net Zero estate strategies, planning applications, budget papers &mdash; and translates them into named buyers with reasons, timing, and a route in.
-      This page tracks the retrofit, roofing and solar corner of that market in real time.
-    </p>
+    <h2>${cfg.interpH2}</h2>
+    <p class="rm-interp-text">${cfg.interpText}</p>
   </section>
 
   <section class="rm-for">
     <div class="rm-for-head">Built for</div>
-    <h3>Small and mid-size contractors who want to find buyers, not chase portals</h3>
+    <h3>${escapeHtml(cfg.builtForHeading)}</h3>
     <div class="rm-for-grid">
-      ${BUILT_FOR.map(b => `<div class="rm-for-item">${escapeHtml(b)}</div>`).join("")}
+      ${cfg.builtFor.map(b => `<div class="rm-for-item">${escapeHtml(b)}</div>`).join("")}
     </div>
   </section>
 
@@ -18086,7 +18240,7 @@ ${pageShellHeader(null, authCtx)}
     <div class="rm-types-head">Best buyer types</div>
     <h3>Organisations most likely to need what you sell</h3>
     <div class="rm-type-grid">
-      ${BUYER_TYPES.map(bt => `<div class="rm-type-card">
+      ${cfg.buyerTypes.map(bt => `<div class="rm-type-card">
         <div class="rm-type-top">
           <div class="rm-type-icon">${escapeHtml(bt.icon)}</div>
           <div class="rm-type-label">${escapeHtml(bt.label)}</div>
@@ -18107,7 +18261,7 @@ ${pageShellHeader(null, authCtx)}
     ${isCompiling
       ? `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">Compiling &mdash; desk data refreshes every 24 hours. Check back shortly.</p>`
       : recentOpen.length > 0
-        ? openRowsHtml + (recentOpen.length > 20 ? `<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:14px">Showing 20 of ${recentOpen.length}. <a href="/desk/construction" style="color:var(--brand);text-decoration:underline">View all on the Construction desk &rarr;</a></p>` : "")
+        ? openRowsHtml + (recentOpen.length > 20 ? `<p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:14px">Showing 20 of ${recentOpen.length}. <a href="/desk/${deskLink}" style="color:var(--brand);text-decoration:underline">View all on the desk &rarr;</a></p>` : "")
         : `<p style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:28px 0">No open retrofit opportunities found right now. Data refreshes every 24 hours.</p>`
     }
   </section>
@@ -18180,7 +18334,7 @@ ${pageShellHeader(null, authCtx)}
     <div class="rm-routes-head">Routes to revenue</div>
     <h3>Where the money is coming from</h3>
     <div class="rm-route-grid">
-      ${ROUTES.map(r => {
+      ${cfg.routes.map(r => {
         const sigClass = r.signal === "Active" ? "rm-route-signal-active" : r.signal === "Building" ? "rm-route-signal-building" : r.signal === "Recurring" ? "rm-route-signal-recurring" : "rm-route-signal-planning";
         return `<div class="rm-route">
           <div class="rm-route-top">
@@ -18210,13 +18364,13 @@ ${pageShellHeader(null, authCtx)}
 <section class="rm-cta">
   <div class="rm-cta-inner">
     <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;99</div>
-    <h2>Get ${isCompiling ? "15+" : String(Math.min(buyerProfiles.length, 25))} retrofit buyer opportunities this week</h2>
+    <h2>Get ${isCompiling ? "15+" : String(Math.min(buyerProfiles.length, 25))} ${escapeHtml(cfg.ctaNiche)} buyer opportunities this week</h2>
     <p class="rm-cta-lede">Named buyers, intent scores, Why Now? analysis, tailored outreach packs (email + call + LinkedIn + &ldquo;do not say&rdquo;), and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
     <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;99 &rarr;</a>
     <p class="rm-cta-note">One-off &bull; public data only &bull; delivered within 48 hours</p>
     <p style="font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.3);margin-top:24px;line-height:1.6">
-      Want ongoing monitoring? <strong style="color:rgba(236,230,214,.5)">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.<br>
-      Agencies &amp; bid writers? <strong style="color:rgba(236,230,214,.5)">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.<br>
+      ${cfg.ctaWatchlistLine}<br>
+      ${cfg.ctaGrowthLine}<br>
       Enterprise? <strong style="color:rgba(236,230,214,.5)">Exclusive Opportunity Feed &pound;1,500+/mo</strong> &mdash; category or territory exclusivity, white-label reports.
     </p>
   </div>
@@ -18225,7 +18379,7 @@ ${pageShellHeader(null, authCtx)}
 <footer class="hp-foot"><div class="wrap">
   <div><div class="logo">Atlas<b>Revenue</b></div><p class="bl">UK revenue intelligence for suppliers, agencies, contractors, and consultants selling into public-sector demand.</p></div>
   <div><h4>Desks</h4><ul>${DESK_PROFILES.slice(0, 5).map(d => `<li><a href="/desk/${d.slug}">${escapeHtml(d.label)}</a></li>`).join("")}<li><a href="/desks">All desks &rarr;</a></li></ul></div>
-  <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/market/retrofit">Retrofit Buyers</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
+  <div><h4>Product</h4><ul><li><a href="/scan">Intelligence Scan</a></li><li><a href="/market/retrofit">Retrofit Buyers</a></li><li><a href="/market/plumbing">Plumbing &amp; M&amp;E</a></li><li><a href="/market/facilities">FM Buyers</a></li><li><a href="/pricing">Pricing</a></li></ul></div>
   <div><h4>Sources</h4><ul><li><a href="https://www.gov.uk/contracts-finder" target="_blank" rel="noopener noreferrer">Contracts Finder</a></li><li><a href="https://www.find-tender.service.gov.uk" target="_blank" rel="noopener noreferrer">Find a Tender</a></li><li><a href="https://find-and-update.company-information.service.gov.uk" target="_blank" rel="noopener noreferrer">Companies House</a></li></ul></div>
   <div class="legal"><span>&copy; 2026 AtlasRevenue &middot; United Kingdom</span><span>Intelligence, not certainty. Public data only.</span></div>
 </div></footer>
