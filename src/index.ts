@@ -8323,7 +8323,7 @@ app.get("/", asyncRoute(async (req, res) => {
     ? (heroSignal!.value_amount >= 1_000_000
         ? `&pound;${(heroSignal!.value_amount / 1_000_000).toFixed(1)}m`
         : `&pound;${Math.round(heroSignal!.value_amount / 1000)}k`)
-    : "Value not stated";
+    : "";
 
   const noticesDisplay = count24h > 0 ? String(count24h) : "—";
 
@@ -8346,9 +8346,12 @@ app.get("/", asyncRoute(async (req, res) => {
   const last3Avg = chartPoints.length >= 3
     ? chartPoints.slice(-3).reduce((a, b) => a + b, 0) / 3
     : chartFinalVal;
-  const chartTrendPct = first3Avg > 0
+  const chartTrendPctRaw = first3Avg > 0
     ? Math.round(((last3Avg - first3Avg) / first3Avg) * 100)
     : 34;
+  // §6.2: anomaly suppression — any period-over-period stat beyond ±40% is hidden
+  const chartTrendPct = Math.abs(chartTrendPctRaw) > 40 ? 0 : chartTrendPctRaw;
+  const chartTrendSuppressed = Math.abs(chartTrendPctRaw) > 40;
   const chartStep = parseFloat((Math.max(chartFinalVal / 35, 0.01)).toFixed(3));
   // Server-rendered so the figure is correct even before (or without) the count-up
   // animation — the £0.0m initial value was leaking to users when the observer
@@ -8365,7 +8368,10 @@ app.get("/", asyncRoute(async (req, res) => {
     ? `Led by <b>${escapeHtml(chartResult.topDesk)}</b> this period`
     : `Across all ${DESK_PROFILES.filter(d => d.live).length} active desks`;
   // Build bullets: lead with market signals, tail with procurement
-  const mktBullets = homeMktSignals.slice(0, 3).map(s => {
+  const mktBulletsFiltered = homeMktSignals.filter(s =>
+    s.changePercent == null || (Math.abs(s.changePercent) > 0.05 && Math.abs(s.changePercent) <= 40)
+  );
+  const mktBullets = mktBulletsFiltered.slice(0, 3).map(s => {
     const chgStr = s.changePercent != null ? ` &middot; ${s.changePercent >= 0 ? "+" : ""}${s.changePercent.toFixed(1)}%` : "";
     return `<li><b>${escapeHtml(s.source)}</b> &middot; ${escapeHtml(s.stat)}${chgStr}</li>`;
   }).join("");
@@ -8378,9 +8384,13 @@ app.get("/", asyncRoute(async (req, res) => {
     : (mktBullets || "") + `<li><b>Procurement</b> &middot; ${trendLabel}${chartResult.topDesk ? ` &middot; led by ${escapeHtml(chartResult.topDesk)}` : ""}</li>`;
 
   // Signal cards to render below the homepage chart
-  const homeMktCardsHtml = homeMktSignals.length > 0
-    ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px">
-        ${homeMktSignals.slice(0, 3).map(s => {
+  // §6.3: exclude +0.0% null signals; §6.2: suppress ±40% anomalies
+  const filteredMktSignals = homeMktSignals.filter(s =>
+    s.changePercent == null || (Math.abs(s.changePercent) > 0.05 && Math.abs(s.changePercent) <= 40)
+  );
+  const homeMktCardsHtml = filteredMktSignals.length > 0
+    ? `<div style="display:grid;grid-template-columns:repeat(${Math.min(filteredMktSignals.length, 3)},1fr);gap:10px;margin-top:18px">
+        ${filteredMktSignals.slice(0, 3).map(s => {
           const chgBadge = s.changePercent != null
             ? `<span style="font-family:var(--mono);font-size:9px;font-weight:600;padding:1px 5px;border-radius:2px;${s.changePercent >= 0 ? "color:#2F8A52;background:rgba(47,138,82,.1)" : "color:#9b2d20;background:rgba(155,45,32,.1)"}">${s.changePercent >= 0 ? "▲" : "▼"} ${Math.abs(s.changePercent).toFixed(1)}%</span>`
             : "";
@@ -8771,7 +8781,7 @@ ${pageShellHeader(null, homepageAuth)}
           <span class="lab">Procurement spend${chartResult.illustrative ? ' <span style="font-size:9px;opacity:.5;letter-spacing:.06em">&middot; ILLUSTRATIVE</span>' : ''}</span>
           <span class="lab" style="display:block;font-size:10px;opacity:.6;margin-top:2px">Monthly totals &middot; rolling 12 months</span>
         </div>
-        <span class="big" id="chartTotal"><span id="chartTotalVal">${chartFinalValDisplay}</span><span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span></span>
+        <span class="big" id="chartTotal"><span id="chartTotalVal">${chartFinalValDisplay}</span>${chartTrendSuppressed ? '' : `<span class="${chartTrendPct >= 0 ? 'up' : 'dn'}">${chartTrendPct >= 0 ? '&#9650;' : '&#9660;'} ${Math.abs(chartTrendPct)}%</span>`}</span>
       </div>
       <canvas id="growthChart" style="cursor:pointer" onclick="location.href='/charts'"></canvas>
       ${homeMktCardsHtml}
@@ -8820,12 +8830,11 @@ ${chaseNowHtml}
   <div class="wrap">
     <div class="section-head"><h2>The desks</h2></div>
     <div class="desk-grid">
-      ${DESK_PROFILES.filter(d => d.live).slice(0, 9).map(d => {
+      ${DESK_PROFILES.filter(d => d.live).map(d => {
         const sig = deskSignals.get(d.slug);
-        return sig
-          ? renderDeskCard(sig, d.label, d.slug)
-          : `<a class="desk-card reveal" href="/desk/${escapeHtml(d.slug)}"><div class="dc-top"><span class="dc-label">${escapeHtml(d.label)}</span><div class="dc-chips"><span class="dc-chip dc-chip-src">CF</span></div></div><div class="dc-title">Scanning for live notices…</div><div class="dc-buyer">Signals load on first hourly refresh.</div><div class="dc-foot"><span class="dc-date">—</span><span class="dc-cta">View desk &rarr;</span></div></a>`;
-      }).join("")}
+        // §6.6: empty desks auto-hide — no signal = not rendered on homepage
+        return sig ? renderDeskCard(sig, d.label, d.slug) : "";
+      }).filter(Boolean).slice(0, 9).join("")}
     </div>
     <div style="text-align:center;margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
       <a href="/desks" style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mid);border:1px solid var(--border-2);padding:12px 28px;transition:border-color .15s,color .15s">See all ${DESK_PROFILES.filter(d => d.live).length} desks &rarr;</a>
@@ -14002,7 +14011,7 @@ ${pageShellHeader(null, authCtx)}
     <div class="sr-stat-grid">
       <div class="sr-stat"><div class="sr-stat-lbl">Total awarded (18 months) <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;87.4m</div></div>
       <div class="sr-stat"><div class="sr-stat-lbl">Open contract value <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;23.1m</div></div>
-      <div class="sr-stat"><div class="sr-stat-lbl">Avg contract size <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;2.3m</div></div>
+      <div class="sr-stat"><div class="sr-stat-lbl">Median contract size <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">&pound;2.3m</div></div>
       <div class="sr-stat"><div class="sr-stat-lbl">Unique buyers <span class="sr-demo-tag">demo</span></div><div class="sr-stat-val">22</div></div>
     </div>
     <p class="sr-p">Example sector commentary: facilities management spend is concentrated in Q1 and Q3 (financial year), with peak procurement activity in October and March. Reactive maintenance lots are typically the most frequently tendered, followed by planned maintenance and compliance-driven M&amp;E renewals. Live reports replace this with the actual quarterly and category patterns extracted from your sector&rsquo;s real data.</p>
@@ -16608,8 +16617,12 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   // ── Market intelligence data ─────────────────────────────────────────────
   const nowMs = Date.now();
 
-  const awardedCountWithValue = validAwardedNotices.filter(n => (n.awardedValue ?? 0) > 0).length;
-  const avgContractVal = awardedCountWithValue > 0 ? totalAwarded / awardedCountWithValue : 0;
+  const awardedVals = validAwardedNotices.map(n => n.awardedValue ?? 0).filter(v => v > 0).sort((a, b) => a - b);
+  const medianContractVal = awardedVals.length > 0
+    ? (awardedVals.length % 2 === 1
+        ? awardedVals[Math.floor(awardedVals.length / 2)]
+        : (awardedVals[awardedVals.length / 2 - 1] + awardedVals[awardedVals.length / 2]) / 2)
+    : 0;
 
   const buyersThisMonth = new Set(
     allOpen.filter(n => {
@@ -16878,9 +16891,9 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
         <span class="dp-pulse-val">${openNoticeCount}</span>
         <span class="dp-pulse-label">Active tenders</span>
       </div>
-      ${avgContractVal > 0 ? `<div class="dp-pulse-stat">
-        <span class="dp-pulse-val">${escapeHtml(fmtBig(avgContractVal))}</span>
-        <span class="dp-pulse-label">Avg contract value</span>
+      ${medianContractVal > 0 ? `<div class="dp-pulse-stat">
+        <span class="dp-pulse-val">${escapeHtml(fmtBig(medianContractVal))}</span>
+        <span class="dp-pulse-label">Median contract value</span>
       </div>` : ''}
       <div class="dp-pulse-stat">
         <span class="dp-pulse-val">${buyersThisMonth > 0 ? buyersThisMonth : "&mdash;"}</span>
@@ -17044,8 +17057,8 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
           <div class="an-kpi-lbl">Active buyers</div>
         </div>
         <div class="an-kpi an-kpi--div">
-          <div class="an-kpi-val">${avgContractVal > 0 ? escapeHtml(fmtShort(avgContractVal)) : "&mdash;"}</div>
-          <div class="an-kpi-lbl">Avg contract</div>
+          <div class="an-kpi-val">${medianContractVal > 0 ? escapeHtml(fmtShort(medianContractVal)) : "&mdash;"}</div>
+          <div class="an-kpi-lbl">Median contract</div>
         </div>
       </div>
       <div class="an-card">
@@ -20482,7 +20495,7 @@ ${pageShellHeader(null, authCtx)}
       </div>
       <div class="pg-stat">
         <span class="pg-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</span>
-        <span class="pg-stat-label">Avg contract value</span>
+        <span class="pg-stat-label">Median contract value</span>
       </div>
       <div class="pg-stat">
         <span class="pg-stat-val">${freqLabel}</span>
@@ -20550,7 +20563,7 @@ ${pageShellHeader(null, authCtx)}
             </div>
             <div>
               <div class="bp-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</div>
-              <div class="bp-stat-label">Avg contract</div>
+              <div class="bp-stat-label">Median contract</div>
             </div>
             <div>
               <div class="bp-stat-val">${officers.length}</div>
@@ -20788,7 +20801,7 @@ ${pageShellHeader(null, authCtx)}
         </div>
         <div>
           <div class="bp-stat-val">${stats.avgContractValue > 0 ? fmtMoney(stats.avgContractValue) : "—"}</div>
-          <div class="bp-stat-label">Avg contract</div>
+          <div class="bp-stat-label">Median contract</div>
         </div>
         <div>
           <div class="bp-stat-val">${stats.topBuyers.length}</div>

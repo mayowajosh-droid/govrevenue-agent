@@ -57,7 +57,12 @@ export async function buildBuyerProfile(entityId: string): Promise<BuyerProfile 
     stats: {
       totalContracts: history.length,
       totalValue,
-      avgContractValue: history.length > 0 ? Math.round(totalValue / history.length) : 0,
+      avgContractValue: (() => {
+        const vals = history.map(h => Number(h.awarded_value || h.value_high || h.value_low || 0)).filter(v => v > 0).sort((a, b) => a - b);
+        if (vals.length === 0) return 0;
+        const mid = Math.floor(vals.length / 2);
+        return Math.round(vals.length % 2 === 1 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2);
+      })(),
       topCategories,
       topSuppliers,
       procurementFrequency: frequency,

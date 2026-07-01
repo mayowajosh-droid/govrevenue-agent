@@ -867,6 +867,8 @@ function cncDeadlineChip(deadline: string | null | undefined): string {
   if (!deadline) return "";
   const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
   if (days <= 0) return "";
+  // §6.4: closing dates >52 weeks out are probable parsing errors — suppress
+  if (days > 364) return "";
   if (days <= 7)  return `<span class="cnc-deadline cnc-deadline--red">Closes ${days}d</span>`;
   if (days <= 30) return `<span class="cnc-deadline cnc-deadline--amber">Closes ${days}d</span>`;
   const wk = Math.ceil(days / 7);
