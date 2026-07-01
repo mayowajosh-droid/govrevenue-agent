@@ -112,6 +112,81 @@ export async function notifyScanFailed(input: ScanEmailInput) {
   });
 }
 
+export type WatchlistBuyer = {
+  buyer: string;
+  orgType: string;
+  intentScore: number;
+  prevScore: number | null;
+  whyNow: string;
+  likelyNeed: string;
+  isNew: boolean;
+};
+
+export async function sendWatchlistDigest(input: {
+  email: string;
+  niche: string;
+  buyers: WatchlistBuyer[];
+  totalTracked: number;
+  highIntentCount: number;
+  avgScore: number;
+  marketPageUrl: string;
+  unsubscribeUrl: string;
+}) {
+  const client = getResend();
+  const from = env("FROM_EMAIL");
+  if (!client || !from || !input.email) return;
+
+  const buyerLines = input.buyers.slice(0, 12).map((b, i) => {
+    const delta = b.prevScore !== null ? (b.intentScore - b.prevScore) : null;
+    const deltaStr = delta !== null && delta !== 0
+      ? delta > 0 ? ` (+${delta})` : ` (${delta})`
+      : "";
+    const newTag = b.isNew ? " [NEW]" : "";
+    return [
+      `${i + 1}. ${b.buyer}${newTag}`,
+      `   Intent Score: ${b.intentScore}/100${deltaStr}`,
+      `   Type: ${b.orgType}`,
+      `   Likely need: ${b.likelyNeed}`,
+      `   Why now: ${b.whyNow.slice(0, 120)}`,
+    ].join("\n");
+  }).join("\n\n");
+
+  const newCount = input.buyers.filter(b => b.isNew).length;
+  const movers = input.buyers.filter(b => b.prevScore !== null && b.intentScore - b.prevScore >= 10);
+
+  const summaryParts = [
+    `${input.highIntentCount} high-intent buyers (60+)`,
+    `${input.totalTracked} total tracked`,
+    `Avg score: ${input.avgScore}/100`,
+  ];
+  if (newCount > 0) summaryParts.push(`${newCount} new this week`);
+  if (movers.length > 0) summaryParts.push(`${movers.length} rising (score up 10+)`);
+
+  await sendEmail({
+    to: input.email,
+    subject: `Buyer Watchlist — ${input.niche} — ${input.highIntentCount} high-intent buyers`,
+    text: [
+      `Weekly Buyer Watchlist — ${input.niche}`,
+      ``,
+      summaryParts.join(" · "),
+      ``,
+      `─────────────────────────────────`,
+      ``,
+      buyerLines,
+      ``,
+      input.buyers.length > 12 ? `...and ${input.buyers.length - 12} more buyers tracked.\n` : "",
+      `View full buyer map: ${input.marketPageUrl}`,
+      ``,
+      `─────────────────────────────────`,
+      ``,
+      `This is your weekly Buyer Watchlist digest from AtlasRevenue.`,
+      `Scores update when new procurement data is published.`,
+      ``,
+      `Unsubscribe: ${input.unsubscribeUrl}`,
+    ].filter(Boolean).join("\n"),
+  });
+}
+
 export type WeeklyAlertNotice = {
   title: string;
   buyer: string;

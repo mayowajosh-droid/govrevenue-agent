@@ -23,7 +23,7 @@ import puppeteer from "puppeteer";
 import { createHash } from "node:crypto";
 import { renderWorldClassDashboard, renderArticleChart, type ArticleChartSpec } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject, storeObject } from "./lib/pdfStorage.js";
-import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail } from "./lib/emailNotifications.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail, sendWatchlistDigest } from "./lib/emailNotifications.js";
 import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
@@ -1342,6 +1342,20 @@ async function initDb() {
       UNIQUE(article_id, fingerprint)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS watchlist_subscribers (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      niche TEXT NOT NULL,
+      desk_slug TEXT NOT NULL,
+      last_scores JSONB,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_sent_at TIMESTAMPTZ,
+      UNIQUE(email, niche)
+    )
+  `);
+
   console.log("[db] ready");
 }
 
@@ -3912,7 +3926,7 @@ Rate the company on each dimension (score out of 10, with rationale):
 | Channel access | | | |
 | Competitive differentiation | | | |
 
-**Overall readiness**: X/10. The one thing that would move this score the most in 90 days.
+**Overall readiness**: X/10. The one thing that would move this score the most in 30 days.
 
 ## 8. Do Not Chase These Yet
 Which buyer segments, channels, or market positions to avoid right now — and why. Be specific. Name the trap and the reason.
@@ -4113,7 +4127,7 @@ Rules:
 - Every signal must contain a real number. Never write "the market is growing" — write "+19% CAGR 2022–2026".
 - Go model/brand/category level — not just industry totals. Find specific marque registrations, demographic splits, named CAGRs, specific search terms with percentages.
 - ${preloadedSignals.length > 0 ? "Include ALL pre-fetched signals above, then add more via web search to reach 16–20 total." : "Use web search to find 2025 or 2026 data. Minimum 16 signals."}
-- Minimum 4 signals from consumer/demand-side sources (Mintel, Euromonitor, Amazon UK, Google Trends, ONS spending cohorts).
+- Minimum 4 signals from consumer/demand-side sources (ONS spending cohorts, Google Trends, DVLA, Land Registry).
 - No generic signals. Every signal must be specific to this company's sector and buyer type.
 
 Structure:
@@ -4286,11 +4300,11 @@ Cover all sector-relevant documents including:
 Create a checklist specific to the top-scoring route from Section 5.
 For each criterion: describe what "yes" looks like for this company and this route. Not generic pass/fail — give the actual threshold.
 
-### 9.5 90-Day Revenue Pipeline Forecast
+### 9.5 30-Day Revenue Pipeline Forecast
 Create a table:
 Route | Target buyer | Action needed | Expected value | Probability | Expected revenue contribution | Timeline
 
-Then write a 3-sentence paragraph: what realistic revenue looks like in 90 days if the company executes sections 9.1-9.3, what the key risk is, and the single decision that most determines the outcome.
+Then write a 3-sentence paragraph: what realistic revenue looks like in 30 days if the company executes sections 9.1-9.3, what the key risk is, and the single decision that most determines the outcome.
 
 ### 9.6 Framework & Accreditation Roadmap
 List the 3-5 most relevant frameworks or DPS schemes for this company's sector.
@@ -4539,7 +4553,7 @@ Newly registered UK businesses that match your ideal-buyer profile (~${result.es
 
 ${rows}
 
-*Pair this list with the 90-day outreach plan above. Each name links to its full Companies House record for the registered office and officers.*`;
+*Pair this list with the 30-day outreach plan above. Each name links to its full Companies House record for the registered office and officers.*`;
 }
 
 async function runScan(id: string, input: z.infer<typeof intakeSchema>) {
@@ -6381,7 +6395,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
     </div>
     <div class="rail-card">
       <div class="rail-label">Full intelligence</div>
-      <div class="rail-pricing-text">Sector reports, weekly alerts, and buyer data. <strong style="color:var(--dark)">From £29.</strong></div>
+      <div class="rail-pricing-text">Sector reports, weekly alerts, and buyer data. <strong style="color:var(--dark)">From £99.</strong></div>
       <a href="/pricing" class="rail-pricing-btn">See pricing →</a>
       <a href="/scan/sample" class="rail-sample-link">View sample report →</a>
     </div>
@@ -8169,7 +8183,7 @@ html,body{width:1200px;height:630px;overflow:hidden;background:radial-gradient(1
 <div><div class="brand"><div class="dot"></div><div class="name">AtlasRevenue</div></div>
 <div class="meta" style="margin-top:48px">UK Demand &amp; Contract Intelligence</div></div>
 <div class="headline">Know exactly who wants what you sell <em>before your competitors do.</em></div>
-<div class="foot"><div class="tags">Companies House &middot; Contracts Finder &middot; DVLA &middot; ONS &middot; SMMT</div><div class="tags">atlasrevenue.io</div></div>
+<div class="foot"><div class="tags">Companies House &middot; Contracts Finder &middot; DVLA &middot; ONS &middot; Land Registry</div><div class="tags">atlasrevenue.io</div></div>
 </div></body></html>`;
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
   try {
@@ -8360,7 +8374,7 @@ app.get("/", asyncRoute(async (req, res) => {
     ? `<li><b>DVLA</b> &middot; vehicle registration data — sector fleet demand signal</li>
         <li><b>Land Registry</b> &middot; residential &amp; commercial completions — construction demand</li>
         <li><b>Companies House</b> &middot; new incorporations by sector — market formation signal</li>
-        <li><b>Procurement</b> &middot; awarded spend across 28 sectors — illustrative trend +34%</li>`
+        <li><b>Procurement</b> &middot; awarded spend across sector desks — illustrative trend +34%</li>`
     : (mktBullets || "") + `<li><b>Procurement</b> &middot; ${trendLabel}${chartResult.topDesk ? ` &middot; led by ${escapeHtml(chartResult.topDesk)}` : ""}</li>`;
 
   // Signal cards to render below the homepage chart
@@ -8440,7 +8454,7 @@ app.get("/", asyncRoute(async (req, res) => {
         {
           "@type": "Question",
           "name": "What does an AtlasRevenue scan actually show me?",
-          "acceptedAnswer": { "@type": "Answer", "text": "AtlasRevenue maps where demand is forming across UK public and private markets. Public-sector contract intelligence is powered by official procurement records (Contracts Finder, Find a Tender). Wider market-demand intelligence combines company data (Companies House) with geography, property, economic, and sector signals (DVLA, ONS, SMMT, Land Registry, Planning Data). You get named buyers, demand signals with figures and dates, the best routes to revenue, and a 90-day activation plan." }
+          "acceptedAnswer": { "@type": "Answer", "text": "AtlasRevenue maps where demand is forming across UK public and private markets. Public-sector contract intelligence is powered by official procurement records (Contracts Finder, Find a Tender). Wider market-demand intelligence combines company data (Companies House) with geography, property, economic, and sector signals (DVLA, ONS, Land Registry, Companies House). You get named buyers, demand signals with figures and dates, the best routes to revenue, and a 30-day activation plan." }
         },
         {
           "@type": "Question",
@@ -8455,7 +8469,7 @@ app.get("/", asyncRoute(async (req, res) => {
         {
           "@type": "Question",
           "name": "How much does it cost?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Scans start at £29 pay-as-you-go, with Pro and Agency subscriptions for ongoing weekly intelligence." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Buyer Pack scans are £99 one-off. Buyer Watchlist (£249/mo) and Growth Intelligence (£749/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector." }
         }
       ]
     }
@@ -8721,7 +8735,7 @@ ${pageShellHeader(null, homepageAuth)}
       <div class="chips">
         <div class="chip"><b>Named prospects</b> for what you sell</div>
         <div class="chip"><b id="liveNotices">${noticesDisplay}</b> live public contracts</div>
-        <div class="chip">Real data &middot; <b>zero guesses</b></div>
+        <div class="chip">Every figure <b>sourced and dated</b></div>
       </div>
     </div>
     <div class="hero-card-wrap">
@@ -8745,7 +8759,7 @@ ${pageShellHeader(null, homepageAuth)}
     <div class="reveal">
       <div class="eyebrow">Demand signal &middot; ${chartResult.illustrative ? 'illustrative' : 'live'}</div>
       <h2>See demand building before anyone else acts on it.</h2>
-      <p>Recurring spend in a category is the leading indicator of where buyers are heading next. We track it across five independent UK sources — DVLA vehicle flows, Land Registry completions, Companies House formations, ONS economic indicators, and government procurement records — so you can move on demand while it is still forming, not after the market has priced it in.</p>
+      <p>Recurring spend in a category is the leading indicator of where buyers are heading next. Built on official UK public data: Contracts Finder, Find a Tender, Companies House, DVLA, ONS, and HM Land Registry — so you can move on demand while it is still forming, not after the market has priced it in.</p>
       <ul>
         ${chartBullets}
       </ul>
@@ -8770,7 +8784,7 @@ ${pageShellHeader(null, homepageAuth)}
     <div style="text-align:center;max-width:640px;margin:0 auto 48px">
       <div class="eyebrow">Two ways to win</div>
       <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:12px 0 14px;color:var(--text)">Whatever you sell, the demand is already in the data.</h2>
-      <p style="color:var(--muted);font-size:16px;line-height:1.6">Pick the scan that fits how you make money. Both are built on the same real UK datasets — and both end with a 90-day plan to act on what they find.</p>
+      <p style="color:var(--muted);font-size:16px;line-height:1.6">Pick the scan that fits how you make money. Both are built on the same real UK datasets — and both end with a 30-day plan to act on what they find.</p>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div style="background:var(--surface-2);border:1px solid var(--border-2);border-top:3px solid var(--brand);padding:34px 32px;display:flex;flex-direction:column">
@@ -8778,10 +8792,10 @@ ${pageShellHeader(null, homepageAuth)}
         <h3 style="font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.15;color:var(--text);margin-bottom:12px">For anyone selling a product or service</h3>
         <p style="color:var(--text-mid);font-size:15px;line-height:1.6;margin-bottom:20px">Find out who is buying what you sell, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with named segments, real numbers, and a regional demand heat map.</p>
         <ul style="list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:9px">
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>16+ sourced demand signals (DVLA, ONS, SMMT, Mintel)</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Sourced demand signals (DVLA, ONS, Land Registry, Companies House)</li>
           <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Buyer watchlist — named segments to approach now</li>
           <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Money Map: fastest routes to first revenue</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Regional demand heat map + 90-day plan</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--brand)">▸</span>Regional demand heat map + 30-day plan</li>
         </ul>
         <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Map my market demand &rarr;</a>
       </div>
@@ -8793,7 +8807,7 @@ ${pageShellHeader(null, homepageAuth)}
           <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Live open + awarded contracts in your sector</li>
           <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Buyer watchlist + incumbent contract timeline</li>
           <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Bid-readiness score &amp; do-not-chase list</li>
-          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Framework routes + 90-day activation plan</li>
+          <li style="font-size:14px;color:var(--text-mid);padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--green)">▸</span>Framework routes + 30-day activation plan</li>
         </ul>
         <a href="/scan" style="margin-top:auto;align-self:flex-start;background:var(--hero-cta);color:#F3EFE6;font-size:13px;font-weight:600;padding:12px 22px;letter-spacing:.01em">Find contracts I can win &rarr;</a>
       </div>
@@ -8826,7 +8840,7 @@ ${chaseNowHtml}
     <div class="scan-strip-left">
       <div class="scan-strip-eyebrow">Intelligence scan &middot; 2&ndash;4 minutes</div>
       <div class="scan-strip-hed">Stop guessing where your next revenue comes from.</div>
-      <div class="scan-strip-sub">Tell us what you sell and where. We combine procurement records, company data, geography, property, economic and sector signals to show where demand is forming and which buyers match your services. From £29.</div>
+      <div class="scan-strip-sub">Tell us what you sell and where. We combine procurement records, company data, geography, property, economic and sector signals to show where demand is forming and which buyers match your services. From £99.</div>
     </div>
     <div class="scan-strip-right">
       <a class="scan-strip-btn" href="/scan">Run a scan &rarr;</a>
@@ -8844,9 +8858,9 @@ ${chaseNowHtml}
     </div>
     <div class="steps">
       <div class="step"><span class="n">01</span><span class="x"><b>Profile</b><small>What you sell &middot; who buys it &middot; where you operate</small></span></div>
-      <div class="step"><span class="n">02</span><span class="x"><b>Pull</b><small>DVLA &middot; ONS &middot; SMMT &middot; Land Registry &middot; Companies House &middot; Contracts Finder</small></span></div>
+      <div class="step"><span class="n">02</span><span class="x"><b>Pull</b><small>DVLA &middot; ONS &middot; Land Registry &middot; Companies House &middot; Contracts Finder</small></span></div>
       <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Demand strength &middot; buyer fit &middot; competition &middot; route-to-revenue</small></span></div>
-      <div class="step"><span class="n">04</span><span class="x"><b>Plan</b><small>Named buyers &middot; money map &middot; heat map &middot; 90-day actions</small></span></div>
+      <div class="step"><span class="n">04</span><span class="x"><b>Plan</b><small>Named buyers &middot; money map &middot; heat map &middot; 30-day actions</small></span></div>
     </div>
   </div>
 </section>
@@ -8858,11 +8872,11 @@ ${chaseNowHtml}
     </div>
     <div style="display:flex;flex-direction:column;gap:0">
       ${[
-        ["What does an AtlasRevenue scan actually show me?", "It maps real UK demand for what you sell — pulled from DVLA, ONS, SMMT, Land Registry and Companies House — and surfaces live public-sector contracts from Contracts Finder and Find a Tender. You get named buyers, demand signals with real numbers, the best routes to revenue, and a 90-day activation plan."],
+        ["What does an AtlasRevenue scan actually show me?", "It maps real UK demand for what you sell — pulled from DVLA, ONS, Land Registry and Companies House — and surfaces live public-sector contracts from Contracts Finder and Find a Tender. You get named buyers, demand signals with real numbers, the best routes to revenue, and a 30-day activation plan."],
         ["Is the data real, or AI-generated guesses?", "Real. Every demand signal is sourced from a named UK dataset or authority with the figure, geography and date attached. Nothing is invented. Where the evidence is thin, the report says so plainly rather than padding it out."],
         ["I don't sell to government — is this still for me?", "Yes. Choose the market-demand scan mode and AtlasRevenue focuses entirely on who buys your products or services, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with no procurement content at all."],
         ["How long does a scan take?", "Two to four minutes. You submit a short profile, the engine pulls and scores the data, and your report is ready to read on screen or download as a PDF."],
-        ["How much does it cost?", "Scans start at £29 pay-as-you-go. Pro and Agency subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector."],
+        ["How much does it cost?", "Buyer Pack scans are £99 one-off. Buyer Watchlist (£249/mo) and Growth Intelligence (£749/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector."],
       ].map(([q, a]) => `
       <details style="border-bottom:1px solid var(--border-2);padding:18px 0">
         <summary style="font-family:var(--sans);font-weight:600;font-size:17px;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px">${escapeHtml(q)}<span style="color:var(--brand);font-size:20px;font-weight:400">+</span></summary>
@@ -9119,9 +9133,9 @@ app.get("/market-intelligence", asyncRoute(async (req, res) => {
     : `<div style="grid-column:1/-1;background:var(--surface-2);border:1px solid var(--border-2);padding:24px;text-align:center;color:var(--muted);font-size:14px">Live demand signals load on the next data refresh. <a href="/scan" style="color:var(--brand)">Run a scan</a> to generate signals for your sector now.</div>`;
 
   const faqs: [string, string][] = [
-    ["What is market demand intelligence?", "It is the practice of using real data — government datasets, registrations, spending indices, search and platform trends — to work out who is buying a product or service, how much, where, and which way demand is moving, before committing sales and marketing spend. AtlasRevenue does this for UK businesses using DVLA, ONS, SMMT, Land Registry and Companies House data."],
-    ["How is this different from a generic market report?", "A generic report gives you broad industry numbers. AtlasRevenue gives you signals specific to what you sell and where you operate — named buyer segments, regional demand concentration, competitor positioning, and the exact routes to reach buyers — with every figure sourced and dated. It ends with a 90-day action plan, not a slide deck."],
-    ["What data sources do you use?", "DVLA vehicle registrations and fleet data, ONS consumer spending and economic output, SMMT new-car and segment data, HM Land Registry completions, Companies House incorporations, and market research where relevant (Mintel, Euromonitor), plus platform demand signals like Amazon UK and Google Trends."],
+    ["What is market demand intelligence?", "It is the practice of using real data — government datasets, registrations, spending indices, search and platform trends — to work out who is buying a product or service, how much, where, and which way demand is moving, before committing sales and marketing spend. AtlasRevenue does this for UK businesses using DVLA, ONS, Land Registry and Companies House data."],
+    ["How is this different from a generic market report?", "A generic report gives you broad industry numbers. AtlasRevenue gives you signals specific to what you sell and where you operate — named buyer segments, regional demand concentration, competitor positioning, and the exact routes to reach buyers — with every figure sourced and dated. It ends with a 30-day action plan, not a slide deck."],
+    ["What data sources do you use?", "Built on official UK public data: Contracts Finder, Find a Tender, Companies House, DVLA, ONS, and HM Land Registry."],
     ["Do I need to sell to government to use this?", "No. Market demand intelligence is for any business selling a product or service. If you also sell to the public sector, AtlasRevenue layers live contracts on top — but the demand scan works entirely on its own."],
   ];
 
@@ -9131,13 +9145,13 @@ app.get("/market-intelligence", asyncRoute(async (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UK Market Demand Intelligence — Know Who's Buying What You Sell | AtlasRevenue</title>
-<meta name="description" content="Market demand intelligence for UK businesses. Find out who is buying what you sell, where demand is concentrated, and how to reach buyers — built on real DVLA, ONS, SMMT, Land Registry and Companies House data. No guesses.">
+<meta name="description" content="Market demand intelligence for UK businesses. Find out who is buying what you sell, where demand is concentrated, and how to reach buyers — built on official UK public data: Contracts Finder, Find a Tender, Companies House, DVLA, ONS, and HM Land Registry.">
 <meta name="keywords" content="market demand intelligence, UK demand data, who is buying my product, B2B sales intelligence UK, market research alternative, demand signals, sales targeting data">
 <link rel="canonical" href="${BASE}/market-intelligence">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta property="og:type" content="website">
 <meta property="og:title" content="UK Market Demand Intelligence — Know Who's Buying What You Sell">
-<meta property="og:description" content="Real UK demand data turned into named buyers, regional heat maps and a 90-day plan. DVLA, ONS, SMMT, Companies House.">
+<meta property="og:description" content="Real UK demand data turned into named buyers, regional heat maps and a 30-day plan. Built on Contracts Finder, Find a Tender, Companies House, DVLA, ONS, Land Registry.">
 <meta property="og:url" content="${BASE}/market-intelligence">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">${JSON.stringify({
@@ -9154,7 +9168,7 @@ ${pageShellHeader(null, auth)}
     <div style="max-width:1100px;margin:0 auto;padding:72px 40px">
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:14px">Market Demand Intelligence</div>
       <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(34px,4.4vw,54px);line-height:1.05;letter-spacing:-.02em;margin-bottom:18px;max-width:16em">Stop guessing who wants what you sell. The demand is already in the data.</h1>
-      <p style="font-size:17px;line-height:1.6;color:#C5C9BC;max-width:40em;margin-bottom:28px">AtlasRevenue reads real UK data — DVLA, ONS, SMMT, Land Registry, Companies House — and turns it into a demand map for your product or service: named buyers, regional concentration, competitor gaps, and exactly how to reach them.</p>
+      <p style="font-size:17px;line-height:1.6;color:#C5C9BC;max-width:40em;margin-bottom:28px">AtlasRevenue reads real UK data — DVLA, ONS, Land Registry, Companies House — and turns it into a demand map for your product or service: named buyers, regional concentration, competitor gaps, and exactly how to reach them.</p>
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <a href="/scan" style="background:var(--brand);color:#10110D;font-weight:600;font-size:14px;padding:14px 24px">Map my market demand &rarr;</a>
         <a href="/scan" style="font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:#C5C9BC;text-decoration:underline;text-underline-offset:4px">See a sample report &rarr;</a>
@@ -9178,13 +9192,13 @@ ${pageShellHeader(null, auth)}
   <section style="background:var(--surface)">
     <div style="max-width:1000px;margin:0 auto;padding:64px 40px">
       <div class="eyebrow" style="text-align:center;display:block">How it works</div>
-      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.2vw,38px);line-height:1.1;text-align:center;margin:12px 0 40px;color:var(--text)">From "who would buy this?" to a 90-day plan</h2>
+      <h2 style="font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.2vw,38px);line-height:1.1;text-align:center;margin:12px 0 40px;color:var(--text)">From "who would buy this?" to a 30-day plan</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px">
         ${[
           ["01", "Tell us what you sell", "Your product or service, your ideal buyers, and where you operate. Two minutes."],
-          ["02", "We pull the real data", "The engine searches DVLA, ONS, SMMT, Land Registry, Companies House and market research for signals specific to your category."],
+          ["02", "We pull the real data", "The engine searches DVLA, ONS, Land Registry, Companies House, Contracts Finder and Find a Tender for signals specific to your category."],
           ["03", "We score the demand", "Demand strength, regional concentration, competitor positioning, and the fastest routes to first revenue."],
-          ["04", "You get a plan", "Named buyers, a money map, a regional demand heat map, and a 90-day activation plan with copy-ready outreach."],
+          ["04", "You get a plan", "Named buyers, a money map, a regional demand heat map, and a 30-day activation plan with copy-ready outreach."],
         ].map(([n, t, d]) => `
         <div style="background:var(--surface-2);border:1px solid var(--border-2);padding:24px 22px">
           <div style="font-family:var(--mono);font-size:22px;color:var(--brand);margin-bottom:10px">${n}</div>
@@ -9820,7 +9834,7 @@ app.get("/desk/:slug/export.csv", asyncRoute(async (req, res) => {
   if (deskProfile.live) {
     const authCtx = getAuthUser(req);
     if (!authCtx || (authCtx.tier === "free")) {
-      res.status(403).send("Pro subscription required for CSV export"); return;
+      res.status(403).send("Buyer Watchlist subscription required for CSV export"); return;
     }
   }
 
@@ -10346,7 +10360,7 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     <div class="svc-gate">
       <div>
         <div class="svc-gate-title">Get all ${moreCount.toLocaleString("en-GB")}+ named businesses</div>
-        <div class="svc-gate-sub">A full intelligence scan returns the complete named list for your sector, the regions where demand is densest, and a ready-to-send 90-day outreach plan built around your offer.</div>
+        <div class="svc-gate-sub">A full intelligence scan returns the complete named list for your sector, the regions where demand is densest, and a ready-to-send 30-day outreach plan built around your offer.</div>
       </div>
       <div class="svc-gate-actions">
         <a class="svc-btn" href="/scan?services=${encodeURIComponent(q)}">Run a full scan &rarr;</a>
@@ -10373,7 +10387,7 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     <div class="svc-cards">
       <a class="svc-card" href="/preview?q=design%20studio"><div class="svc-card-label">1 · Type what you sell</div><div class="svc-card-blurb">Tell us your product or service — “web design”, “IT support”, “accountancy”. No account needed.</div><div class="svc-card-ex">free · instant</div></a>
       <a class="svc-card" href="/sectors"><div class="svc-card-label">2 · See the market</div><div class="svc-card-blurb">We show how many UK businesses are in your sector, the regions with the most demand, and three named prospects.</div><div class="svc-card-ex">real Companies House data</div></a>
-      <a class="svc-card" href="/scan"><div class="svc-card-label">3 · Get the full list</div><div class="svc-card-blurb">Run a scan for the complete named list, contact routes, and a 90-day outreach plan around your offer.</div><div class="svc-card-ex">from £29</div></a>
+      <a class="svc-card" href="/scan"><div class="svc-card-label">3 · Get the full list</div><div class="svc-card-blurb">Run a scan for the complete named list, contact routes, and a 30-day outreach plan around your offer.</div><div class="svc-card-ex">from £99</div></a>
     </div>`;
   }
 
@@ -10504,7 +10518,7 @@ ${pageShellHeader(null, auth)}
   ${leadsHtml}
   <div class="svc-gate" style="margin-top:28px">
     <div><div class="svc-gate-title">Get the full ${escapeHtml(sector.label)} prospect list</div>
-    <div class="svc-gate-sub">Run a scan for the complete named list, contact routes, and a 90-day outreach plan built around what you sell.</div></div>
+    <div class="svc-gate-sub">Run a scan for the complete named list, contact routes, and a 30-day outreach plan built around what you sell.</div></div>
     <div class="svc-gate-actions"><a class="svc-btn" href="/scan?services=${encodeURIComponent(sector.query)}">Run a scan &rarr;</a><a class="svc-btn svc-btn-ghost" href="/preview?q=${encodeURIComponent(sector.query)}">Free preview</a></div>
   </div>
 </div>
@@ -11411,7 +11425,7 @@ function renderLeads(data){
   }).join('');
   if(foot){
     foot.innerHTML='<div style="background:var(--surface-2);border:1px solid var(--border);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">'
-      +'<div style="font-size:13px;color:var(--text)"><b>'+fmtNum(data.estimatedTotal)+'</b> total registered businesses in this market. Get the full named list, contacts and a 90-day outreach plan.</div>'
+      +'<div style="font-size:13px;color:var(--text)"><b>'+fmtNum(data.estimatedTotal)+'</b> total registered businesses in this market. Get the full named list, contacts and a 30-day outreach plan.</div>'
       +'<a href="/scan" style="background:var(--brand);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:11px 20px;text-decoration:none;text-transform:uppercase;white-space:nowrap">Build my lead list &rarr;</a>'
       +'</div>';
   }
@@ -12146,7 +12160,7 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 
   const completedCount = userScans.filter((s: any) => s.status === "completed").length;
   const memberSince = new Date(user.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-  const tierLabel: Record<UserTier, string> = { free: "Free", payg: "Pay as you go", pro: "Pro", agency: "Agency" };
+  const tierLabel: Record<UserTier, string> = { free: "Free", payg: "Buyer Pack", pro: "Buyer Watchlist", agency: "Growth Intelligence" };
   const isPaid = user.tier !== "free";
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -12517,7 +12531,7 @@ ${userScans.length === 0 ? `
     <div class="rcc-empty-card">
       <span class="rcc-empty-num">3</span>
       <h3>Take action</h3>
-      <p>Get buyer targets, readiness gaps, and a 30&ndash;90 day plan you can hand to your team on Monday.</p>
+      <p>Get buyer targets, readiness gaps, and a 30-day plan you can hand to your team on Monday.</p>
     </div>
   </div>
   <div class="rcc-empty-cta">
@@ -12581,8 +12595,8 @@ ${userScans.length === 0 ? `
         <div class="rcc-action-pack">
           <strong>Turn this scan into a buyer action pack</strong>
           ${isPaygOnly
-            ? `Capability statement, outreach emails, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist and readiness gaps.<br><a href="/pricing">Unlock with Pro &rarr;</a>`
-            : `Outreach emails, capability statement, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist.<br><a href="/pricing">Upgrade to Pro &rarr;</a>`}
+            ? `Capability statement, outreach emails, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist and readiness gaps.<br><a href="/pricing">Unlock with Buyer Watchlist &rarr;</a>`
+            : `Outreach emails, capability statement, and framework pre-qual &mdash; built from this scan&rsquo;s buyer watchlist.<br><a href="/pricing">Upgrade to Buyer Watchlist &rarr;</a>`}
         </div>` : ""}
         ` : `<div class="rcc-action-pack" style="margin-top:0"><strong>Scan in progress.</strong>The report will appear here as soon as it&rsquo;s ready &mdash; usually 2&ndash;5 minutes.</div>`}
       </div>
@@ -12682,7 +12696,7 @@ ${userScans.length === 0 ? `
       <div class="rcc-card-body">
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Email</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:11px">${escapeHtml(user.email)}</span></div>
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Plan</span><span class="rcc-plan-val"><span class="rcc-tier-pill rcc-tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span></span></div>
-        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Rate</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:12px">${user.tier === "free" ? "Free" : user.tier === "payg" ? "&pound;29/scan" : user.tier === "pro" ? "&pound;79/mo" : "&pound;499/mo"}</span></div>
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Rate</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:12px">${user.tier === "free" ? "Free" : user.tier === "payg" ? "&pound;99/scan" : user.tier === "pro" ? "&pound;249/mo" : "&pound;749/mo"}</span></div>
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Member since</span><span class="rcc-plan-val">${escapeHtml(memberSince)}</span></div>
         ${user.tier !== "free" && user.stripe_customer_id ? `
         <form method="POST" action="/billing/portal" style="margin-top:14px">
@@ -12703,8 +12717,8 @@ ${userScans.length === 0 ? `
           <li>Weekly opportunity alert emails</li>
           <li>Buyer watchlist monitoring</li>
         </ul>
-        <a href="/billing/checkout?plan=pro" class="rcc-btn-primary" style="display:block;text-align:center">Upgrade to Pro &mdash; &pound;79/mo</a>
-        <div class="rcc-upgrade-sub"><a href="/checkout?plan=payg">One-off scan &pound;29</a> &middot; <a href="/billing/checkout?plan=agency">Agency &pound;499/mo</a></div>
+        <a href="/billing/checkout?plan=pro" class="rcc-btn-primary" style="display:block;text-align:center">Upgrade to Buyer Watchlist &mdash; &pound;249/mo</a>
+        <div class="rcc-upgrade-sub"><a href="/checkout?plan=payg">Buyer Pack &pound;99</a> &middot; <a href="/billing/checkout?plan=agency">Growth Intelligence &pound;749/mo</a></div>
       </div>
     </section>
     ` : ""}
@@ -13182,7 +13196,7 @@ app.get("/privacy", (req, res) => {
 <p>Every data point in a AtlasRevenue report comes from publicly available procurement records: <a href="https://www.contractsfinder.service.gov.uk">Contracts Finder</a> (Crown Commercial Service) and the <a href="https://www.find-tender.service.gov.uk">Find a Tender Service</a> (Cabinet Office). We do not scrape private databases or access restricted systems.</p>
 
 <h2>Data retention</h2>
-<p>Scan data is retained for 12 months from the scan date. You can request deletion of your data at any time by emailing <a href="mailto:privacy@atlasrevenue.co.uk">privacy@atlasrevenue.co.uk</a>.</p>
+<p>Scan data is retained for 12 months from the scan date. You can request deletion of your data at any time by emailing <a href="mailto:privacy@atlasrevenue.io">privacy@atlasrevenue.io</a>.</p>
 
 <h2>Your rights (UK GDPR)</h2>
 <p>You have the right to access, correct, or delete your personal data. You may also request a copy of your data in a portable format. To exercise any of these rights, contact us at the email above.</p>
@@ -13191,7 +13205,7 @@ app.get("/privacy", (req, res) => {
 <p>Payment processing is handled by <a href="https://stripe.com">Stripe</a>. We never see or store your card details. Stripe's privacy policy applies to payment data.</p>
 
 <h2>Contact</h2>
-<p>For privacy questions: <a href="mailto:privacy@atlasrevenue.co.uk">privacy@atlasrevenue.co.uk</a></p>
+<p>For privacy questions: <a href="mailto:privacy@atlasrevenue.io">privacy@atlasrevenue.io</a></p>
 `, req));
 });
 
@@ -13205,7 +13219,7 @@ app.get("/terms", (req, res) => {
 <p>AtlasRevenue reports are intelligence products. They inform your decisions; they do not replace professional bid-writing, legal review, or due diligence.</p>
 
 <h2>Accounts and payment</h2>
-<p>Pay As You Go scans are one-time purchases. Pro and Agency subscriptions renew monthly and can be cancelled at any time. Refunds are considered on a case-by-case basis within 14 days of purchase.</p>
+<p>Buyer Pack scans are one-time purchases. Buyer Watchlist and Growth Intelligence subscriptions renew monthly and can be cancelled at any time. Refunds are considered on a case-by-case basis within 14 days of purchase.</p>
 
 <h2>Acceptable use</h2>
 <p>You may use AtlasRevenue reports for your own business purposes. You may not resell reports, use automated tools to bulk-scrape our pages, or misrepresent AtlasRevenue data as your own research without attribution.</p>
@@ -13217,7 +13231,7 @@ app.get("/terms", (req, res) => {
 <p>We may update these terms. Material changes will be communicated by email to registered users.</p>
 
 <h2>Contact</h2>
-<p>For terms questions: <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a></p>
+<p>For terms questions: <a href="mailto:hello@atlasrevenue.io">hello@atlasrevenue.io</a></p>
 `, req));
 });
 
@@ -13311,16 +13325,16 @@ app.get("/roadmap", (req, res) => {
 </ul>
 
 <h2>Suggest a feature</h2>
-<p>AtlasRevenue is built by people who use it. If there is something you need that is not on this list, email <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a> and it will be read by the team building the product.</p>
+<p>AtlasRevenue is built by people who use it. If there is something you need that is not on this list, email <a href="mailto:hello@atlasrevenue.io">hello@atlasrevenue.io</a> and it will be read by the team building the product.</p>
 `, req));
 });
 
 app.get("/api-docs", (req, res) => {
   res.type("html").send(legalPage("API Documentation", `
-<p style="font-size:16px;line-height:1.75;margin-bottom:32px">AtlasRevenue provides a JSON API for integrating procurement intelligence into your CRM, bid management tools, or internal dashboards. The API is available on <strong>Agency</strong> plans and above.</p>
+<p style="font-size:16px;line-height:1.75;margin-bottom:32px">AtlasRevenue provides a JSON API for integrating procurement intelligence into your CRM, bid management tools, or internal dashboards. The API is available on <strong>Growth Intelligence</strong> plans and above.</p>
 
 <h2>Authentication</h2>
-<p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Agency accounts — contact <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a> to request access.</p>
+<p>All API requests require an <code style="background:rgba(0,0,0,.06);padding:2px 6px;font-size:14px">Authorization: Bearer &lt;your-api-key&gt;</code> header. API keys are provisioned for Growth Intelligence accounts — contact <a href="mailto:hello@atlasrevenue.io">hello@atlasrevenue.io</a> to request access.</p>
 
 <h2>Base URL</h2>
 <p><code style="background:rgba(0,0,0,.06);padding:4px 10px;font-size:14px;display:inline-block">${BASE_URL}</code></p>
@@ -13413,10 +13427,10 @@ app.get("/api-docs", (req, res) => {
 <p>Returns a full supplier profile: entity details, Companies House data, all contract wins with buyer names and values, top buyers, and top categories. No authentication required.</p>
 
 <h2>Webhooks (coming soon)</h2>
-<p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a>.</p>
+<p>We are building webhook support to push scan-complete and weekly-alert events to your endpoint. Register interest by emailing <a href="mailto:hello@atlasrevenue.io">hello@atlasrevenue.io</a>.</p>
 
 <h2>Need help?</h2>
-<p>For API support, integration guidance, or to request access: <a href="mailto:hello@atlasrevenue.co.uk">hello@atlasrevenue.co.uk</a></p>
+<p>For API support, integration guidance, or to request access: <a href="mailto:hello@atlasrevenue.io">hello@atlasrevenue.io</a></p>
 `, req));
 });
 
@@ -13547,7 +13561,7 @@ ${pageShellHeader(null, getAuthUser(req))}
         <li><span class="tick">&#10003;</span> Priority support</li>
         <li><span class="tick">&#10003;</span> Quarterly strategy call</li>
       </ul>
-      <a href="mailto:hello@atlasrevenue.co.uk" class="plan-talk">Managing 5+ client accounts? Talk to us &rarr;</a>
+      <a href="mailto:hello@atlasrevenue.io" class="plan-talk">Managing 5+ client accounts? Talk to us &rarr;</a>
       <a href="/checkout?plan=growth" class="btn btn-outline">Get started &rarr;</a>
     </div>
   </div>
@@ -13619,11 +13633,11 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="faq-item">
       <div class="faq-q">Can I cancel or unsubscribe?</div>
-      <div class="faq-a">Yes. Pro and Agency subscriptions can be cancelled any time &mdash; no lock-in, no penalty. Weekly alert emails include a one-click unsubscribe link in every message. If you want to delete your account and data entirely, email us.</div>
+      <div class="faq-a">Yes. Buyer Watchlist and Growth Intelligence subscriptions can be cancelled any time &mdash; no lock-in, no penalty. Weekly alert emails include a one-click unsubscribe link in every message. If you want to delete your account and data entirely, email us.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q">Where does the data come from?</div>
-      <div class="faq-a">Every data point comes from two official sources: <strong>Contracts Finder</strong> (Crown Commercial Service) and the <strong>Find a Tender Service</strong> (Cabinet Office). We do not scrape private databases. <a href="/sources" style="color:var(--brand);text-decoration:underline">Read about our sources &rarr;</a></div>
+      <div class="faq-a">Built on official UK public data: <strong>Contracts Finder</strong> (Crown Commercial Service), <strong>Find a Tender Service</strong> (Cabinet Office), Companies House, DVLA, ONS, and HM Land Registry. We do not scrape private databases. <a href="/sources" style="color:var(--brand);text-decoration:underline">Read about our sources &rarr;</a></div>
     </div>
   </div>
   ${sampleCtaBlock("full")}
@@ -14193,7 +14207,7 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — find buyers showing evidence-backed demand before they publicly ask for suppliers. Named buyers, intent scores, outreach angles. From £29.">
+<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — find buyers showing evidence-backed demand before they publicly ask for suppliers. Named buyers, intent scores, outreach angles. From £99.">
 <link rel="canonical" href="${BASE_URL}/scan">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Find buyers before they ask for suppliers">
@@ -14511,7 +14525,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
       </div>
 
       <div class="submit-row">
-        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
+        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;99)"} &rarr;</button>
         <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
         <div style="margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Public record only &middot; Intelligence, not certainty</div>
       </div>
@@ -17879,6 +17893,180 @@ const NICHE_FACILITIES: NicheConfig = {
   ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
   ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
 };
+
+const NICHE_CONFIGS: Record<string, NicheConfig> = {
+  retrofit: NICHE_RETROFIT,
+  plumbing: NICHE_PLUMBING,
+  facilities: NICHE_FACILITIES,
+};
+
+type WatchlistSubRow = { id: string; email: string; niche: string; desk_slug: string; last_scores: Record<string, number> | null };
+const watchlistMemStore = new Map<string, WatchlistSubRow>();
+
+function buildNicheBuyerProfiles(cfg: NicheConfig, data: ProcurementData | undefined): BuyerIntentProfile[] {
+  if (!data) return [];
+  const matchTitle = (n: ProcurementNotice): boolean => {
+    const title = n.title.toLowerCase();
+    return cfg.keywords.some(kw => title.includes(kw));
+  };
+  const matchAll = (n: ProcurementNotice): boolean => {
+    const text = `${n.title} ${n.description || ""}`.toLowerCase();
+    return cfg.keywords.some(kw => text.includes(kw));
+  };
+
+  const allOpen = dedupeNoticesSoft(
+    (data.contractsFinder.open || []).concat(data.findTender?.notices || []).filter(matchTitle)
+  );
+  const allAwarded = (data.contractsFinder.awarded || []).filter(matchAll);
+  const cutoff30 = Date.now() - 30 * 24 * 3_600_000;
+
+  const buyerMap = new Map<string, { awardedValue: number; count: number; openCount: number; latestDate: string; signals: Set<string> }>();
+  for (const n of (allAwarded as ProcurementNotice[]).concat(allOpen)) {
+    if (!n.buyer || n.buyer === "Not stated") continue;
+    const e = buyerMap.get(n.buyer) || { awardedValue: 0, count: 0, openCount: 0, latestDate: "", signals: new Set<string>() };
+    e.count++;
+    e.awardedValue += n.awardedValue ?? 0;
+    const d = n.awardedDate || n.publishedDate || "";
+    if (d > e.latestDate) e.latestDate = d;
+    if (allOpen.includes(n)) e.openCount++;
+    for (const s of detectSignals(n.title)) e.signals.add(s);
+    buyerMap.set(n.buyer, e);
+  }
+
+  return [...buyerMap.entries()]
+    .filter(([buyer]) => !isAggregatorBuyer(buyer))
+    .map(([buyer, info]) => {
+      const orgType = buyerOrgType(buyer);
+      const signals = [...info.signals];
+      const hasRecentOpen = info.openCount > 0 && new Date(info.latestDate).getTime() > cutoff30;
+      const intentScore = computeIntentScore(buyer, { awardedValue: info.awardedValue, noticeCount: info.count, openCount: info.openCount, hasRecentOpen, signals, orgType });
+      const whyNow = generateWhyNow(orgType, signals, hasRecentOpen, info.awardedValue);
+      const outreach = generateOutreach(orgType, signals);
+      return {
+        buyer, orgType, awardedValue: info.awardedValue, noticeCount: info.count, openCount: info.openCount,
+        latestDate: info.latestDate, hasRecentOpen, signals, intentScore, whyNow,
+        likelyNeed: generateLikelyNeed(signals),
+        route: generateRoute(orgType, hasRecentOpen),
+        outreachAngle: outreach.angle, outreachEmail: outreach.email,
+        outreachCall: outreach.call, outreachLinkedIn: outreach.linkedIn,
+        doNotSay: outreach.doNotSay,
+        contractorFit: generateContractorFit(info.awardedValue, info.count),
+        timing: generateTiming(hasRecentOpen, info.latestDate),
+      };
+    })
+    .sort((a, b) => b.intentScore - a.intentScore);
+}
+
+async function runWatchlistDigests(): Promise<void> {
+  if (!isEmailConfigured()) {
+    console.log("[watchlist] email not configured, skipping");
+    return;
+  }
+
+  const subscribers: WatchlistSubRow[] = pool
+    ? (await pool.query<WatchlistSubRow>(`SELECT id, email, niche, desk_slug, last_scores FROM watchlist_subscribers WHERE active = TRUE ORDER BY created_at ASC`)).rows
+    : [...watchlistMemStore.values()].filter(s => true);
+
+  if (subscribers.length === 0) {
+    console.log("[watchlist] no subscribers");
+    return;
+  }
+
+  const cacheByDesk = new Map<string, ProcurementData | null>();
+  let sent = 0;
+
+  for (const sub of subscribers) {
+    try {
+      const cfg = NICHE_CONFIGS[sub.niche];
+      if (!cfg) { console.log(`[watchlist] unknown niche ${sub.niche}, skipping`); continue; }
+
+      if (!cacheByDesk.has(sub.desk_slug)) {
+        const cached = await getDeskCache(sub.desk_slug).catch(() => null);
+        cacheByDesk.set(sub.desk_slug, cached?.data ?? null);
+      }
+      const data = cacheByDesk.get(sub.desk_slug);
+      if (!data) { console.log(`[watchlist] no cache for desk ${sub.desk_slug}, skipping`); continue; }
+
+      const profiles = buildNicheBuyerProfiles(cfg, data);
+      if (profiles.length === 0) continue;
+
+      const prevScores = sub.last_scores || {};
+      const topBuyers = profiles.slice(0, 15);
+      const highIntentCount = profiles.filter(b => b.intentScore >= 60).length;
+      const avgScore = topBuyers.length > 0 ? Math.round(topBuyers.reduce((s, b) => s + b.intentScore, 0) / topBuyers.length) : 0;
+
+      const buyers = topBuyers.map(bp => ({
+        buyer: bp.buyer,
+        orgType: bp.orgType,
+        intentScore: bp.intentScore,
+        prevScore: prevScores[bp.buyer] ?? null,
+        whyNow: bp.whyNow,
+        likelyNeed: bp.likelyNeed,
+        isNew: !(bp.buyer in prevScores),
+      }));
+
+      await sendWatchlistDigest({
+        email: sub.email,
+        niche: cfg.title.replace(/&amp;/g, "&").replace(/&mdash;.*/, "").replace(/<[^>]+>/g, "").trim(),
+        buyers,
+        totalTracked: profiles.length,
+        highIntentCount,
+        avgScore,
+        marketPageUrl: absoluteAppUrl(`/market/${sub.niche}`),
+        unsubscribeUrl: absoluteAppUrl(`/unsubscribe-watchlist/${sub.id}`),
+      });
+
+      const newScores: Record<string, number> = {};
+      for (const bp of profiles) newScores[bp.buyer] = bp.intentScore;
+      if (pool) {
+        await pool.query(`UPDATE watchlist_subscribers SET last_scores = $1, last_sent_at = NOW() WHERE id = $2`, [JSON.stringify(newScores), sub.id]);
+      } else {
+        const mem = watchlistMemStore.get(sub.id);
+        if (mem) { mem.last_scores = newScores; }
+      }
+
+      sent++;
+    } catch (err) {
+      console.error(`[watchlist] failed for ${sub.email}`, err);
+    }
+  }
+  console.log(`[watchlist] sent ${sent}/${subscribers.length} digests`);
+}
+
+function startWatchlistWorker() {
+  if (!redisConnection) {
+    console.log("[watchlist] Redis not configured. Weekly watchlist digests disabled.");
+    return;
+  }
+
+  const wlQueue = new Queue("atlasrevenue-watchlist", { connection: redisConnection as any });
+  wlQueue.add(
+    "weekly-watchlist",
+    {},
+    {
+      repeat: { every: 7 * 24 * 60 * 60 * 1000 },
+      jobId: "watchlist-digest",
+      attempts: 2,
+      backoff: { type: "exponential", delay: 10_000 },
+      removeOnComplete: { age: 60 * 60 * 24 * 30 },
+      removeOnFail: { age: 60 * 60 * 24 * 30 },
+    }
+  ).catch(err => console.error("[watchlist] failed to schedule job", err));
+
+  const worker = new Worker(
+    "atlasrevenue-watchlist",
+    async () => { await runWatchlistDigests(); },
+    { connection: redisConnection as any, concurrency: 1 }
+  );
+
+  worker.on("completed", job => { console.log(`[watchlist] completed job ${job.id}`); });
+  worker.on("failed", (job, err) => {
+    console.error(`[watchlist] failed job ${job?.id}`, err);
+    captureError(err, { watchlistWorker: true });
+  });
+
+  console.log("[watchlist] worker started");
+}
 
 function nicheMarketPage(
   cfg: NicheConfig,
@@ -22934,6 +23122,44 @@ app.get("/unsubscribe-briefing/:id", asyncRoute(async (req, res) => {
 </body></html>`);
 }));
 
+app.post("/api/watchlist/subscribe", asyncRoute(async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const niche = String(req.body?.niche || "").trim().toLowerCase();
+  if (!email || !niche) { res.status(400).json({ error: "email and niche are required" }); return; }
+  const cfg = NICHE_CONFIGS[niche];
+  if (!cfg) { res.status(400).json({ error: `Unknown niche: ${niche}. Available: ${Object.keys(NICHE_CONFIGS).join(", ")}` }); return; }
+  const id = crypto.randomUUID();
+  if (pool) {
+    await pool.query(
+      `INSERT INTO watchlist_subscribers (id, email, niche, desk_slug) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email, niche) DO UPDATE SET active = TRUE`,
+      [id, email, niche, cfg.deskSlug]
+    );
+  } else {
+    watchlistMemStore.set(`${email}:${niche}`, { id, email, niche, desk_slug: cfg.deskSlug, last_scores: null });
+  }
+  res.json({ ok: true, niche, message: `Subscribed ${email} to weekly ${niche} buyer watchlist` });
+}));
+
+app.get("/unsubscribe-watchlist/:id", asyncRoute(async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) { res.status(400).type("html").send(`<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;padding:40px"><p>Invalid link.</p></body>`); return; }
+  if (pool) {
+    await pool.query(`UPDATE watchlist_subscribers SET active = FALSE WHERE id = $1`, [id]);
+  } else {
+    for (const [k, v] of watchlistMemStore.entries()) { if (v.id === id) { watchlistMemStore.delete(k); break; } }
+  }
+  res.type("html").send(`<!doctype html>
+<html lang="en">
+<body style="font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#F3EFE6;color:#0B0F14;padding:40px">
+<div style="max-width:600px;margin:auto;background:#FAF8F3;border:1px solid #0F141926;padding:32px">
+  <h1 style="font-family:'Spectral','Iowan Old Style',Georgia,serif;margin-top:0">Unsubscribed</h1>
+  <p>You have been removed from the weekly buyer watchlist digest.</p>
+  <p><a href="/" style="color:#1d6b4f">Back to AtlasRevenue</a></p>
+</div>
+</body></html>`);
+}));
+
 app.get("/admin/subscriptions", requireAdmin, asyncRoute(async (req, res) => {
   const subs = await listAllSubscriptions();
   const token = String(req.query.token || "");
@@ -23530,7 +23756,7 @@ app.post("/admin/articles/comments/:id/reply", requireAdmin, asyncRoute(async (r
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: process.env.FROM_EMAIL ?? "noreply@atlasrevenue.co.uk",
+        from: process.env.FROM_EMAIL ?? "noreply@atlasrevenue.io",
         to: commenterEmail,
         subject: `AtlasRevenue replied to your comment on "${article.title}"`,
         html: `<p>AtlasRevenue replied to your comment on <a href="${BASE_URL}/articles/${article.slug}">${escapeHtml(article.title)}</a>:</p><blockquote>${escapeHtml(body)}</blockquote>`
@@ -23749,6 +23975,7 @@ initDb()
       startScanWorker();
       startAlertWorker();
       startBriefingWorker();
+      startWatchlistWorker();
       startSignalsWorker();
       if (redisConnection) {
         startIngestScheduler(redisConnection);
