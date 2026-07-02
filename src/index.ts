@@ -6437,7 +6437,7 @@ ${article.hero_image_url ? `<div class="art-hero-image" style="max-width:1320px;
     </div>
     <div class="rail-card">
       <div class="rail-label">Full intelligence</div>
-      <div class="rail-pricing-text">Sector reports, weekly alerts, and buyer data. <strong style="color:var(--dark)">From £99.</strong></div>
+      <div class="rail-pricing-text">Sector reports, weekly alerts, and buyer data. <strong style="color:var(--dark)">From £29.</strong></div>
       <a href="/pricing" class="rail-pricing-btn">See pricing →</a>
       <a href="/scan/sample" class="rail-sample-link">View sample report →</a>
     </div>
@@ -8521,7 +8521,7 @@ app.get("/", asyncRoute(async (req, res) => {
         {
           "@type": "Question",
           "name": "How much does it cost?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Buyer Pack scans are £99 one-off. Buyer Watchlist (£249/mo) and Growth Intelligence (£749/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Buyer Pack scans are £29 one-off. Buyer Watchlist (£49/mo) and Growth Intelligence (£149/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector." }
         }
       ]
     }
@@ -8919,7 +8919,7 @@ ${chaseNowHtml}
     <div class="scan-strip-left">
       <div class="scan-strip-eyebrow">Intelligence scan &middot; 2&ndash;4 minutes</div>
       <div class="scan-strip-hed">Stop guessing where your next revenue comes from.</div>
-      <div class="scan-strip-sub">Tell us what you sell and where. We combine procurement records, company data, geography, property, economic and sector signals to show where demand is forming and which buyers match your services. From £99.</div>
+      <div class="scan-strip-sub">Tell us what you sell and where. We combine procurement records, company data, geography, property, economic and sector signals to show where demand is forming and which buyers match your services. From £29.</div>
     </div>
     <div class="scan-strip-right">
       <a class="scan-strip-btn" href="/scan">Run a scan &rarr;</a>
@@ -9010,7 +9010,7 @@ ${chaseNowHtml}
         ["Is the data real, or AI-generated guesses?", "Real. Every demand signal is sourced from a named UK dataset or authority with the figure, geography and date attached. Nothing is invented. Where the evidence is thin, the report says so plainly rather than padding it out."],
         ["I don't sell to government — is this still for me?", "Yes. Choose the market-demand scan mode and AtlasRevenue focuses entirely on who buys your products or services, where demand is concentrated, who your competitors are, and exactly how to reach buyers — with no procurement content at all."],
         ["How long does a scan take?", "Two to four minutes. You submit a short profile, the engine pulls and scores the data, and your report is ready to read on screen or download as a PDF."],
-        ["How much does it cost?", "Buyer Pack scans are £99 one-off. Buyer Watchlist (£249/mo) and Growth Intelligence (£749/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector."],
+        ["How much does it cost?", "Buyer Pack scans are £29 one-off. Buyer Watchlist (£49/mo) and Growth Intelligence (£149/mo) subscriptions add ongoing weekly intelligence and alerts when new demand or contracts appear in your sector."],
       ].map(([q, a]) => `
       <details style="border-bottom:1px solid var(--border-2);padding:18px 0">
         <summary style="font-family:var(--sans);font-weight:600;font-size:17px;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px">${escapeHtml(q)}<span style="color:var(--brand);font-size:20px;font-weight:400">+</span></summary>
@@ -10520,7 +10520,7 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     <div class="svc-gate">
       <div>
         <div class="svc-gate-title">Get the full list — ${moreCount.toLocaleString("en-GB")}+ companies</div>
-        <div class="svc-gate-sub">Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. The engine goes beyond the register — it maps who's actually buying what you sell. £99.</div>
+        <div class="svc-gate-sub">Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. The engine goes beyond the register — it maps who's actually buying what you sell. £29.</div>
       </div>
       <div class="svc-gate-actions">
         <a class="svc-btn" href="/scan?services=${encodeURIComponent(q)}">Run a full scan &rarr;</a>
@@ -10547,7 +10547,7 @@ function previewPage(q: string, result: import("./signals/market-intel.js").Name
     <div class=”svc-cards”>
       <a class=”svc-card” href=”/preview?q=design%20studio”><div class=”svc-card-label”>1 · Type what you sell</div><div class=”svc-card-blurb”>”web design”, “IT support”, “accountancy”. No account, no email.</div><div class=”svc-card-ex”>free · instant</div></a>
       <a class=”svc-card” href=”/sectors”><div class=”svc-card-label”>2 · See your market mapped</div><div class=”svc-card-blurb”>Total companies in your space, the densest regions, and the newest entrants from the live Companies House register.</div><div class=”svc-card-ex”>real register data</div></a>
-      <a class=”svc-card” href=”/scan”><div class=”svc-card-label”>3 · Find who's actually buying</div><div class=”svc-card-blurb”>Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. £99.</div><div class=”svc-card-ex”>from £99</div></a>
+      <a class=”svc-card” href=”/scan”><div class=”svc-card-label”>3 · Find who's actually buying</div><div class=”svc-card-blurb”>Run a full scan for demand signals, live contracts, named buyers, and a 30-day plan. £29.</div><div class=”svc-card-ex”>from £29</div></a>
     </div>`;
   }
 
@@ -12909,7 +12909,7 @@ ${userScans.length === 0 ? `
       <div class="rcc-card-body">
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Email</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:11px">${escapeHtml(user.email)}</span></div>
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Plan</span><span class="rcc-plan-val"><span class="rcc-tier-pill rcc-tier-${escapeHtml(user.tier)}">${escapeHtml(tierLabel[user.tier])}</span></span></div>
-        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Rate</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:12px">${user.tier === "free" ? "Free" : user.tier === "payg" ? "&pound;99/scan" : user.tier === "pro" ? "&pound;249/mo" : "&pound;749/mo"}</span></div>
+        <div class="rcc-plan-row"><span class="rcc-plan-lbl">Rate</span><span class="rcc-plan-val" style="font-family:var(--mono);font-size:12px">${user.tier === "free" ? "Free" : user.tier === "payg" ? "&pound;29/scan" : user.tier === "pro" ? "&pound;49/mo" : "&pound;149/mo"}</span></div>
         <div class="rcc-plan-row"><span class="rcc-plan-lbl">Member since</span><span class="rcc-plan-val">${escapeHtml(memberSince)}</span></div>
         ${user.tier !== "free" && user.stripe_customer_id ? `
         <form method="POST" action="/billing/portal" style="margin-top:14px">
@@ -12930,8 +12930,8 @@ ${userScans.length === 0 ? `
           <li>Weekly opportunity alert emails</li>
           <li>Buyer watchlist monitoring</li>
         </ul>
-        <a href="/billing/checkout?plan=pro" class="rcc-btn-primary" style="display:block;text-align:center">Upgrade to Buyer Watchlist &mdash; &pound;249/mo</a>
-        <div class="rcc-upgrade-sub"><a href="/checkout?plan=payg">Buyer Pack &pound;99</a> &middot; <a href="/billing/checkout?plan=agency">Growth Intelligence &pound;749/mo</a></div>
+        <a href="/billing/checkout?plan=pro" class="rcc-btn-primary" style="display:block;text-align:center">Upgrade to Buyer Watchlist &mdash; &pound;49/mo</a>
+        <div class="rcc-upgrade-sub"><a href="/checkout?plan=payg">Buyer Pack &pound;29</a> &middot; <a href="/billing/checkout?plan=agency">Growth Intelligence &pound;149/mo</a></div>
       </div>
     </section>
     ` : ""}
@@ -13653,11 +13653,11 @@ app.get("/pricing", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — AtlasRevenue | Buyer Packs from £99</title>
-<meta name="description" content="AtlasRevenue pricing. Buyer Packs from £99 one-off, Buyer Watchlist from £249/month, Growth Intelligence from £749/month. Named buyers with intent scores, outreach packs, and action plans.">
+<title>Pricing — AtlasRevenue | Buyer Packs from £29</title>
+<meta name="description" content="AtlasRevenue pricing. Buyer Packs from £29 one-off, Buyer Watchlist from £49/month, Growth Intelligence from £149/month. Named buyers with intent scores, outreach packs, and action plans.">
 <link rel="canonical" href="${BASE_URL}/pricing">
 <meta name="robots" content="index, follow">
-<meta property="og:title" content="AtlasRevenue Pricing — Buyer Packs from £99">
+<meta property="og:title" content="AtlasRevenue Pricing — Buyer Packs from £29">
 <meta property="og:description" content="Named buyers with intent scores, outreach packs, and action plans. One-off or subscribe.">
 <meta property="og:url" content="${BASE_URL}/pricing">
 <style>
@@ -13731,7 +13731,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     <div class="plan featured">
       <div class="plan-badge">Start here</div>
       <div class="plan-name">Buyer Pack</div>
-      <div class="plan-price"><sup>£</sup>99</div>
+      <div class="plan-price"><sup>£</sup>29</div>
       <div class="plan-period">one-off &middot; per niche</div>
       <div class="plan-desc">15&ndash;25 named buyers in your niche with intent scores, outreach packs, and a 30-day action plan. Proves the value before you subscribe.</div>
       <ul>
@@ -13747,7 +13747,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="plan">
       <div class="plan-name">Buyer Watchlist</div>
-      <div class="plan-price"><sup>£</sup>249</div>
+      <div class="plan-price"><sup>£</sup>49</div>
       <div class="plan-period">per month &middot; cancel anytime</div>
       <div class="plan-desc">Continuous monitoring of your niche. Weekly score updates, new buyer alerts, and refreshed outreach angles as signals change.</div>
       <ul>
@@ -13762,7 +13762,7 @@ ${pageShellHeader(null, getAuthUser(req))}
     </div>
     <div class="plan">
       <div class="plan-name">Growth Intelligence</div>
-      <div class="plan-price"><sup>£</sup>749</div>
+      <div class="plan-price"><sup>£</sup>149</div>
       <div class="plan-period">per month</div>
       <div class="plan-desc">For agencies, bid writers, and consultancies managing client portfolios. Multi-niche coverage, team access, and white-label reports.</div>
       <ul>
@@ -13786,9 +13786,9 @@ ${pageShellHeader(null, getAuthUser(req))}
       <thead>
         <tr>
           <th style="min-width:220px">Feature</th>
-          <th class="cmp-hl" style="min-width:120px">Buyer Pack<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;99</span></th>
-          <th style="min-width:120px">Watchlist<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;249/mo</span></th>
-          <th style="min-width:120px">Growth<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;749/mo</span></th>
+          <th class="cmp-hl" style="min-width:120px">Buyer Pack<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;29</span></th>
+          <th style="min-width:120px">Watchlist<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;49/mo</span></th>
+          <th style="min-width:120px">Growth<br><span style="font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)">&pound;149/mo</span></th>
         </tr>
       </thead>
       <tbody>
@@ -13872,21 +13872,21 @@ ${pageShellFoot()}
 const PLAN_CONFIG: Record<string, { name: string; price: string; period: string; mode: string; items: string[] }> = {
   payg: {
     name: "Buyer Pack",
-    price: "£99",
+    price: "£29",
     period: "one-off per niche",
     mode: "payment",
     items: ["15–25 buyer opportunity cards", "Intent Score (0–100) per buyer", "Why Now? analysis", "Outreach pack (email + call + LinkedIn)", "Routes to revenue map", "30-day activation plan", "PDF export"],
   },
   watchlist: {
     name: "Buyer Watchlist",
-    price: "£249",
+    price: "£49",
     period: "per month — cancel anytime",
     mode: "subscription",
     items: ["Everything in Buyer Pack", "Weekly intent score updates", "New buyer alerts (email)", "Refreshed outreach angles", "Contract expiry tracking", `All ${DESK_PROFILES.filter(d => d.live).length} intelligence desks`],
   },
   growth: {
     name: "Growth Intelligence",
-    price: "£749",
+    price: "£149",
     period: "per month",
     mode: "subscription",
     items: ["Everything in Watchlist", "Up to 5 niche verticals", "Client portfolio management", "Team access (5 seats)", "White-label PDF reports", "Priority support", "Quarterly strategy call"],
@@ -14054,12 +14054,12 @@ app.get("/scan/sample", asyncRoute(async (req, res) => {
     <div class="sr-tier-banner sr-tier-2-banner">
       <div class="sr-tier-tag">Illustrative Report Format</div>
       <div class="sr-tier-h">Report format: fictional company, fictional opportunities</div>
-      <div class="sr-tier-p">The sections below show the structure a £99 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
+      <div class="sr-tier-p">The sections below show the structure a £29 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
     </div>` : `
     <div class="sr-tier-banner sr-tier-2-banner">
       <div class="sr-tier-tag">Illustrative Report Format</div>
       <div class="sr-tier-h">Report format: fictional company, fictional opportunities</div>
-      <div class="sr-tier-p">The sections below show the structure a £99 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
+      <div class="sr-tier-p">The sections below show the structure a £29 Buyer Pack delivers. Every buyer name, value, and deadline is illustrative. In a live scan, these come from real Contracts Finder and Find a Tender records with source links you can click to verify.</div>
     </div>`;
 
   res.type("html").send(`<!DOCTYPE html>
@@ -14329,7 +14329,7 @@ ${pageShellHeader(null, authCtx)}
     <div style="font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:8px;color:var(--text);line-height:1.4">Same engine, your profile, 2&ndash;4 minutes.</div>
     <p style="font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:20px;max-width:40em;margin-left:auto;margin-right:auto">Report depth varies by sector &mdash; data-rich sectors like construction return more matches than niche ones. The engine says so plainly when evidence is thin.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center">
-      <a href="/scan">Run your scan &mdash; &pound;99 &rarr;</a>
+      <a href="/scan">Run your scan &mdash; &pound;29 &rarr;</a>
       <a href="/pricing" style="display:inline-block;background:transparent;color:var(--text-mid);font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:14px 24px;border:1px solid var(--border-3);text-decoration:none">View pricing</a>
     </div>
   </div>
@@ -14374,7 +14374,7 @@ app.get("/scan", (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — find buyers showing evidence-backed demand before they publicly ask for suppliers. Named buyers, intent scores, outreach angles. From £99.">
+<meta name="description" content="Run an AtlasRevenue scan. Tell us what you sell and where — find buyers showing evidence-backed demand before they publicly ask for suppliers. Named buyers, intent scores, outreach angles. From £29.">
 <link rel="canonical" href="${BASE_URL}/scan">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Find buyers before they ask for suppliers">
@@ -14692,7 +14692,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
       </div>
 
       <div class="submit-row">
-        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;99)"} &rarr;</button>
+        <button type="submit" class="btn-submit">${auth ? "Run AtlasRevenue Scan" : "Continue to payment (&pound;29)"} &rarr;</button>
         <span class="submit-note">${auth ? "Takes 2–4 minutes · HTML & PDF report" : "Pay once · no account needed · report ready in minutes"}</span>
         <div style="margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Public record only &middot; Intelligence, not certainty</div>
       </div>
@@ -18004,8 +18004,8 @@ const NICHE_RETROFIT: NicheConfig = {
     { label: "Contract Expiry / Rebid", desc: "Existing retrofit framework agreements expiring within 12 months — new competition opens.", signal: "Recurring" },
   ],
   ctaNiche: "retrofit",
-  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
-  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;49/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;149/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
 };
 
 const NICHE_PLUMBING: NicheConfig = {
@@ -18054,8 +18054,8 @@ const NICHE_PLUMBING: NicheConfig = {
     { label: "Emergency & Reactive Cover", desc: "Out-of-hours callout contracts for heating, plumbing and electrical faults — high-margin, recurring.", signal: "Recurring" },
   ],
   ctaNiche: "plumbing & M&E",
-  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
-  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;49/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;149/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
 };
 
 const NICHE_FACILITIES: NicheConfig = {
@@ -18104,8 +18104,8 @@ const NICHE_FACILITIES: NicheConfig = {
     { label: "Emergency & Mobilisation", desc: "Short-notice interim FM contracts when an incumbent fails or a new building opens. High-margin, fast turnaround.", signal: "Recurring" },
   ],
   ctaNiche: "FM",
-  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;249/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
-  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;749/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
+  ctaWatchlistLine: "Want ongoing monitoring? <strong style=\"color:rgba(236,230,214,.5)\">Buyer Watchlist &pound;49/mo</strong> &mdash; weekly score updates, new buyer alerts, refreshed outreach angles.",
+  ctaGrowthLine: "Agencies &amp; bid writers? <strong style=\"color:rgba(236,230,214,.5)\">Growth Intelligence &pound;149/mo</strong> &mdash; multi-niche packs, client portfolios, team access.",
 };
 
 const NICHE_CONFIGS: Record<string, NicheConfig> = {
@@ -18776,10 +18776,10 @@ ${pageShellHeader(null, authCtx)}
 
 <section class="rm-cta">
   <div class="rm-cta-inner">
-    <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;99</div>
+    <div class="rm-cta-eyebrow">Buyer Pack &mdash; &pound;29</div>
     <h2>Get ${isCompiling ? "15+" : String(Math.min(buyerProfiles.length, 25))} ${escapeHtml(cfg.ctaNiche)} buyer opportunities this week</h2>
     <p class="rm-cta-lede">Named buyers, intent scores, Why Now? analysis, tailored outreach packs (email + call + LinkedIn + &ldquo;do not say&rdquo;), and a 30-day action plan. Built for contractors who want to find work before the competition sees it.</p>
-    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;99 &rarr;</a>
+    <a href="/scan" class="rm-cta-btn">Get buyer pack &nbsp;&pound;29 &rarr;</a>
     <p class="rm-cta-note">One-off &bull; public data only &bull; delivered within 48 hours</p>
     <p style="font-family:var(--mono);font-size:10px;color:rgba(236,230,214,.3);margin-top:24px;line-height:1.6">
       ${cfg.ctaWatchlistLine}<br>
