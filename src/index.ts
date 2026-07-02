@@ -23,7 +23,7 @@ import puppeteer from "puppeteer";
 import { createHash } from "node:crypto";
 import { renderWorldClassDashboard, renderArticleChart, type ArticleChartSpec } from "./designEngine.js";
 import { buildPdfStorageKey, isPdfStorageConfigured, storePdfObject, storeObject } from "./lib/pdfStorage.js";
-import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail, sendWatchlistDigest } from "./lib/emailNotifications.js";
+import { buildScanLinks, isEmailConfigured, notifyScanCompleted, notifyScanFailed, sendWeeklyAlert, sendBriefingEmail, sendWelcomeEmail, sendPasswordResetEmail, sendWatchlistDigest } from "./lib/emailNotifications.js";
 import {
   escapeHtml, formatMoney, formatDate, fmtMoney, slugify,
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
@@ -5189,7 +5189,10 @@ const DESK_PROFILES: DeskProfile[] = [
     ]
   },
   { slug: "catering", label: "Catering & Food", standfirst: "School meals, hospital catering, care home catering, prison catering, vending, and food equipment across the public sector.", live: true,
-    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "catering school meals hospital catering care home meals on wheels vending food services kitchen", idealBuyers: "local authorities NHS trusts schools academies prison service care homes", mainGoal: "find catering and food services contracts" }),
+    // "care home meals" tripped the social-care branch in resolveSector (checked before
+    // catering), making this desk pull the social-care dataset. "residential meals" avoids
+    // every social-care trigger while "meals on wheels"/"catering" still resolve catering.
+    pinnedProfile: intakeSchema.parse({ companyName: "AtlasRevenue Desk", mainServices: "catering school meals hospital catering residential meals on wheels vending food services kitchen", idealBuyers: "local authorities NHS trusts schools academies prison service care homes", mainGoal: "find catering and food services contracts" }),
     categories: [
       { label: "School Meals & Education Catering", keywords: ["school meals", "school catering", "school kitchen", "breakfast club", "universal infant"], subcategories: ["Primary school meals","Secondary school meals","Universal infant free meals","Breakfast clubs","Kitchen management","Catering staff","Allergen management","Food education","Healthy school meals","Academy catering","School tuck shops","Packed lunch alternatives"] },
       { label: "Hospital & NHS Catering", keywords: ["hospital catering", "nhs catering", "patient meals", "ward food", "clinical nutrition"], subcategories: ["Patient meals","Ward trolley service","Cook-chill meals","Texture-modified meals","Clinical nutrition","Specialist diets","Cafe concessions","Staff restaurant","Vending (NHS)","Retail outlets (NHS)","Allergen control (NHS)","Bedside catering"] },
@@ -12062,7 +12065,7 @@ ${err ? `<div class="err">${err}</div>` : ""}
 <div class="field"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
 <button class="btn-primary" type="submit">Sign in</button>
 </form>
-<p class="auth-alt">No account? <a href="/register">Create one free</a></p>
+<p class="auth-alt">No account? <a href="/register">Create one free</a> &middot; <a href="/forgot">Forgot password?</a></p>
 <div style="margin-top:16px;padding:16px 20px;border:1px solid rgba(160,82,45,.25);background:rgba(160,82,45,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
   <div><div style="font-family:monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#A0522D;margin-bottom:4px">&#9679; Sample available</div><div style="font-size:12px;color:#888">Preview a full 10-section intelligence report</div></div>
   <a href="/scan/sample" style="font-family:monospace;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#A0522D;padding:8px 16px;text-decoration:none">View &rarr;</a>
@@ -12081,6 +12084,59 @@ app.post("/login", asyncRoute(async (req, res) => {
   const token = signToken(user);
   res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
   res.redirect(nextUrl.startsWith("/") ? nextUrl : "/account");
+}));
+
+// Password reset = re-issued setup link (reuses users.setup_token + /account/setup).
+// Response is identical whether or not the email exists (no account enumeration);
+// per-email debounce stops mailbox flooding.
+const forgotDebounce = new Map<string, number>();
+const FORGOT_DEBOUNCE_MS = 10 * 60 * 1000;
+
+function forgotSentPage(): string {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Check your email — AtlasRevenue</title><style>${authCss}</style></head>
+<body>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/login">Sign in</a></nav>
+<div class="auth-wrap"><div class="auth-card">
+<div class="auth-card-label">Password reset</div>
+<h1>Check your email</h1>
+<p class="sub">If that email has an AtlasRevenue account, a reset link is on its way. It expires in 1 hour. Check spam if it hasn't arrived in a couple of minutes.</p>
+<p class="auth-alt"><a href="/login">Back to sign in</a></p>
+</div></div></body></html>`;
+}
+
+app.get("/forgot", (req, res) => {
+  if (getAuthUser(req)) { res.redirect("/account"); return; }
+  res.type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reset password — AtlasRevenue</title><style>${authCss}</style></head>
+<body>
+<nav class="auth-nav"><div class="auth-nav-brand"><div class="auth-nav-dot"></div><a href="/" class="auth-nav-logo">Atlas<b>Revenue</b></a></div><a href="/login">Sign in</a></nav>
+<div class="auth-wrap"><div class="auth-card">
+<div class="auth-card-label">Password reset</div>
+<h1>Forgot your password?</h1>
+<p class="sub">Enter your account email and we'll send you a link to set a new one.</p>
+<form method="POST" action="/forgot">
+<div class="field"><label>Email address</label><input type="email" name="email" required autocomplete="email"></div>
+<button class="btn-primary" type="submit">Send reset link</button>
+</form>
+<p class="auth-alt">Remembered it? <a href="/login">Sign in</a></p>
+</div></div></body></html>`);
+});
+
+app.post("/forgot", asyncRoute(async (req, res) => {
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  if (!email || !pool) { res.type("html").send(forgotSentPage()); return; }
+  const last = forgotDebounce.get(email) || 0;
+  if (Date.now() - last > FORGOT_DEBOUNCE_MS) {
+    const user = await getUserByEmail(email);
+    if (user) {
+      forgotDebounce.set(email, Date.now());
+      const resetToken = makeId() + makeId();
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await pool.query(`UPDATE users SET setup_token=$2, setup_token_expires=$3 WHERE id=$1`, [user.id, resetToken, resetExpires]);
+      const resetUrl = `${BASE_URL}/account/setup?token=${encodeURIComponent(resetToken)}`;
+      sendPasswordResetEmail(email, resetUrl).catch(err => console.error("[forgot] reset email failed", err));
+    }
+  }
+  res.type("html").send(forgotSentPage());
 }));
 
 app.get("/logout", (req, res) => {

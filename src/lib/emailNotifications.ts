@@ -261,6 +261,24 @@ export async function sendWelcomeEmail(email: string, plan: string, setupUrl: st
   });
 }
 
+export async function sendPasswordResetEmail(email: string, resetUrl: string) {
+  await sendEmail({
+    to: email,
+    subject: `Reset your AtlasRevenue password`,
+    text: [
+      `Someone (hopefully you) asked to reset the password for this AtlasRevenue account.`,
+      ``,
+      `Set a new password here:`,
+      ``,
+      `${resetUrl}`,
+      ``,
+      `This link expires in 1 hour. If you didn't request this, you can ignore this email — your password is unchanged.`,
+      ``,
+      `— AtlasRevenue`
+    ].join("\n")
+  });
+}
+
 export async function sendWeeklyAlert(input: {
   subscriptionId: string;
   companyName: string;
