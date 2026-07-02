@@ -12966,10 +12966,16 @@ ${pageShellFoot()}
 
 // ── Stripe billing ────────────────────────────────────────────────────────────
 
+// Public plan keys (watchlist/growth on /pricing and /checkout) map onto the
+// three billing tiers — without this, plan=growth fell through to the pro price
+// and the webhook wrote invalid tiers like "growth" into users.tier.
+const normalizePlanKey = (plan: string): "payg" | "pro" | "agency" =>
+  plan === "payg" ? "payg" : plan === "agency" || plan === "growth" ? "agency" : "pro";
+
 app.get("/billing/checkout", asyncRoute(async (req, res) => {
   if (!stripe) { res.redirect("/pricing"); return; }
   const auth = getAuthUser(req);
-  const plan = String(req.query.plan || "pro");
+  const plan = normalizePlanKey(String(req.query.plan || "pro"));
 
   let priceId: string;
   let mode: "payment" | "subscription";
@@ -13036,7 +13042,7 @@ app.post("/billing/webhook", express.raw({ type: "application/json" }), asyncRou
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const plan = ((session.metadata?.plan as string) || "pro") as UserTier;
+    const plan: UserTier = normalizePlanKey((session.metadata?.plan as string) || "pro");
     const stripeCustomerId = session.customer as string;
     const stripeSubId = (session.subscription as string | null) ?? undefined;
     const paymentIntent = (session.payment_intent as string | null) ?? null;
