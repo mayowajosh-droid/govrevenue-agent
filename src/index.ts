@@ -6201,9 +6201,21 @@ footer.hp-foot .fp-legal-inner{max-width:1320px;margin:0 auto;padding:20px 48px;
 }
 
 function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: CommentRow[], authCtx?: { userId: string; email: string; tier: UserTier } | null): string {
-  // Strip AI-generated FAQ sections — they belong in the prompt output, not the published article
-  const cleanedBodyMd = article.body_md.replace(/^#{1,3}\s*frequently asked questions[\s\S]*/im, "").trim();
-  const bodyHtml = parseShortcodes(cleanedBodyMd, assets);
+  // FAQ sections render in place (AEO: search and AI engines quote them) and also
+  // emit FAQPage JSON-LD. Q = each ### heading inside the FAQ block, A = the text
+  // under it. Block ends at the next ## heading or end of document.
+  const faqEntries: { q: string; a: string }[] = [];
+  const faqBlock = article.body_md.match(/^#{1,3}\s*frequently asked questions[^\n]*\n([\s\S]*?)(?=^##[^#]|(?![\s\S]))/im);
+  if (faqBlock) {
+    for (const chunk of faqBlock[1].split(/^###\s+/m).slice(1)) {
+      const nl = chunk.indexOf("\n");
+      if (nl < 0) continue;
+      const q = chunk.slice(0, nl).trim();
+      const a = chunk.slice(nl).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+      if (q && a) faqEntries.push({ q, a });
+    }
+  }
+  const bodyHtml = parseShortcodes(article.body_md, assets);
   const heroHtml = article.hero_image_url
     ? `<div class="art-hero-img" style="width:100%;overflow:hidden;border:1px solid var(--border);margin-bottom:0"><img src="${escapeHtml(article.hero_image_url)}" alt="${escapeHtml(article.title)}" style="width:100%;max-height:520px;object-fit:cover;display:block"></div>`
     : article.hero_prompt
@@ -6286,6 +6298,11 @@ function articlePage(article: ArticleRow, assets: ArticleAssetRow[], comments: C
 ${ogImg ? `<meta property="og:image" content="${escapeHtml(ogImg)}">` : ""}
 <meta property="article:published_time" content="${escapeHtml(article.published_at ?? "")}">
 <meta property="article:modified_time" content="${escapeHtml(article.updated_at)}">
+${faqEntries.length ? `<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": faqEntries.map(f => ({ "@type": "Question", "name": f.q, "acceptedAnswer": { "@type": "Answer", "text": f.a } })),
+}).replace(/</g, "\\u003c")}</script>` : ""}
 <style>${articlePageCss()}</style>
 </head>
 <body>
