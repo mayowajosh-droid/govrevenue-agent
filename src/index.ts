@@ -99,6 +99,17 @@ type UserRecord = {
   role: string;
   setup_token: string | null;
   setup_token_expires: string | null;
+  company_name: string | null;
+  profile_json: UserProfile | null;
+};
+
+type UserProfile = {
+  sells: string;
+  audience: string;
+  region: string;
+  goal: string;
+  sectorKey: string;
+  sectorLabel: string;
 };
 type ScanRecord = {
   id: string;
@@ -1160,6 +1171,8 @@ async function initDb() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token_expires TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_json JSONB`);
 
   // Rename alert-subscriptions table if the old name still exists
   await pool.query(`DO $$ BEGIN
@@ -1894,13 +1907,13 @@ async function getUserByEmail(email: string): Promise<UserRecord | null> {
   return u;
 }
 
-async function createUser(email: string, password: string): Promise<UserRecord> {
+async function createUser(email: string, password: string, companyName?: string, profile?: UserProfile): Promise<UserRecord> {
   const id = makeId();
   const hash = await bcrypt.hash(password, 10);
   if (pool) {
     const r = await pool.query<UserRecord>(
-      `INSERT INTO users (id, email, password_hash, tier) VALUES ($1,$2,$3,'free') RETURNING *`,
-      [id, email.toLowerCase().trim(), hash]
+      `INSERT INTO users (id, email, password_hash, tier, company_name, profile_json) VALUES ($1,$2,$3,'free',$4,$5) RETURNING *`,
+      [id, email.toLowerCase().trim(), hash, companyName ?? null, profile ? JSON.stringify(profile) : null]
     );
     return r.rows[0];
   }
@@ -2382,8 +2395,13 @@ const authCss = `
   .auth-card p.sub{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:32px}
   .field{margin-bottom:22px}
   .field label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#5C6157;margin-bottom:9px}
-  .field input{width:100%;padding:13px 15px;border:1px solid var(--border-2);font-size:15px;background:#FBF9F3;color:var(--text);outline:none;font-family:var(--sans)}
-  .field input:focus{border-color:var(--brand)}
+  .field input,.field select{width:100%;padding:13px 15px;border:1px solid var(--border-2);font-size:15px;background:#FBF9F3;color:var(--text);outline:none;font-family:var(--sans)}
+  .field input:focus,.field select:focus{border-color:var(--brand)}
+  .field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2386897E' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 15px center;cursor:pointer}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field-hint{font-size:12px;color:var(--faint);margin-top:7px;line-height:1.5}
+  .form-divider{display:flex;align-items:center;gap:12px;margin:28px 0 22px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand)}
+  .form-divider::after{content:"";flex:1;height:1px;background:var(--border-2)}
   .btn-primary{width:100%;background:#102A1E;color:#F3EFE6;border:none;padding:15px;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:0.01em;font-family:var(--sans)}
   .btn-primary:hover{background:#0A1C12}
   .auth-alt{text-align:center;margin-top:20px;font-size:13px;color:var(--muted)}
@@ -2397,7 +2415,8 @@ const authCss = `
     .auth-card h1{font-size:22px}
     .auth-card p.sub{font-size:13px;margin-bottom:22px}
     .field{margin-bottom:16px}
-    .field input{padding:11px 12px;font-size:14px}
+    .field input,.field select{padding:11px 12px;font-size:14px}
+    .field-row{grid-template-columns:1fr}
     .btn-primary{padding:13px}
   }
 `;
@@ -12133,11 +12152,44 @@ app.get("/register", (req, res) => {
 <div class="auth-wrap"><div class="auth-card">
 <div class="auth-card-label">New account</div>
 <h1>Create your account</h1>
-<p class="sub">Get scan history, capability statements and buyer outreach tools.</p>
+<p class="sub">Tell us what you sell and we&rsquo;ll tune your dashboard to your market &mdash; the right desk, deadlines, and demand signals from day one.</p>
 ${err ? `<div class="err">${err}</div>` : ""}
 <form method="POST" action="/register${nextParam}">
 <div class="field"><label>Email address</label><input type="email" name="email" required autocomplete="email" placeholder="you@company.com"></div>
 <div class="field"><label>Password</label><input type="password" name="password" required autocomplete="new-password" placeholder="At least 8 characters" minlength="8"></div>
+<div class="form-divider">Your market</div>
+<div class="field"><label>Company or business name</label><input type="text" name="companyName" required maxlength="120" autocomplete="organization" placeholder="e.g. Apex Facilities Ltd"></div>
+<div class="field"><label>What do you sell?</label><input type="text" name="sells" required maxlength="200" placeholder="e.g. roofing and property maintenance">
+<div class="field-hint">A few words is enough &mdash; we use this to match you to the right intelligence desk.</div></div>
+<div class="field-row">
+<div class="field"><label>Who do you sell to?</label><select name="audience">
+<option value="mix">A mix</option>
+<option value="public">Public sector buyers</option>
+<option value="b2b">Private businesses (B2B)</option>
+<option value="b2c">Consumers (B2C)</option>
+</select></div>
+<div class="field"><label>Region you cover</label><select name="region">
+<option value="UK-wide">UK-wide</option>
+<option>London</option>
+<option>South East</option>
+<option>South West</option>
+<option>East of England</option>
+<option>East Midlands</option>
+<option>West Midlands</option>
+<option>Yorkshire &amp; the Humber</option>
+<option>North West</option>
+<option>North East</option>
+<option>Scotland</option>
+<option>Wales</option>
+<option>Northern Ireland</option>
+</select></div>
+</div>
+<div class="field"><label>Main goal right now</label><select name="goal">
+<option value="win-contracts">Win public-sector contracts</option>
+<option value="find-clients">Find new B2B clients</option>
+<option value="understand-demand">Understand market demand</option>
+<option value="exploring">Just exploring</option>
+</select></div>
 <button class="btn-primary" type="submit">Create account</button>
 </form>
 <p class="auth-alt">Already have an account? <a href="/login${nextParam}">Sign in</a></p>
@@ -12151,11 +12203,20 @@ ${err ? `<div class="err">${err}</div>` : ""}
 app.post("/register", asyncRoute(async (req, res) => {
   const email = String(req.body?.email || "").toLowerCase().trim();
   const password = String(req.body?.password || "");
+  const companyName = String(req.body?.companyName || "").trim().slice(0, 120);
+  const sells = String(req.body?.sells || "").trim().slice(0, 200);
+  const audience = String(req.body?.audience || "mix").slice(0, 20);
+  const region = String(req.body?.region || "UK-wide").slice(0, 40);
+  const goal = String(req.body?.goal || "exploring").slice(0, 30);
   if (!email || !email.includes("@")) { res.redirect("/register?err=Invalid+email+address"); return; }
   if (password.length < 8) { res.redirect("/register?err=Password+must+be+at+least+8+characters"); return; }
+  if (!companyName) { res.redirect("/register?err=Please+add+your+company+or+business+name"); return; }
+  if (!sells) { res.redirect("/register?err=Tell+us+what+you+sell+so+we+can+tune+your+dashboard"); return; }
   const existing = await getUserByEmail(email);
   if (existing) { res.redirect("/register?err=An+account+with+that+email+already+exists"); return; }
-  const user = await createUser(email, password);
+  const sector = resolveSector(sells);
+  const profile: UserProfile = { sells, audience, region, goal, sectorKey: sector.key, sectorLabel: sector.label };
+  const user = await createUser(email, password, companyName, profile);
   const token = signToken(user);
   res.cookie("gr_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 24 * 60 * 60 * 1000 });
   const nextUrl = String(req.query.next || "");
@@ -12311,6 +12372,22 @@ app.post("/account/setup", asyncRoute(async (req, res) => {
 
 // ── Account / dashboard ──────────────────────────────────────────────────────
 
+app.post("/account/profile", requireAuth, asyncRoute(async (req, res) => {
+  const auth = getAuthUser(req)!;
+  const companyName = String(req.body?.companyName || "").trim().slice(0, 120);
+  const sells = String(req.body?.sells || "").trim().slice(0, 200);
+  const audience = String(req.body?.audience || "mix").slice(0, 20);
+  const region = String(req.body?.region || "UK-wide").slice(0, 40);
+  const goal = String(req.body?.goal || "exploring").slice(0, 30);
+  if (!companyName || !sells) { res.redirect("/account"); return; }
+  const sector = resolveSector(sells);
+  const profile: UserProfile = { sells, audience, region, goal, sectorKey: sector.key, sectorLabel: sector.label };
+  if (pool) {
+    await pool.query(`UPDATE users SET company_name=$2, profile_json=$3 WHERE id=$1`, [auth.userId, companyName, JSON.stringify(profile)]);
+  }
+  res.redirect("/account");
+}));
+
 app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   const auth = getAuthUser(req)!;
   const user = await getUserById(auth.userId);
@@ -12327,6 +12404,17 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
   let totalOpenValue = 0;
   let signalsThisWeek = 0;
 
+  // Sector keys from resolveSector that don't share a name with a live desk
+  const SECTOR_DESK_ALIAS: Record<string, string> = {
+    "social-housing": "construction", "built-environment": "construction",
+    cleaning: "facilities", creative: "creative-design", photography: "creative-design",
+    leisure: "leisure-sport",
+  };
+  const profile = user.profile_json;
+  const profileDeskSlug = profile?.sectorKey && profile.sectorKey !== "general"
+    ? (DESK_PROFILES.find(d => d.live && d.slug === (SECTOR_DESK_ALIAS[profile.sectorKey] || profile.sectorKey))?.slug ?? "")
+    : "";
+
   if (pool) {
     const [scansRes, deadlinesRes, hotRes, signalsRes, countRes, statsRes] = await Promise.all([
       pool.query(
@@ -12340,7 +12428,8 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
          FROM homepage_signals
          WHERE deadline_date BETWEEN NOW() AND NOW() + INTERVAL '21 days'
            AND (LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%')
-         ORDER BY deadline_date ASC LIMIT 12`
+         ORDER BY (category = $1) DESC, deadline_date ASC LIMIT 12`,
+        [profileDeskSlug]
       ).catch(() => ({ rows: [] as any[] })),
       pool.query(
         `SELECT category, COUNT(*) AS cnt FROM homepage_signals
@@ -12350,7 +12439,8 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
       pool.query(
         `SELECT id, category, title, buyer, source, source_url, value_amount, status, deadline_date
          FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'
-         ORDER BY fetched_at DESC LIMIT 12`
+         ORDER BY (category = $1) DESC, fetched_at DESC LIMIT 12`,
+        [profileDeskSlug]
       ).catch(() => ({ rows: [] as any[] })),
       pool.query<{ n: string }>(
         `SELECT COUNT(*) AS n FROM homepage_signals WHERE LOWER(status) LIKE '%open%' OR LOWER(status) LIKE '%active%'`
@@ -12595,6 +12685,10 @@ app.get("/account", requireAuth, asyncRoute(async (req, res) => {
 .rcc-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand);margin-bottom:10px}
 .rcc-h1{font-family:var(--serif);font-size:34px;font-weight:400;color:var(--text);line-height:1.1;margin-bottom:8px;letter-spacing:-.01em}
 .rcc-sub{font-size:14.5px;color:var(--muted);max-width:54em;line-height:1.55;margin-bottom:20px}
+.rcc-market{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-6px 0 20px}
+.rcc-market-chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mid);border:1px solid var(--border-2);background:var(--surface);padding:6px 11px}
+.rcc-market-link{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);border:1px solid rgba(180,146,78,.35);background:rgba(180,146,78,.07);padding:6px 11px;text-decoration:none}
+.rcc-market-link:hover{border-color:var(--brand)}
 .rcc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border-2);background:var(--surface)}
 .rcc-kpi{padding:14px 20px;border-right:1px solid var(--border)}
 .rcc-kpi:last-child{border-right:none}
@@ -12708,8 +12802,15 @@ ${pageShellHeader(null, { email: user.email, tier: user.tier })}
 <div class="rcc-mast">
   <div class="rcc-mast-inner">
     <div class="rcc-eyebrow">Revenue Command Centre</div>
-    <h1 class="rcc-h1">${escapeHtml(user.email.split("@")[0])}&rsquo;s revenue map</h1>
+    <h1 class="rcc-h1">${escapeHtml(user.company_name || user.email.split("@")[0])}&rsquo;s revenue map</h1>
     <p class="rcc-sub">Here&rsquo;s your revenue situation. Here&rsquo;s what AtlasRevenue found. Here&rsquo;s who to chase next.</p>
+    ${profile ? `<div class="rcc-market">
+      <span class="rcc-market-chip">${escapeHtml(profile.sectorLabel)}</span>
+      <span class="rcc-market-chip">${escapeHtml({ public: "Public sector buyers", b2b: "B2B", b2c: "Consumers", mix: "Public + private" }[profile.audience] || profile.audience)}</span>
+      <span class="rcc-market-chip">${escapeHtml(profile.region)}</span>
+      ${profileDeskSlug ? `<a class="rcc-market-link" href="/desk/${profileDeskSlug}">Your desk &rarr;</a>` : ""}
+      <a class="rcc-market-link" href="/atlas?q=${encodeURIComponent(profile.sells)}">Your demand map &rarr;</a>
+    </div>` : ""}
     <div class="rcc-kpis">
       <div class="rcc-kpi"><span class="rcc-kpi-val">${userScans.length || "0"}</span><span class="rcc-kpi-lbl">Scans run</span></div>
       <div class="rcc-kpi"><span class="rcc-kpi-val">${completedCount || "0"}</span><span class="rcc-kpi-lbl">Reports complete</span></div>
@@ -12725,6 +12826,28 @@ ${pageShellHeader(null, { email: user.email, tier: user.tier })}
 
 ${welcome ? `<div class="rcc-flash">Account created &mdash; welcome to AtlasRevenue. Run your first scan to populate your revenue map.</div>` : ""}
 ${upgraded ? `<div class="rcc-flash">Subscription active. Full Command Centre unlocked.</div>` : ""}
+
+${!profile ? (() => {
+  const inp = `width:100%;padding:10px 12px;border:1px solid var(--border-2);font-size:14px;background:var(--surface);color:var(--text);outline:none;font-family:var(--sans)`;
+  const lbl = `display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:7px`;
+  return `<section class="rcc-card" style="margin-bottom:24px">
+  <div class="rcc-card-body">
+    <div class="rcc-latest-eyebrow">Tune your dashboard</div>
+    <div style="font-family:var(--serif);font-size:21px;color:var(--text);margin:8px 0 6px">Tell us your market</div>
+    <p style="font-size:13.5px;color:var(--muted);max-width:52em;line-height:1.6;margin-bottom:18px">Thirty seconds. We use this to rank deadlines and live signals for your sector, link your intelligence desk, and prefill your scans.</p>
+    <form method="POST" action="/account/profile">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:14px">
+        <div><label style="${lbl}">Company name</label><input style="${inp}" type="text" name="companyName" required maxlength="120" placeholder="e.g. Apex Facilities Ltd"></div>
+        <div><label style="${lbl}">What do you sell?</label><input style="${inp}" type="text" name="sells" required maxlength="200" placeholder="e.g. roofing and maintenance"></div>
+        <div><label style="${lbl}">Who do you sell to?</label><select style="${inp}" name="audience"><option value="mix">A mix</option><option value="public">Public sector buyers</option><option value="b2b">Private businesses (B2B)</option><option value="b2c">Consumers (B2C)</option></select></div>
+        <div><label style="${lbl}">Region you cover</label><select style="${inp}" name="region"><option value="UK-wide">UK-wide</option><option>London</option><option>South East</option><option>South West</option><option>East of England</option><option>East Midlands</option><option>West Midlands</option><option>Yorkshire &amp; the Humber</option><option>North West</option><option>North East</option><option>Scotland</option><option>Wales</option><option>Northern Ireland</option></select></div>
+        <div><label style="${lbl}">Main goal</label><select style="${inp}" name="goal"><option value="win-contracts">Win public-sector contracts</option><option value="find-clients">Find new B2B clients</option><option value="understand-demand">Understand market demand</option><option value="exploring">Just exploring</option></select></div>
+      </div>
+      <button type="submit" class="rcc-btn-primary" style="border:none;cursor:pointer">Save &amp; personalise &rarr;</button>
+    </form>
+  </div>
+</section>`;
+})() : ""}
 
 ${userScans.length === 0 ? `
 <section class="rcc-empty">
@@ -14353,8 +14476,9 @@ ${pageShellFoot()}
 </html>`);
 }));
 
-app.get("/scan", (req, res) => {
+app.get("/scan", asyncRoute(async (req, res) => {
   const auth = getAuthUser(req);
+  const authUser = auth ? await getUserById(auth.userId).catch(() => null) : null;
   const deskParam = typeof req.query.desk === "string" ? req.query.desk.slice(0, 60) : "";
   const noticeIdParam = typeof req.query.noticeId === "string" ? req.query.noticeId.slice(0, 80) : "";
   const servicesParam = typeof req.query.services === "string" ? req.query.services.slice(0, 300) : "";
@@ -14370,7 +14494,10 @@ app.get("/scan", (req, res) => {
        </div>`
     : "";
 
-  const mainServicesValue = servicesParam ? escapeHtml(servicesParam) : "";
+  const mainServicesValue = servicesParam
+    ? escapeHtml(servicesParam)
+    : (authUser?.profile_json?.sells ? escapeHtml(authUser.profile_json.sells) : "");
+  const companyNameValue = authUser?.company_name ? escapeHtml(authUser.company_name) : "";
   const mainServicesPlaceholder = deskProfile
     ? `e.g. ${deskProfile.pinnedProfile.mainServices.split(" ").slice(0, 4).join(", ")}`
     : "e.g. facilities management, reactive maintenance, cleaning";
@@ -14530,7 +14657,7 @@ h1{font-family:var(--serif);font-size:clamp(28px,3.5vw,38px);font-weight:400;let
 
         <div class="field" data-required>
           <label for="companyName">Company name <span>*</span></label>
-          <input id="companyName" name="companyName" required placeholder="e.g. Apex Facilities Ltd">
+          <input id="companyName" name="companyName" required placeholder="e.g. Apex Facilities Ltd" value="${companyNameValue}">
           <div class="err-msg">Company name is required</div>
         </div>
         <div class="field" data-required>
@@ -14747,7 +14874,7 @@ document.querySelectorAll('#step1 [data-required] input, #step1 [data-required] 
 </footer>
 </body>
 </html>`);
-});
+}));
 
 // Post-PAYG-checkout landing — logs the buyer in and drops them straight at their scan
 app.get("/scan/resume", asyncRoute(async (req, res) => {
