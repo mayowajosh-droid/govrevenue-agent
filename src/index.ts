@@ -23114,7 +23114,7 @@ ${reranMsg ? `<div class="a-alert-ok" style="margin:14px 28px 0">${reranMsg} sca
     </div>
   </div>
 </section>
-<div style="text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--muted-2);padding:16px 0 32px;letter-spacing:.08em">GOVREVENUE ADMIN &middot; POSTGRESQL CONNECTED &middot; BULLMQ + REDIS &middot; NODE ${process.version} &middot; CLAUDE OPUS PRIMARY</div>
+<div style="text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--muted-2);padding:16px 0 32px;letter-spacing:.08em">ATLASREVENUE ADMIN &middot; POSTGRESQL CONNECTED &middot; BULLMQ + REDIS &middot; NODE ${process.version} &middot; CLAUDE OPUS PRIMARY</div>
 </main>
 </div>
 
