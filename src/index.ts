@@ -29,6 +29,7 @@ import {
   computeOutlierThreshold, parseEdpFromMarkdown, stripEdpFromMarkdown,
   validateReportConsistency, isAggregatorBuyer, isOverseasNotice,
   computeRenewalRadar, renewalDaysLeft,
+  keywordMatchesText, anyKeywordMatches,
   type ParsedEdp
 } from "./lib/intel.js";
 import {
@@ -968,10 +969,10 @@ async function findTenderSearch(keywords: string[], signal?: AbortSignal): Promi
         release?.parties?.map?.((party: any) => party?.name).join(" ")
       ].filter(Boolean).join(" ").toLowerCase();
 
-      const matchCount = keywordSet.filter(kw => haystack.includes(kw)).length;
+      const matchCount = keywordSet.filter(kw => keywordMatchesText(haystack, kw)).length;
       if (!matchCount) continue;
 
-      const matchedKeyword = keywordSet.find(kw => haystack.includes(kw))!;
+      const matchedKeyword = keywordSet.find(kw => keywordMatchesText(haystack, kw))!;
       const notice = normaliseFindTenderRelease(release, matchedKeyword);
       if (notice) scored.push({ notice, score: matchCount });
     }
@@ -5499,7 +5500,7 @@ async function refreshHomepageSignals(): Promise<void> {
       const relevant = deskKw.length > 0
         ? deduped.filter(n => {
             const title = n.title.toLowerCase();
-            return deskKw.some(kw => title.includes(kw));
+            return anyKeywordMatches(title, deskKw);
           })
         : deduped;
       const signalPool = relevant;
@@ -9872,7 +9873,7 @@ app.get("/desk/:slug/export.csv", asyncRoute(async (req, res) => {
   ].filter((n: any) => {
     const t = new Date(n.publishedDate || n.awardedDate || 0).getTime();
     if (t > 0 && t < cutoff365) return false;
-    return deskKeywords.some((kw: string) => n.title.toLowerCase().includes(kw));
+    return anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
   });
 
   const csv = exportOpportunitiesCsv(notices);
@@ -9911,7 +9912,7 @@ app.get("/intelligence", asyncRoute(async (req, res) => {
     const openNotices = ((data.contractsFinder.open || []) as any[]).concat((data.findTender?.notices || []) as any[]).filter((n: any) => {
       const t = new Date(n.publishedDate || 0).getTime();
       if (t > 0 && t < cutoff365) return false;
-      return deskKeywords.some((kw: string) => n.title.toLowerCase().includes(kw));
+      return anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
     });
 
     const awardedNotices = ((data.contractsFinder.awarded || []) as any[]).filter((n: any) => {
@@ -16397,7 +16398,7 @@ function inferDeskCategories(notices: ProcurementNotice[], categories: DeskCateg
   for (const notice of notices) {
     const text = (notice.title + " " + notice.description).toLowerCase();
     for (let i = 0; i < categories.length; i++) {
-      if (categories[i].keywords.some(kw => text.includes(kw))) {
+      if (anyKeywordMatches(text, categories[i].keywords)) {
         result[i].count++;
         result[i].value += notice.awardedValue ?? 0;
         const d = new Date(notice.publishedDate || notice.awardedDate || "").getTime();
@@ -16419,7 +16420,7 @@ function categoryDrillPage(
 
   const matchTitle = (n: ProcurementNotice) => {
     const title = n.title.toLowerCase();
-    return cat.keywords.some(kw => title.includes(kw));
+    return anyKeywordMatches(title, cat.keywords);
   };
 
   const allAwarded: ProcurementNotice[] = (data?.contractsFinder.awarded || [])
@@ -16597,7 +16598,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     if (t <= cutoff365) return false;
     if (isOverseasNotice(n.title, n.buyer || "")) return false;
     const title = n.title.toLowerCase();
-    return deskKeywords.some(kw => title.includes(kw));
+    return anyKeywordMatches(title, deskKeywords);
   });
   const openNoticeCount = allMatchingOpen.length;
   const openNotices = allMatchingOpen.slice(0, 6);
@@ -16670,7 +16671,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const buyersThisMonth = new Set(
     allOpen.filter(n => {
       if (nowMs - new Date(n.publishedDate || 0).getTime() > 30 * 24 * 3_600_000) return false;
-      return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+      return anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
     }).map(n => n.buyer).filter(b => b && !isAggregatorBuyer(b))
   ).size;
 
@@ -16678,7 +16679,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
     if (!n.deadlineDate) return false;
     const d = new Date(n.deadlineDate).getTime();
     return d > nowMs && d <= nowMs + 7 * 24 * 3_600_000 &&
-      deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+      anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
   }).length;
 
   // Monthly spend trend (last 12 months, from awardedNotices, no future dates)
@@ -16697,7 +16698,7 @@ function deskPage(profile: DeskProfile, cached: { data: ProcurementData; cached_
   const recentAwards = awardedNotices.filter(n => {
     const t = new Date(n.awardedDate || n.publishedDate || 0).getTime();
     if (t < cutoff90ms || t > nowMs) return false;
-    return deskKeywords.some(kw => n.title.toLowerCase().includes(kw));
+    return anyKeywordMatches(n.title.toLowerCase(), deskKeywords);
   }).sort((a, b) =>
     new Date(b.awardedDate || b.publishedDate || 0).getTime() -
     new Date(a.awardedDate || a.publishedDate || 0).getTime()
@@ -18006,11 +18007,11 @@ function buildNicheBuyerProfiles(cfg: NicheConfig, data: ProcurementData | undef
   if (!data) return [];
   const matchTitle = (n: ProcurementNotice): boolean => {
     const title = n.title.toLowerCase();
-    return cfg.keywords.some(kw => title.includes(kw));
+    return anyKeywordMatches(title, cfg.keywords);
   };
   const matchAll = (n: ProcurementNotice): boolean => {
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
-    return cfg.keywords.some(kw => text.includes(kw));
+    return anyKeywordMatches(text, cfg.keywords);
   };
 
   const allOpen = dedupeNoticesSoft(
@@ -18177,11 +18178,11 @@ function nicheMarketPage(
 
   const matchTitle = (n: ProcurementNotice): boolean => {
     const title = n.title.toLowerCase();
-    return cfg.keywords.some(kw => title.includes(kw));
+    return anyKeywordMatches(title, cfg.keywords);
   };
   const matchAll = (n: ProcurementNotice): boolean => {
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
-    return cfg.keywords.some(kw => text.includes(kw));
+    return anyKeywordMatches(text, cfg.keywords);
   };
 
   const allOpen = dedupeNoticesSoft(
@@ -18702,12 +18703,12 @@ function subPage(
 
   const matchNotice = (n: ProcurementNotice): boolean => {
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
-    return allKw.some(kw => text.includes(kw));
+    return anyKeywordMatches(text, allKw);
   };
 
   const matchTitle = (n: ProcurementNotice): boolean => {
     const title = n.title.toLowerCase();
-    return cat.keywords.some(kw => title.includes(kw));
+    return anyKeywordMatches(title, cat.keywords);
   };
 
   const allOpen = dedupeNoticesSoft(
@@ -19883,7 +19884,7 @@ function buyersPage(
     if (!isNaN(d) && d > e.latestDate) e.latestDate = d;
     const text = `${n.title} ${n.description || ""}`.toLowerCase();
     for (const cat of profile.categories) {
-      if (cat.keywords.some(kw => text.includes(kw))) {
+      if (anyKeywordMatches(text, cat.keywords)) {
         const existing = e.categories.find(c => c.label === cat.label);
         if (existing) existing.count++;
         else e.categories.push({ label: cat.label, count: 1 });

@@ -10,6 +10,8 @@ import {
   isAggregatorBuyer,
   computeRenewalRadar,
   renewalDaysLeft,
+  keywordMatchesText,
+  anyKeywordMatches,
 } from "./intel.js";
 
 describe("escapeHtml", () => {
@@ -204,5 +206,41 @@ describe("renewalDaysLeft", () => {
     const now = new Date("2026-07-02T00:00:00Z");
     expect(renewalDaysLeft("2026-07-12T00:00:00Z", now)).toBe(10);
     expect(renewalDaysLeft("2026-06-22T00:00:00Z", now)).toBe(-10);
+  });
+});
+
+describe("keywordMatchesText", () => {
+  it("matches short keywords only as whole words", () => {
+    expect(keywordMatchesText("enterprise software procurement", "erp")).toBe(false);
+    expect(keywordMatchesText("erp implementation for council", "erp")).toBe(true);
+    expect(keywordMatchesText("social care framework", "soc")).toBe(false);
+    expect(keywordMatchesText("soc 2 compliance audit", "soc")).toBe(true);
+    expect(keywordMatchesText("commissioning services", "mis")).toBe(false);
+    expect(keywordMatchesText("mis replacement project", "mis")).toBe(true);
+  });
+  it("treats punctuation and string edges as word boundaries", () => {
+    expect(keywordMatchesText("upgrade (erp)", "erp")).toBe(true);
+    expect(keywordMatchesText("erp", "erp")).toBe(true);
+    expect(keywordMatchesText("cctv/security upgrade", "cctv")).toBe(true);
+  });
+  it("does not treat digits as boundaries", () => {
+    expect(keywordMatchesText("iso27001erp cert", "erp")).toBe(false);
+  });
+  it("handles regex-special characters in short keywords", () => {
+    expect(keywordMatchesText("m&e services contract", "m&e")).toBe(true);
+    expect(keywordMatchesText("time services contract", "m&e")).toBe(false);
+  });
+  it("keeps substring matching for keywords longer than 4 chars", () => {
+    expect(keywordMatchesText("recleaning works", "cleaning")).toBe(true);
+    expect(keywordMatchesText("ux design sprint retainer", "ux design")).toBe(true);
+  });
+});
+
+describe("anyKeywordMatches", () => {
+  it("returns true when any keyword matches", () => {
+    expect(anyKeywordMatches("hvac maintenance", ["erp", "hvac"])).toBe(true);
+  });
+  it("returns false when only substring hits exist for short keywords", () => {
+    expect(anyKeywordMatches("enterprise misommunication society", ["erp", "mis", "soc"])).toBe(false);
   });
 });

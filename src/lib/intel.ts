@@ -295,3 +295,24 @@ export function computeRenewalRadar<T extends RenewalNotice>(
 export function renewalDaysLeft(contractEnd: string, now: Date = new Date()): number {
   return Math.round((new Date(contractEnd).getTime() - now.getTime()) / 86_400_000);
 }
+
+// Keywords of <= 4 chars ("erp", "soc", "mis", "ux") match as whole words only —
+// substring matching made "erp" hit "enterprise" and "soc" hit "social".
+// Longer keywords keep plain substring matching (multi-word phrases included).
+const SHORT_KEYWORD_MAX = 4;
+const shortKeywordRegexCache = new Map<string, RegExp>();
+
+export function keywordMatchesText(textLower: string, keywordLower: string): boolean {
+  if (keywordLower.length > SHORT_KEYWORD_MAX) return textLower.includes(keywordLower);
+  let re = shortKeywordRegexCache.get(keywordLower);
+  if (!re) {
+    const escaped = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    re = new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`);
+    shortKeywordRegexCache.set(keywordLower, re);
+  }
+  return re.test(textLower);
+}
+
+export function anyKeywordMatches(textLower: string, keywordsLower: string[]): boolean {
+  return keywordsLower.some(kw => keywordMatchesText(textLower, kw));
+}
