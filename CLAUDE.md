@@ -87,7 +87,7 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 
 - **`atlasrevenue-report-engine.ts` unused** — Stage A migration target: use its scorer as preprocessing before `buildPrompt()` so the LLM gets structured data, not raw notices. Stage B: replace `reportPage()` with a typed struct renderer. Do not call it without reading it first.
 - **Find a Tender batch limit** — 100-record batch, no API-level keyword filter; sorted by match count but records beyond the batch are missed.
-- **Generic keywords leak on desk pages** — "compliance", "electrical", "fire safety" match off-topic notices. Substring matching for short keywords is FIXED (word-boundary matcher `keywordMatchesText`/`anyKeywordMatches` in `lib/intel.ts` — use these, never raw `.includes()`, for any keyword-vs-title matching). The remaining leak is keyword genericness, needing per-desk keyword curation.
+- **Keyword matching rules** — short keywords (≤4 chars) use the word-boundary matcher `keywordMatchesText`/`anyKeywordMatches` in `lib/intel.ts`; use these, never raw `.includes()`, for any keyword-vs-title matching. Bare generics "electrical"/"compliance" were replaced with two-word phrases (July 2026) — when adding desk/niche keywords, prefer two-word phrases over single generic words. Overseas leaks are handled by `isOverseasNotice`, not keywords.
 - **reportPage `--ink` divergence** — `reportPage()` scopes its own `--ink:#24140f` (warm brown) vs site-wide `--ink:#0B0F14`; same variable name, different value.
 
 ---
@@ -139,8 +139,9 @@ Searches are keyword-driven with a parallel CPV-code pass per sector (`SECTOR_CP
 | ✅ Done | CPV code search layer — parallel CPV pass on Contracts Finder per sector |
 | ✅ Done | SSE scan progress — live stage UI via EventEmitter + DB poll fallback |
 | ✅ Done | Desk page data visualisation — spend trend, top buyers, value band charts (SSR SVG, June 2026) |
-| Next | **Framework pre-qualification assistant** — identify open frameworks, eligibility check, checklist |
-| Next | **Scan-to-bid-pack** — capability statement + outreach email from top 3 routes |
+| ✅ Done | Framework pre-qualification assistant — `GET /scan/:id/frameworks` (LLM, cached in `frameworks_assessment`, `?regen=1`) |
+| ✅ Done | Scan-to-bid-pack — `GET /scan/:id/capability-statement` + `/scan/:id/outreach-emails` (LLM, cached columns, linked from report "Next steps") |
+| ✅ Done | Buyer-intent layer — `computeIntentScore` (0–100), Why Now?, `generateOutreach` (angle/email/call/LinkedIn/do-not-say) on niche buyer cards (`/desk/:slug/sub/:sub`) |
 | Future | **atlasrevenue-report-engine Stage A** — wire engine scorer as preprocessing before LLM prompt |
 
 ---
