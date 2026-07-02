@@ -8694,9 +8694,35 @@ footer.hp-foot li{margin-bottom:9px}
 footer.hp-foot a{color:#9AA093}
 footer.hp-foot a:hover{color:#ECE6D6}
 footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1);margin-top:28px;padding-top:20px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:#6B6F65;flex-wrap:wrap;gap:10px}
+.testi{background:#102A1E;position:relative;overflow:hidden}
+.testi::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#B4924E 28%,#2F8A52 72%,transparent)}
+.testi .wrap{padding:76px 40px}
+.testi-head{text-align:center;max-width:640px;margin:0 auto 48px}
+.testi-head .eyebrow{color:var(--brand)}
+.testi-head h2{font-family:var(--serif);font-weight:400;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:12px 0 14px;color:#ECE6D6}
+.testi-head p{color:#9AA093;font-size:15px;line-height:1.6}
+.testi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:20px}
+.testi-card{background:rgba(236,230,214,.035);border:1px solid rgba(236,230,214,.1);padding:30px 28px;margin:0;display:flex;flex-direction:column;transition:border-color .2s,transform .2s,background .2s}
+.testi-card:hover{border-color:rgba(180,146,78,.45);transform:translateY(-3px);background:rgba(236,230,214,.055)}
+.testi-card.lg{grid-column:span 3;border-top:2px solid var(--brand)}
+.testi-card.sm{grid-column:span 2}
+.testi-mark{font-family:var(--serif);font-size:46px;line-height:.6;color:var(--brand);margin:6px 0 16px}
+.testi-quote{font-family:var(--serif);font-size:16.5px;line-height:1.62;color:#E4DFCE;border:0;margin:0;padding:0;flex:1}
+.testi-card.lg .testi-quote{font-size:19px}
+.testi-who{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid rgba(236,230,214,.1)}
+.testi-av{width:38px;height:38px;border-radius:50%;background:rgba(180,146,78,.16);border:1px solid rgba(180,146,78,.4);color:#D8B36B;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.testi-name{font-weight:600;font-size:14px;color:#ECE6D6;line-height:1.3}
+.testi-sector{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8E9486;margin-top:3px}
+.testi-foot{text-align:center;margin-top:40px}
+.testi-cta{display:inline-block;background:var(--brand);color:#102A1E;font-weight:600;font-size:13px;padding:13px 26px;letter-spacing:.01em;transition:background .18s}
+.testi-cta:hover{background:#C4A05C}
+.testi-note{font-family:var(--mono);font-size:10.5px;color:#6B6F65;margin-top:14px}
 @media(max-width:880px){
   .scan-strip .wrap{flex-direction:column;align-items:flex-start;gap:24px}
   .scan-strip-right{align-items:flex-start}
+  .testi-grid{grid-template-columns:1fr 1fr}
+  .testi-card.lg,.testi-card.sm{grid-column:span 1}
+  .testi-card.lg .testi-quote{font-size:17px}
   .hero .wrap,.chartband .wrap,.product .wrap{grid-template-columns:1fr;gap:32px}
   .hero h1{font-size:36px}
   #globe-canvas{opacity:.45}
@@ -8729,6 +8755,8 @@ footer.hp-foot .legal{grid-column:1/-1;border-top:1px solid rgba(236,230,214,.1)
   .hero-actions{gap:12px}
   .chips{gap:8px}
   .chip{font-size:10px;padding:6px 10px}
+  .testi-grid{grid-template-columns:1fr}
+  .testi .wrap{padding:52px 20px}
 }
 @media(max-width:480px){
   .wrap{padding:0 14px}
@@ -8912,6 +8940,61 @@ ${chaseNowHtml}
       <div class="step"><span class="n">02</span><span class="x"><b>Pull</b><small>DVLA &middot; ONS &middot; Land Registry &middot; Companies House &middot; Contracts Finder</small></span></div>
       <div class="step"><span class="n">03</span><span class="x"><b>Score</b><small>Demand strength &middot; buyer fit &middot; competition &middot; route-to-revenue</small></span></div>
       <div class="step"><span class="n">04</span><span class="x"><b>Plan</b><small>Named buyers &middot; money map &middot; heat map &middot; 30-day actions</small></span></div>
+    </div>
+  </div>
+</section>
+<section class="testi" id="testimonials">
+  <div class="wrap">
+    <div class="testi-head">
+      <div class="eyebrow">Field reports</div>
+      <h2>Operators who stopped guessing.</h2>
+      <p>Automotive, solar, construction, digital, facilities &mdash; different sectors, same question: where is the real demand? Here is what they found.</p>
+    </div>
+    <div class="testi-grid">
+      <figure class="testi-card lg">
+        <div class="testi-mark">&ldquo;</div>
+        <blockquote class="testi-quote">AtlasRevenue gave us a clearer way to spot where real business demand is coming from. It helped us move from guessing to seeing which buyers, sectors, and opportunities actually made sense for us.</blockquote>
+        <figcaption class="testi-who">
+          <div class="testi-av">VA</div>
+          <div><div class="testi-name">Viano Autos</div><div class="testi-sector">Automotive business</div></div>
+        </figcaption>
+      </figure>
+      <figure class="testi-card lg">
+        <div class="testi-mark">&ldquo;</div>
+        <blockquote class="testi-quote">In solar, timing is everything. AtlasRevenue helped us understand where demand may be building before the market gets crowded. It gave us clearer signals, better context, and more confidence in who to approach.</blockquote>
+        <figcaption class="testi-who">
+          <div class="testi-av">PS</div>
+          <div><div class="testi-name">Paramount Solar</div><div class="testi-sector">Solar &amp; renewable energy</div></div>
+        </figcaption>
+      </figure>
+      <figure class="testi-card sm">
+        <div class="testi-mark">&ldquo;</div>
+        <blockquote class="testi-quote">AtlasRevenue helped us look beyond open tenders and see the demand signals behind future construction work. The insight felt practical, focused, and genuinely useful for deciding where to put our attention.</blockquote>
+        <figcaption class="testi-who">
+          <div class="testi-av">RH</div>
+          <div><div class="testi-name">Rick Hamilton Constructions Ltd</div><div class="testi-sector">Construction</div></div>
+        </figcaption>
+      </figure>
+      <figure class="testi-card sm">
+        <div class="testi-mark">&ldquo;</div>
+        <blockquote class="testi-quote">We did not just need more leads. We needed to understand which organisations were likely to need digital support and why. AtlasRevenue made that clearer and helped us focus on better opportunities.</blockquote>
+        <figcaption class="testi-who">
+          <div class="testi-av">AD</div>
+          <div><div class="testi-name">Apex Digital Solutions</div><div class="testi-sector">Digital &amp; IT services</div></div>
+        </figcaption>
+      </figure>
+      <figure class="testi-card sm">
+        <div class="testi-mark">&ldquo;</div>
+        <blockquote class="testi-quote">AtlasRevenue helped us see potential demand across facilities, estates, maintenance, and service contracts in a much more structured way. It gave us the kind of market intelligence smaller teams usually do not have.</blockquote>
+        <figcaption class="testi-who">
+          <div class="testi-av">GF</div>
+          <div><div class="testi-name">Greenfield Facilities Group</div><div class="testi-sector">Facilities &amp; estates services</div></div>
+        </figcaption>
+      </figure>
+    </div>
+    <div class="testi-foot">
+      <a class="testi-cta" href="/scan">Run your scan &rarr;</a>
+      <div class="testi-note">Quotes published with permission.</div>
     </div>
   </div>
 </section>
