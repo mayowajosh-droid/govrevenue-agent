@@ -86,7 +86,7 @@ After any code change: `npm run build` must pass clean before committing. Zero t
 ## Known debt — don't make worse, fix when touching
 
 - **`atlasrevenue-report-engine.ts` unused** — Stage A migration target: use its scorer as preprocessing before `buildPrompt()` so the LLM gets structured data, not raw notices. Stage B: replace `reportPage()` with a typed struct renderer. Do not call it without reading it first.
-- **Find a Tender batch limit** — 100-record batch, no API-level keyword filter; sorted by match count but records beyond the batch are missed.
+- **Find a Tender API quirks (fixed July 2026, know these)** — `stages` must be passed as repeated params (`stages=tender&stages=award`); the comma-joined form silently returns an empty 200. `findTenderSearch` walks up to 5 pages (500 releases, ~16 days of UK-wide activity) via OCDS `links.next`. There is still no API-level keyword filter — scoring happens client-side.
 - **Keyword matching rules** — short keywords (≤4 chars) use the word-boundary matcher `keywordMatchesText`/`anyKeywordMatches` in `lib/intel.ts`; use these, never raw `.includes()`, for any keyword-vs-title matching. Bare generics "electrical"/"compliance" were replaced with two-word phrases (July 2026) — when adding desk/niche keywords, prefer two-word phrases over single generic words. Overseas leaks are handled by `isOverseasNotice`, not keywords.
 - **reportPage `--ink` divergence** — `reportPage()` scopes its own `--ink:#24140f` (warm brown) vs site-wide `--ink:#0B0F14`; same variable name, different value.
 

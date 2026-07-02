@@ -945,20 +945,34 @@ async function findTenderSearch(keywords: string[], signal?: AbortSignal): Promi
   try {
     const to = new Date();
     const from = new Date(to.getTime() - 1000 * 60 * 60 * 24 * 90);
-    const url = new URL("https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages");
-    url.searchParams.set("limit", "100");
-    url.searchParams.set("stages", "tender,award");
-    url.searchParams.set("updatedFrom", from.toISOString().slice(0, 19));
-    url.searchParams.set("updatedTo", to.toISOString().slice(0, 19));
+    const firstUrl = new URL("https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages");
+    firstUrl.searchParams.set("limit", "100");
+    // Comma-joined stages ("tender,award") silently returns an empty 200 —
+    // the API only honours repeated params.
+    firstUrl.searchParams.append("stages", "tender");
+    firstUrl.searchParams.append("stages", "award");
+    firstUrl.searchParams.set("updatedFrom", from.toISOString().slice(0, 19));
+    firstUrl.searchParams.set("updatedTo", to.toISOString().slice(0, 19));
 
-    const response = await fetch(url, { headers: { Accept: "application/json" }, signal });
-
-    if (!response.ok) {
-      return { notices: [], errors: [`Find a Tender OCDS search failed: ${response.status} ${response.statusText}`] };
+    // Each page holds the 100 most recently updated releases UK-wide — a few
+    // hours of activity. Walk the OCDS next links so keyword scoring sees days
+    // of notices, not hours.
+    const FTS_MAX_PAGES = 5;
+    const releases: any[] = [];
+    let nextUrl: string | null = firstUrl.toString();
+    for (let page = 0; page < FTS_MAX_PAGES && nextUrl; page++) {
+      const response = await fetch(nextUrl, { headers: { Accept: "application/json" }, signal });
+      if (!response.ok) {
+        if (page === 0) {
+          return { notices: [], errors: [`Find a Tender OCDS search failed: ${response.status} ${response.statusText}`] };
+        }
+        errors.push(`Find a Tender OCDS page ${page + 1} failed: ${response.status} — continuing with ${releases.length} releases`);
+        break;
+      }
+      const data = await response.json();
+      if (Array.isArray(data.releases)) releases.push(...data.releases);
+      nextUrl = typeof data?.links?.next === "string" && data.links.next.startsWith("https://www.find-tender.service.gov.uk/") ? data.links.next : null;
     }
-
-    const data = await response.json();
-    const releases = Array.isArray(data.releases) ? data.releases : [];
 
     const scored: { notice: ProcurementNotice; score: number }[] = [];
     for (const release of releases) {
